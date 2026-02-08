@@ -4,13 +4,15 @@ import { MapContainer, TileLayer, Marker, Circle, Polyline, useMap, CircleMarker
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
-// Leafletアイコンの設定
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-    iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-    iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-    shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-});
+// アイコン設定
+if (typeof window !== "undefined") {
+    delete (L.Icon.Default.prototype as any)._getIconUrl;
+    L.Icon.Default.mergeOptions({
+        iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
+        iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+        shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+    });
+}
 
 interface MapProps {
     radiusInKm?: number;
@@ -21,7 +23,7 @@ interface MapProps {
     themeColor?: string;
 }
 
-function AutoZoom({ radiusInKm, center }: { radiusInKm?: number, center?: { lat: number, lng: number } }) {
+function AutoZoom({ radiusInKm, center }: { radiusInKm?: number, center?: { lat: number, lng: number } | null }) {
     const map = useMap();
     useEffect(() => {
         if (center && radiusInKm) {
@@ -33,33 +35,33 @@ function AutoZoom({ radiusInKm, center }: { radiusInKm?: number, center?: { lat:
 }
 
 export default function MapComponent({ radiusInKm, items, path, center, userLocation, themeColor }: MapProps) {
-    const safeItems = items || [];
-    const safePath = path || [];
     const displayColor = themeColor || "#F06292";
+    const mapCenter: [number, number] = userLocation ? [userLocation.lat, userLocation.lng] : (center ? [center.lat, center.lng] : [35.6812, 139.7671]);
 
     return (
-        <MapContainer center={[35.6812, 139.7671]} zoom={13} style={{ height: "100%", width: "100%" }} zoomControl={false} attributionControl={false}>
+        <MapContainer
+            center={mapCenter}
+            zoom={13}
+            style={{ height: "100%", width: "100%" }}
+            zoomControl={false}
+            attributionControl={false}
+        >
             <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
 
             {userLocation && (
                 <>
-                    {/* 現在地の青いドット */}
                     <CircleMarker center={[userLocation.lat, userLocation.lng]} radius={10} pathOptions={{ color: 'white', fillColor: '#2196F3', fillOpacity: 1, weight: 3 }} />
-
-                    {/* 探索範囲の円（ピンクの実線） */}
                     {radiusInKm && (
                         <Circle center={[userLocation.lat, userLocation.lng]} radius={radiusInKm * 1000} pathOptions={{ color: displayColor, fillColor: displayColor, fillOpacity: 0.1, weight: 2 }} />
                     )}
                 </>
             )}
 
-            {/* 軌跡のライン（実線） */}
-            {safePath.length > 0 && (
-                <Polyline positions={safePath.map(p => [p.lat, p.lng])} pathOptions={{ color: displayColor, weight: 6, opacity: 0.8 }} />
+            {path && path.length > 0 && (
+                <Polyline positions={path.map(p => [p.lat, p.lng])} pathOptions={{ color: displayColor, weight: 6, opacity: 0.8 }} />
             )}
 
-            {/* マーカー（アイテム） */}
-            {safeItems.map((item, idx) => (
+            {items && items.map((item, idx) => (
                 <Marker key={idx} position={[item.lat, item.lng]} icon={L.divIcon({
                     className: 'custom-map-icon',
                     html: `<div style="background-color: ${displayColor}; width: 32px; height: 32px; border-radius: 50%; border: 3px solid white; display: flex; align-items: center; justify-content: center; font-weight: 900; color: white; font-size: 13px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">${idx + 1}</div>`,
