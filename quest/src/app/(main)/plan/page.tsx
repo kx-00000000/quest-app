@@ -5,7 +5,16 @@ import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { getPlans, savePlan, type Plan, deletePlan } from "@/lib/storage";
 import { getLocationName } from "@/lib/geo";
-import { Play, RotateCcw, Trash2, MapPin } from "lucide-react";
+import { Play, RotateCcw, Trash2, MapPin, ChevronRight } from "lucide-react";
+
+// 距離をきれいに表示するフォーマッター
+const formatDistance = (km: number): string => {
+    if (km < 1) {
+        const meters = Math.floor(km * 1000);
+        return `${meters.toLocaleString()} m`;
+    }
+    return `${km.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`;
+};
 
 export default function PlanPage() {
     const router = useRouter();
@@ -24,44 +33,45 @@ export default function PlanPage() {
     };
 
     return (
-        <div className="min-h-screen bg-quest-green-900 p-6 pb-24">
-            <div className="sticky top-0 z-10 bg-quest-green-900 -mx-6 px-6 pb-4 pt-2 mb-2">
-                <h1 className="text-2xl font-bold text-white font-puffy flex items-center gap-2">
-                    <MapPin className="text-white" />
-                    {t("tab_plan")} <span className="text-sm font-normal text-quest-green-200 ml-2">({plans.length})</span>
+        <div className="min-h-screen bg-gray-50/50 p-6 pb-24">
+            {/* ヘッダー：デザインをNew画面と統一 */}
+            <div className="sticky top-0 z-10 bg-gray-50/80 backdrop-blur-md -mx-6 px-6 pb-4 pt-6 mb-2">
+                <h1 className="text-2xl font-black text-gray-800 flex items-center gap-2 italic">
+                    <MapPin className="text-pink-600" />
+                    {t("tab_plan").toUpperCase()}
+                    <span className="text-sm font-black text-pink-300 ml-2">({plans.length})</span>
                 </h1>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-6">
                 {plans.map((plan) => (
-                    <div key={plan.id} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 relative overflow-hidden">
+                    <div key={plan.id} className="bg-white/70 backdrop-blur-xl rounded-[2.5rem] p-6 shadow-xl border border-white/60 relative overflow-hidden">
 
-                        {/* Header */}
-                        <div className="flex justify-between items-start mb-4">
-                            <div>
-                                <h3 className="text-lg font-bold text-gray-800 font-puffy">{plan.name}</h3>
-                                <p className="text-xs text-gray-400 mt-1">Created: {plan.createdAt}</p>
-                            </div>
-
-                            {/* Status Badge */}
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${plan.status === 'active' ? 'bg-orange-100 text-orange-600' :
-                                plan.status === 'paused' ? 'bg-yellow-100 text-yellow-600' :
+                        {/* Status Badge */}
+                        <div className="absolute top-0 right-0">
+                            <span className={`px-4 py-1.5 rounded-bl-3xl text-[10px] font-black tracking-tighter uppercase ${plan.status === 'active' ? 'bg-orange-100 text-orange-600' :
                                     plan.status === 'completed' ? 'bg-blue-100 text-blue-600' :
-                                        'bg-gray-100 text-gray-500'
+                                        'bg-pink-50 text-pink-400'
                                 }`}>
                                 {t(`status_${plan.status}`)}
                             </span>
                         </div>
 
-                        {/* Stats Grid */}
-                        <div className="grid grid-cols-2 gap-4 mb-6">
-                            <div className="bg-gray-50 rounded-xl p-3">
-                                <div className="text-xs text-gray-400 mb-1">{t("radius_label")}</div>
-                                <div className="text-lg font-bold text-gray-700">{plan.radius} <span className="text-xs font-normal">km</span></div>
+                        {/* Title & Info */}
+                        <div className="mb-4 pt-2">
+                            <h3 className="text-xl font-black text-gray-800 leading-tight">{plan.name}</h3>
+                            <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest">Created: {plan.createdAt}</p>
+                        </div>
+
+                        {/* Stats Grid: 新しい距離表示を適用 */}
+                        <div className="grid grid-cols-2 gap-3 mb-6">
+                            <div className="bg-black/5 rounded-2xl p-4">
+                                <div className="text-[9px] font-black text-pink-600 uppercase tracking-widest mb-1">{t("radius_label")}</div>
+                                <div className="text-lg font-black text-gray-800">{formatDistance(plan.radius)}</div>
                             </div>
-                            <div className="bg-gray-50 rounded-xl p-3">
-                                <div className="text-xs text-gray-400 mb-1">{t("item_count_label")}</div>
-                                <div className="text-lg font-bold text-gray-700">{plan.itemCount} <span className="text-xs font-normal">items</span></div>
+                            <div className="bg-black/5 rounded-2xl p-4">
+                                <div className="text-[9px] font-black text-pink-600 uppercase tracking-widest mb-1">{t("item_count_label")}</div>
+                                <div className="text-lg font-black text-gray-800">{plan.itemCount} <span className="text-xs">ITEMS</span></div>
                             </div>
                         </div>
 
@@ -71,8 +81,6 @@ export default function PlanPage() {
                                 onClick={async () => {
                                     if (plan.status === 'ready' && !plan.startedAt) {
                                         let startLocName = "Unknown Location";
-
-                                        // Attempt to get start location name
                                         if (navigator.geolocation) {
                                             try {
                                                 const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
@@ -80,12 +88,7 @@ export default function PlanPage() {
                                                 });
                                                 startLocName = await getLocationName(pos.coords.latitude, pos.coords.longitude);
                                             } catch (e) {
-                                                // Fallback to Plan Center (approx location)
-                                                if (plan.center) {
-                                                    startLocName = await getLocationName(plan.center.lat, plan.center.lng);
-                                                } else if (plan.items && plan.items.length > 0) {
-                                                    startLocName = await getLocationName(plan.items[0].lat, plan.items[0].lng);
-                                                }
+                                                if (plan.center) startLocName = await getLocationName(plan.center.lat, plan.center.lng);
                                             }
                                         }
 
@@ -99,7 +102,7 @@ export default function PlanPage() {
                                     }
                                     router.push(`/adventure/${plan.id}`);
                                 }}
-                                className="flex-1 bg-quest-green-700 hover:bg-quest-green-800 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-md transition-colors text-sm"
+                                className="flex-[3] bg-gradient-to-r from-[#F06292] to-[#FF8A65] text-white font-black py-4 px-6 rounded-2xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all text-sm uppercase tracking-widest border-b-4 border-black/10"
                             >
                                 {plan.status === 'active' || plan.status === 'paused' ? (
                                     <>
@@ -114,10 +117,10 @@ export default function PlanPage() {
 
                             <button
                                 onClick={() => handleDelete(plan.id)}
-                                className="bg-gray-100 hover:bg-red-50 hover:text-red-500 text-gray-400 p-3 rounded-xl transition-colors"
+                                className="flex-1 bg-black/5 hover:bg-red-50 hover:text-red-500 text-gray-400 p-4 rounded-2xl transition-all flex items-center justify-center"
                                 aria-label="Delete"
                             >
-                                <Trash2 size={18} />
+                                <Trash2 size={20} />
                             </button>
                         </div>
 
