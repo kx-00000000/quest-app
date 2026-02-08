@@ -56,7 +56,7 @@ export default function NewQuestPage() {
             </div>
 
             {/* 1. 【上部外だし】フローティング名前入力：画像のデザインを継承 */}
-            <div className="absolute top-14 left-6 right-6 z-20">
+            <div className="absolute top-8 left-6 right-6 z-20">
                 <div className="bg-white/40 backdrop-blur-2xl rounded-[2rem] border border-white/40 shadow-xl px-6 py-3">
                     <input
                         type="text"
@@ -89,18 +89,18 @@ export default function NewQuestPage() {
                     {/* スライダーエリア：より低重心にコンパクト化 */}
                     <div className="space-y-4 px-1">
                         <div className="space-y-1">
-                            <div className="flex justify-between text-[10px] font-black text-pink-600 uppercase tracking-widest">
+                            <div className="flex justify-between text-[12px] font-black text-pink-600 uppercase tracking-widest">
                                 <span>Radius Range</span>
                                 <span className="text-gray-800 text-sm">{formatDistance(radius)}</span>
                             </div>
-                            <input type="range" min={activeMode.min} max={activeMode.max} step={activeMode.step} value={radius} onChange={(e) => setRadius(parseFloat(e.target.value))} className="w-full h-1.5 accent-pink-600 bg-pink-100 rounded-full appearance-none" />
+                            <input type="range" min={activeMode.min} max={activeMode.max} step={activeMode.step} value={radius} onChange={(e) => setRadius(parseFloat(e.target.value))} className="w-full h-1.5 accent-gray-400 bg-black/10 rounded-full appearance-none" />
                         </div>
                         <div className="space-y-1">
-                            <div className="flex justify-between text-[10px] font-black text-pink-600 uppercase tracking-widest">
+                            <div className="flex justify-between text-[12px] font-black text-pink-600 uppercase tracking-widest">
                                 <span>Items Count</span>
                                 <span className="text-gray-800 text-sm">{itemCount}</span>
                             </div>
-                            <input type="range" min="1" max="10" step="1" value={itemCount} onChange={(e) => setItemCount(parseInt(e.target.value))} className="w-full h-1.5 accent-pink-600 bg-pink-100 rounded-full appearance-none" />
+                            <input type="range" min="1" max="10" step="1" value={itemCount} onChange={(e) => setItemCount(parseInt(e.target.value))} className="w-full h-1.5 accent-gray-400 bg-black/10 rounded-full appearance-none" />
                         </div>
                     </div>
 

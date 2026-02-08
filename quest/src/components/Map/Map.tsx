@@ -7,17 +7,20 @@ import "leaflet/dist/leaflet.css";
 function MapUpdater({ radiusInKm, center }: any) {
     const map = useMap();
     useEffect(() => {
+        // 緯度経度と半径が揃っているときだけ実行
         if (typeof window === "undefined" || !center || !radiusInKm) return;
 
         try {
             const L = require("leaflet");
+            // 半径に基づいた円の範囲を計算
             const circle = L.circle([center.lat, center.lng], { radius: radiusInKm * 1000 });
 
-            // fitBoundsのオプションを修正（[横方向, 縦方向] の順で指定します）
+            // 円全体が収まるように地図を動かす
             map.fitBounds(circle.getBounds(), {
-                paddingTopLeft: [40, 120],     // [左の余白, 上の余白]
-                paddingBottomRight: [40, 380], // [右の余白, 下の余白]
-                animate: true
+                paddingTopLeft: [40, 100],     // ③ タイトル入力欄を避ける余白
+                paddingBottomRight: [40, 500], // ④ メニューパネルを避けるための余白（ここを増やすと中心が上がります）
+                animate: true,
+                duration: 0.5 // スルスルと動くアニメーションの時間
             });
         } catch (e) {
             console.error(e);
@@ -38,6 +41,7 @@ export default function MapComponent({ radiusInKm, userLocation, themeColor }: a
         <div className="h-full w-full">
             <MapContainer center={centerPos} zoom={13} style={{ height: "100%", width: "100%" }} zoomControl={false} attributionControl={false}>
                 <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
+                {/* ⑤ 縮尺と位置を自動調整する部品 */}
                 <MapUpdater radiusInKm={radiusInKm} center={userLocation} />
                 {userLocation && (
                     <>
