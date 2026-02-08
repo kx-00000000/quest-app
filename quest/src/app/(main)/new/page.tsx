@@ -6,7 +6,12 @@ import { useRouter } from "next/navigation";
 import { savePlan } from "@/lib/storage";
 import { generateRandomPoint } from "@/lib/geo";
 import LazyMap from "@/components/Map/LazyMap";
-import { Map as MapIcon } from "lucide-react";
+
+const rangeModes = [
+    { id: 'neighborhood', label: 'NEIGHBORHOOD', min: 0.5, max: 15, step: 0.1 },
+    { id: 'excursion', label: 'EXCURSION', min: 15, max: 200, step: 1 },
+    { id: 'grand', label: 'GRAND', min: 200, max: 40000, step: 100 }
+];
 
 const formatDistance = (km: number): string => {
     const meters = km * 1000;
@@ -18,8 +23,9 @@ export default function NewQuestPage() {
     const router = useRouter();
     const { t } = useTranslation();
     const [name, setName] = useState("");
+    const [activeMode, setActiveMode] = useState(rangeModes[0]);
     const [radius, setRadius] = useState(1);
-    const [itemCount, setItemCount] = useState(3); // 復活！
+    const [itemCount, setItemCount] = useState(3);
     const [isCreating, setIsCreating] = useState(false);
     const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
 
@@ -27,11 +33,16 @@ export default function NewQuestPage() {
         if ("geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(
                 (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                (err) => console.warn("GPS Error:", err),
-                { enableHighAccuracy: true }
+                (err) => console.warn(err)
             );
         }
     }, []);
+
+    // モード切り替え時に半径を自動調整
+    const handleModeChange = (mode: typeof rangeModes[0]) => {
+        setActiveMode(mode);
+        setRadius(mode.min);
+    };
 
     const handleCreate = async () => {
         setIsCreating(true);
@@ -41,42 +52,58 @@ export default function NewQuestPage() {
             const point = generateRandomPoint(center, radius);
             return { id: Math.random().toString(36).substr(2, 9), lat: point.lat, lng: point.lng, isCollected: false, name: `Item #${i + 1}` };
         });
-        savePlan({ id: Math.random().toString(36).substr(2, 9), name: name || t("default_adventure_name"), radius, itemCount, status: "ready", createdAt: new Date().toLocaleDateString(), totalDistance: 0, collectedCount: 0, center, items });
+        savePlan({ id: Math.random().toString(36).substr(2, 9), name: name || "新しい冒険", radius, itemCount, status: "ready", createdAt: new Date().toLocaleDateString(), totalDistance: 0, collectedCount: 0, center, items });
         router.push("/plan");
     };
 
     return (
-        <div className="flex flex-col h-full min-h-screen pb-24 relative overflow-hidden">
+        <div className="flex flex-col h-full min-h-screen pb-24 relative overflow-hidden bg-black">
+            {/* 1. 地図：背景フル画面 */}
             <div className="absolute inset-0 z-0">
-                <LazyMap radiusInKm={radius} userLocation={userLocation} themeColor="#F48FB1" />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/40 pointer-events-none" />
+                <LazyMap radiusInKm={radius} userLocation={userLocation} themeColor="#F06292" />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/30 pointer-events-none" />
             </div>
 
-            <div className="relative z-10 p-8">
-                <h1 className="text-3xl font-black text-white drop-shadow-lg flex items-center gap-3 italic">
-                    <MapIcon className="w-8 h-8" /> {t("new_quest_title").toUpperCase()}
-                </h1>
-            </div>
-
+            {/* 2. 操作パネル：下部に配置 */}
             <div className="mt-auto relative z-10 px-6 mb-4">
-                <div className="bg-white/40 backdrop-blur-2xl rounded-[3rem] p-8 shadow-2xl border border-white/30 space-y-6">
-                    <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("adventure_name_placeholder")} className="w-full px-6 py-4 rounded-2xl bg-white/60 border-none outline-none text-gray-800 font-bold" />
+                <div className="bg-white/40 backdrop-blur-3xl rounded-[3rem] p-8 shadow-2xl border border-white/30 space-y-6">
 
-                    <div className="grid grid-cols-2 gap-4">
+                    {/* 距離モード選択タブ */}
+                    <div className="flex p-1 bg-black/5 rounded-2xl gap-1">
+                        {rangeModes.map((mode) => (
+                            <button
+                                key={mode.id}
+                                onClick={() => handleModeChange(mode)}
+                                className={`flex-1 py-2 text-[9px] font-black rounded-xl transition-all ${activeMode.id === mode.id ? 'bg-white text-pink-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                            >
+                                {mode.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("adventure_name_placeholder")} className="w-full px-6 py-4 rounded-2xl bg-white/60 border-none outline-none text-gray-800 font-bold placeholder:text-gray-400" />
+
+                    <div className="grid grid-cols-1 gap-6">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-pink-900 uppercase px-1">Radius: {formatDistance(radius)}</label>
-                            <input type="range" min="0.5" max="15" step="0.1" value={radius} onChange={(e) => setRadius(parseFloat(e.target.value))} className="w-full h-1.5 accent-pink-600" />
+                            <div className="flex justify-between items-center px-1">
+                                <label className="text-[10px] font-black text-pink-900 uppercase">Radius</label>
+                                <span className="text-lg font-black text-gray-900">{formatDistance(radius)}</span>
+                            </div>
+                            <input type="range" min={activeMode.min} max={activeMode.max} step={activeMode.step} value={radius} onChange={(e) => setRadius(parseFloat(e.target.value))} className="w-full h-1.5 accent-pink-600" />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-pink-900 uppercase px-1">Items: {itemCount}</label>
+                            <div className="flex justify-between items-center px-1">
+                                <label className="text-[10px] font-black text-pink-900 uppercase">Items</label>
+                                <span className="text-lg font-black text-gray-900">{itemCount}</span>
+                            </div>
                             <input type="range" min="1" max="10" step="1" value={itemCount} onChange={(e) => setItemCount(parseInt(e.target.value))} className="w-full h-1.5 accent-pink-600" />
                         </div>
                     </div>
 
-                    <button onClick={handleCreate} disabled={isCreating} className="w-full py-5 bg-gradient-to-r from-[#F06292] to-[#FF8A65] text-white rounded-[2rem] font-black text-lg shadow-xl active:scale-95 transition-all">
+                    <button onClick={handleCreate} disabled={isCreating} className="w-full py-5 bg-gradient-to-r from-[#F06292] to-[#FF8A65] text-white rounded-[2rem] font-black text-lg shadow-xl active:scale-95 transition-all border-b-4 border-black/10">
                         {isCreating ? "CREATING..." : t("create_button").toUpperCase()}
                     </button>
-                    {!userLocation && <p className="text-center text-[10px] text-pink-900 font-bold animate-pulse">Waiting for GPS...</p>}
                 </div>
             </div>
         </div>
