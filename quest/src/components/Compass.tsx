@@ -1,49 +1,72 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plane } from "lucide-react";
+import { Navigation } from "lucide-react"; // Planeより矢印らしいアイコンに変更
 
 interface CompassProps {
-    bearing: number; // Target bearing (degrees)
+    bearing: number; // ターゲットの方角（度）
 }
 
 export default function Compass({ bearing }: CompassProps) {
     const [heading, setHeading] = useState(0);
 
     useEffect(() => {
-        // DeviceOrientationEvent is the standard way, but iOS requires permission request.
         const handleOrientation = (event: DeviceOrientationEvent) => {
-            // webkitCompassHeading is for iOS
-            const compass = (event as any).webkitCompassHeading || Math.abs(event.alpha! - 360);
-            setHeading(compass);
+            let compassHeading = 0;
+
+            // iOS (Safari) の場合の取得方法
+            if ((event as any).webkitCompassHeading !== undefined) {
+                compassHeading = (event as any).webkitCompassHeading;
+            }
+            // Android / Chrome の場合の取得方法（nullチェックを厳格に）
+            else if (event.alpha !== null && event.alpha !== undefined) {
+                // alphaは反時計回りなので、時計回りに変換
+                compassHeading = Math.abs(event.alpha - 360);
+            }
+
+            setHeading(compassHeading);
         };
 
-        // Simple fallback or permission request would go here.
-        // For prototype on desktop, we might simulate or just show relative to North(0).
-        window.addEventListener("deviceorientation", handleOrientation);
-        return () => window.removeEventListener("deviceorientation", handleOrientation);
+        // センサーが利用可能な場合のみイベントを登録
+        if (typeof window !== "undefined" && window.DeviceOrientationEvent) {
+            window.addEventListener("deviceorientation", handleOrientation);
+        }
+
+        return () => {
+            if (typeof window !== "undefined") {
+                window.removeEventListener("deviceorientation", handleOrientation);
+            }
+        };
     }, []);
 
-    // Calculate rotation: We want the arrow to point to 'bearing'.
-    // If phone is facing 'heading', then arrow should rotate 'bearing - heading'.
+    // 回転の計算：スマホの向き（heading）を考慮して、ターゲット（bearing）を指す
     const rotation = bearing - heading;
 
     return (
         <div className="relative w-64 h-64 flex items-center justify-center">
-            {/* Outer Ring/Radar BG */}
-            <div className="absolute inset-0 rounded-full border-4 border-quest-green-200 opacity-50 border-dashed animate-spin-slow"></div>
-            <div className="absolute inset-4 rounded-full bg-quest-green-900/10 backdrop-blur-sm"></div>
+            {/* 外側のリング：ピンクのデザインに合わせて調整 */}
+            <div className="absolute inset-0 rounded-full border-4 border-pink-200/30 border-dashed animate-[spin_10s_linear_infinite]" />
 
-            {/* The Plane Icon (Arrow) */}
+            {/* 中央の円体：すりガラス効果 */}
+            <div className="absolute inset-8 rounded-full bg-white/20 backdrop-blur-md shadow-inner border border-white/30" />
+
+            {/* 方位針（アイコン）：ピンクのグラデーション */}
             <div
-                className="text-quest-green-400 transition-transform duration-300 ease-out"
+                className="relative z-10 text-pink-500 transition-transform duration-500 ease-out"
                 style={{ transform: `rotate(${rotation}deg)` }}
             >
-                <Plane size={80} fill="currentColor" className="drop-shadow-lg" />
+                <div className="drop-shadow-[0_0_15px_rgba(240,98,146,0.5)]">
+                    <Navigation size={80} fill="currentColor" />
+                </div>
             </div>
 
-            {/* North Indicator */}
-            <div className="absolute top-2 text-xs font-bold text-gray-400">N</div>
+            {/* 北（N）のインジケーター */}
+            <div
+                className="absolute top-2 font-black text-pink-600 text-sm tracking-tighter opacity-40 transition-transform duration-500"
+                style={{ transform: `rotate(${-heading}deg)` }} // 北の位置を固定
+            >
+                N
+            </div>
         </div>
     );
 }
