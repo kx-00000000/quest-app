@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { getPlans, savePlan, type Plan, type Item } from "@/lib/storage";
@@ -9,15 +9,15 @@ import Compass from "@/components/Compass";
 import { calculateBearing, calculateDistance, getLocationName, type LatLng } from "@/lib/geo";
 import dynamic from "next/dynamic";
 
-// 地図を「ブラウザ専用」として読み込む（SSRエラーを物理的に防ぐ）
+// 地図を「ブラウザ専用」として隔離
 const LazyMap = dynamic(() => import("@/components/Map/LazyMap"), {
     ssr: false,
     loading: () => <div className="h-full w-full bg-pink-50 animate-pulse" />
 });
 
 // 距離表示の安全な関数
-const formatDistance = (m: number): string => {
-    if (typeof m !== 'number' || isNaN(m)) return "--- m";
+const formatDistance = (m: number | undefined | null): string => {
+    if (m === undefined || m === null || isNaN(m)) return "--- m";
     if (m < 1000) return `${Math.floor(m).toLocaleString()} m`;
     const km = m / 1000;
     return `${km.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`;
@@ -31,110 +31,127 @@ export default function AdventurePage() {
         setHasMounted(true);
     }, []);
 
-    // ブラウザが準備完了するまでは何も表示しない（Hydrationエラーを100%防ぐ）
-    if (!hasMounted || !params.id) return null;
+    // ハイドレーションエラーを物理的に防ぐ
+    if (!hasMounted || !params?.id) return null;
 
-    return <AdventureContent id={params.id as string} />;
+    return <AdventureManager id={params.id as string} />;
 }
 
-// --- 実際の冒険画面のロジックとUI ---
-function AdventureContent({ id }: { id: string }) {
+// データを管理する中間コンポーネント
+function AdventureManager({ id }: { id: string }) {
+    const [plan, setPlan] = useState<Plan | null>(null);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const plans = getPlans();
+        const found = plans.find(p => p.id === id);
+        if (found) setPlan(found);
+    }, [id]);
+
+    if (!plan) return <div className="h-screen bg-white flex items-center justify-center font-black text-pink-500 italic">LOADING...</div>;
+
+    return <AdventureView initialPlan={plan} />;
+}
+
+// 実際の表示とGPSロジックを担当するコンポーネント
+function AdventureView({ initialPlan }: { initialPlan: Plan }) {
     const { t } = useTranslation();
     const router = useRouter();
 
-    const [plan, setPlan] = useState<Plan | null>(null);
+    const [plan, setPlan] = useState<Plan>(initialPlan);
     const [userLoc, setUserLoc] = useState<LatLng | null>(null);
-    const [distance, setDistance] = useState(0);
+    const [distance, setDistance] = useState<number | null>(null);
     const [bearing, setBearing] = useState(0);
-    const [currentItem, setCurrentItem] = useState<Item | null>(null);
-    const [allCollected, setAllCollected] = useState(false);
     const [collectedItem, setCollectedItem] = useState<Item | null>(null);
 
-    // データ読み込み
-    useEffect(() => {
-        const found = getPlans().find(p => p.id === id);
-        if (found) {
-            setPlan(found);
-            const next = found.items?.find(i => !i.isCollected);
-            if (next) { setCurrentItem(next); setAllCollected(false); }
-            else { setAllCollected(true); }
-        }
-    }, [id]);
+    // 現在のターゲットアイテムを計算
+    const currentItem = useMemo(() => {
+        return plan.items?.find(i => !i.isCollected) || null;
+    }, [plan.items]);
 
-    // GPS追跡
+    const allCollected = !currentItem;
+
+    // GPS追跡（もっともエラーが起きやすい場所）
     useEffect(() => {
         if (!currentItem || typeof window === "undefined" || !navigator.geolocation) return;
 
         const watchId = navigator.geolocation.watchPosition(
             (pos) => {
+                // ここでcurrentItemの存在を再チェック
+                if (!currentItem) return;
+
                 const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                 setUserLoc(newLoc);
-                if (currentItem) {
+
+                // 計算前に数値の正当性をチェック
+                try {
                     const d = calculateDistance(newLoc.lat, newLoc.lng, currentItem.lat, currentItem.lng);
                     const b = calculateBearing(newLoc.lat, newLoc.lng, currentItem.lat, currentItem.lng);
-                    setDistance(d * 1000);
-                    setBearing(b);
+
+                    if (!isNaN(d)) setDistance(d * 1000);
+                    if (!isNaN(b)) setBearing(b);
+                } catch (e) {
+                    console.error("GPS Calc Error:", e);
                 }
             },
             (err) => console.warn(err),
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
-        return () => navigator.geolocation.clearWatch(watchId);
-    }, [currentItem]);
 
-    const handleAcquire = async () => {
+        return () => navigator.geolocation.clearWatch(watchId);
+    }, [currentItem]); // ターゲットが変わるたびに監視をリセット
+
+    const handleAcquire = () => {
         if (!plan || !currentItem) return;
         setCollectedItem(currentItem);
+
         const now = new Date().toISOString();
         const updatedItems = (plan.items || []).map(i => i.id === currentItem.id ? { ...i, isCollected: true, collectedAt: now } : i);
-        const isCompleted = updatedItems.every(i => i.isCollected);
-        const updatedPlan = { ...plan, items: updatedItems, collectedCount: (plan.collectedCount || 0) + 1, status: isCompleted ? 'completed' : 'active' };
+
+        const updatedPlan = {
+            ...plan,
+            items: updatedItems,
+            collectedCount: (plan.collectedCount || 0) + 1,
+            status: updatedItems.every(i => i.isCollected) ? 'completed' : 'active'
+        };
+
         savePlan(updatedPlan as any);
         setPlan(updatedPlan as any);
-        const next = updatedItems.find(i => !i.isCollected);
-        if (next) { setCurrentItem(next); } else { setAllCollected(true); }
     };
-
-    if (!plan) return <div className="h-screen bg-white flex items-center justify-center font-black text-pink-500 italic">LOADING PLAN...</div>;
 
     if (allCollected) {
         return (
             <div className="flex flex-col h-screen bg-gradient-to-br from-[#F06292] to-[#FF8A65] text-white items-center justify-center p-8 text-center">
-                <div className="bg-white/20 backdrop-blur-3xl rounded-[3rem] p-10 shadow-2xl border border-white/30">
-                    <Trophy size={80} className="mb-6 mx-auto text-yellow-300" />
-                    <h1 className="text-4xl font-black mb-2 italic tracking-tighter uppercase">Quest Clear!</h1>
-                    <p className="opacity-90 font-bold mb-8">お疲れ様でした！すべてのアイテムを発見しました。</p>
-                    <button onClick={() => router.push('/log')} className="w-full bg-white text-pink-600 font-black py-4 px-8 rounded-2xl shadow-xl active:scale-95 transition-all uppercase tracking-widest">
-                        記録を見る
-                    </button>
-                </div>
+                <Trophy size={80} className="mb-6 mx-auto text-yellow-300 drop-shadow-lg" />
+                <h1 className="text-4xl font-black mb-2 italic tracking-tighter uppercase">COMPLETED!</h1>
+                <p className="opacity-90 font-bold mb-8 italic">すべてのアイテムを発見した！</p>
+                <button onClick={() => router.push('/log')} className="w-full bg-white text-pink-600 font-black py-4 px-8 rounded-2xl shadow-xl active:scale-95 transition-all uppercase tracking-widest">
+                    冒険の記録を見る
+                </button>
             </div>
         );
     }
 
     return (
         <div className="flex flex-col h-screen relative overflow-hidden bg-white">
-            {/* 1. 地図背景 */}
             <div className="absolute inset-0 z-0">
                 <LazyMap items={plan.items} userLocation={userLoc} themeColor="#F06292" center={plan.center} />
-                <div className="absolute inset-0 bg-gradient-to-b from-white/20 via-transparent to-black/20 pointer-events-none" />
+                <div className="absolute inset-0 bg-gradient-to-b from-white/20 via-transparent to-black/30 pointer-events-none" />
             </div>
 
-            {/* 2. ヘッダー */}
             <header className="relative z-10 flex justify-between items-center p-6 pt-12">
                 <button onClick={() => router.back()} className="w-12 h-12 bg-white/50 backdrop-blur-xl rounded-2xl flex items-center justify-center text-gray-800 shadow-lg border border-white/40 active:scale-90 transition-all">
                     <ArrowLeft size={20} />
                 </button>
                 <div className="bg-white/50 backdrop-blur-xl px-6 py-2 rounded-2xl border border-white/40 shadow-lg text-right">
-                    <p className="text-[9px] font-black text-pink-600 uppercase tracking-widest leading-none mb-1">Status</p>
-                    <p className="font-black text-gray-800 text-lg leading-none">{plan.collectedCount} / {plan.itemCount}</p>
+                    <p className="text-[9px] font-black text-pink-600 uppercase tracking-widest leading-none mb-1 font-sans">Found</p>
+                    <p className="font-black text-gray-800 text-lg leading-none italic">{plan.collectedCount} / {plan.itemCount}</p>
                 </div>
             </header>
 
-            {/* 3. コンパス & 距離 */}
             <main className="flex-1 flex flex-col items-center justify-center relative z-10 px-6">
                 <div className="text-center mb-8 bg-white/40 backdrop-blur-md p-6 rounded-[2.5rem] border border-white/30 shadow-2xl">
-                    <p className="text-[10px] font-black text-pink-600 uppercase tracking-widest mb-1">Target Distance</p>
+                    <p className="text-[10px] font-black text-pink-600 uppercase tracking-widest mb-1 font-sans">Target Distance</p>
                     <h1 className="text-5xl font-black text-gray-900 tracking-tighter italic drop-shadow-sm">
                         {formatDistance(distance)}
                     </h1>
@@ -150,10 +167,9 @@ function AdventureContent({ id }: { id: string }) {
                 </button>
             </main>
 
-            {/* 4. アイテムプレビュー */}
             <div className="relative z-10 px-4 mb-4">
                 <div className="bg-white/50 backdrop-blur-3xl rounded-[3rem] p-6 shadow-2xl border border-white/40">
-                    <div className="flex gap-3 overflow-x-auto no-scrollbar">
+                    <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
                         {(plan.items || []).map((item) => (
                             <div key={item.id} className={`w-14 h-14 flex-shrink-0 rounded-2xl flex items-center justify-center border-2 transition-all ${item.isCollected
                                     ? "bg-pink-100 border-pink-200 text-pink-500"
@@ -168,7 +184,6 @@ function AdventureContent({ id }: { id: string }) {
                 </div>
             </div>
 
-            {/* 獲得モーダル */}
             {collectedItem && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-8 bg-black/40 backdrop-blur-sm animate-fade-in">
                     <div className="bg-white rounded-[3rem] p-10 w-full max-w-sm text-center shadow-2xl">
