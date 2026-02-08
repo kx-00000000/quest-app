@@ -30,51 +30,55 @@ export default function NewQuestPage() {
     const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
 
     useEffect(() => {
-        if ("geolocation" in navigator) {
-            navigator.geolocation.getCurrentPosition(
-                (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                (err) => console.warn(err)
-            );
-        }
+        navigator.geolocation.getCurrentPosition(
+            (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+            (err) => console.warn(err)
+        );
     }, []);
-
-    // モード切り替え時に半径を自動調整
-    const handleModeChange = (mode: typeof rangeModes[0]) => {
-        setActiveMode(mode);
-        setRadius(mode.min);
-    };
 
     const handleCreate = async () => {
         setIsCreating(true);
-        await new Promise(r => setTimeout(r, 800));
+        await new Promise(r => setTimeout(r, 600));
         let center = userLocation || { lat: 35.6812, lng: 139.7671 };
         const items = Array.from({ length: itemCount }).map((_, i) => {
             const point = generateRandomPoint(center, radius);
             return { id: Math.random().toString(36).substr(2, 9), lat: point.lat, lng: point.lng, isCollected: false, name: `Item #${i + 1}` };
         });
-        savePlan({ id: Math.random().toString(36).substr(2, 9), name: name || "新しい冒険", radius, itemCount, status: "ready", createdAt: new Date().toLocaleDateString(), totalDistance: 0, collectedCount: 0, center, items });
+        savePlan({ id: Math.random().toString(36).substr(2, 9), name: name || "NEW QUEST", radius, itemCount, status: "ready", createdAt: new Date().toLocaleDateString(), totalDistance: 0, collectedCount: 0, center, items });
         router.push("/plan");
     };
 
     return (
-        <div className="flex flex-col h-full min-h-screen pb-24 relative overflow-hidden bg-black">
-            {/* 1. 地図：背景フル画面 */}
+        <div className="flex flex-col h-full min-h-screen pb-20 relative overflow-hidden bg-white">
+            {/* 地図背景：フル画面 */}
             <div className="absolute inset-0 z-0">
                 <LazyMap radiusInKm={radius} userLocation={userLocation} themeColor="#F06292" />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/30 pointer-events-none" />
             </div>
 
-            {/* 2. 操作パネル：下部に配置 */}
-            <div className="mt-auto relative z-10 px-6 mb-4">
-                <div className="bg-white/40 backdrop-blur-3xl rounded-[3rem] p-8 shadow-2xl border border-white/30 space-y-6">
+            {/* 1. 【上部外だし】フローティング名前入力：画像のデザインを継承 */}
+            <div className="absolute top-14 left-6 right-6 z-20">
+                <div className="bg-white/40 backdrop-blur-2xl rounded-[2rem] border border-white/40 shadow-xl px-6 py-3">
+                    <input
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder={t("adventure_name_placeholder")}
+                        className="w-full bg-transparent border-none outline-none text-gray-800 font-bold placeholder:text-gray-400 text-center"
+                    />
+                </div>
+            </div>
 
-                    {/* 距離モード選択タブ */}
+            {/* 2. 【コンパクト化】下部操作パネル */}
+            <div className="mt-auto relative z-10 px-4 mb-4">
+                <div className="bg-white/40 backdrop-blur-3xl rounded-[3rem] p-6 shadow-2xl border border-white/40 space-y-5">
+
+                    {/* 3段階距離モード選択： image_cf2d24.png のデザイン */}
                     <div className="flex p-1 bg-black/5 rounded-2xl gap-1">
                         {rangeModes.map((mode) => (
                             <button
                                 key={mode.id}
-                                onClick={() => handleModeChange(mode)}
-                                className={`flex-1 py-2 text-[9px] font-black rounded-xl transition-all ${activeMode.id === mode.id ? 'bg-white text-pink-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                                onClick={() => { setActiveMode(mode); setRadius(mode.min); }}
+                                className={`flex-1 py-2 text-[9px] font-black rounded-xl transition-all ${activeMode.id === mode.id ? 'bg-white text-pink-600 shadow-sm' : 'text-gray-500'
                                     }`}
                             >
                                 {mode.label}
@@ -82,27 +86,31 @@ export default function NewQuestPage() {
                         ))}
                     </div>
 
-                    <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("adventure_name_placeholder")} className="w-full px-6 py-4 rounded-2xl bg-white/60 border-none outline-none text-gray-800 font-bold placeholder:text-gray-400" />
-
-                    <div className="grid grid-cols-1 gap-6">
-                        <div className="space-y-2">
-                            <div className="flex justify-between items-center px-1">
-                                <label className="text-[10px] font-black text-pink-900 uppercase">Radius</label>
-                                <span className="text-lg font-black text-gray-900">{formatDistance(radius)}</span>
+                    {/* スライダーエリア：より低重心にコンパクト化 */}
+                    <div className="space-y-4 px-1">
+                        <div className="space-y-1">
+                            <div className="flex justify-between text-[10px] font-black text-pink-600 uppercase tracking-widest">
+                                <span>Radius Range</span>
+                                <span className="text-gray-800 text-sm">{formatDistance(radius)}</span>
                             </div>
-                            <input type="range" min={activeMode.min} max={activeMode.max} step={activeMode.step} value={radius} onChange={(e) => setRadius(parseFloat(e.target.value))} className="w-full h-1.5 accent-pink-600" />
+                            <input type="range" min={activeMode.min} max={activeMode.max} step={activeMode.step} value={radius} onChange={(e) => setRadius(parseFloat(e.target.value))} className="w-full h-1.5 accent-pink-600 bg-pink-100 rounded-full appearance-none" />
                         </div>
-                        <div className="space-y-2">
-                            <div className="flex justify-between items-center px-1">
-                                <label className="text-[10px] font-black text-pink-900 uppercase">Items</label>
-                                <span className="text-lg font-black text-gray-900">{itemCount}</span>
+                        <div className="space-y-1">
+                            <div className="flex justify-between text-[10px] font-black text-pink-600 uppercase tracking-widest">
+                                <span>Items Count</span>
+                                <span className="text-gray-800 text-sm">{itemCount}</span>
                             </div>
-                            <input type="range" min="1" max="10" step="1" value={itemCount} onChange={(e) => setItemCount(parseInt(e.target.value))} className="w-full h-1.5 accent-pink-600" />
+                            <input type="range" min="1" max="10" step="1" value={itemCount} onChange={(e) => setItemCount(parseInt(e.target.value))} className="w-full h-1.5 accent-pink-600 bg-pink-100 rounded-full appearance-none" />
                         </div>
                     </div>
 
-                    <button onClick={handleCreate} disabled={isCreating} className="w-full py-5 bg-gradient-to-r from-[#F06292] to-[#FF8A65] text-white rounded-[2rem] font-black text-lg shadow-xl active:scale-95 transition-all border-b-4 border-black/10">
-                        {isCreating ? "CREATING..." : t("create_button").toUpperCase()}
+                    {/* 作成ボタン：グラデーションと丸みをキープ */}
+                    <button
+                        onClick={handleCreate}
+                        disabled={isCreating}
+                        className="w-full py-4 bg-gradient-to-r from-[#F06292] to-[#FF8A65] text-white rounded-[2rem] font-black text-lg shadow-lg active:scale-95 transition-all border-b-4 border-black/10"
+                    >
+                        {isCreating ? "..." : "作成"}
                     </button>
                 </div>
             </div>
