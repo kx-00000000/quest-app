@@ -62,7 +62,7 @@ export default function NewQuestPage() {
             </div>
 
             <div className="mt-auto relative z-10 px-4 mb-4">
-                <div className="bg-white/40 backdrop-blur-3xl rounded-[3rem] p-6 shadow-2xl border border-white/40 space-y-5">
+                <div className="bg-white/30 backdrop-blur-3xl rounded-[3rem] p-6 shadow-2xl border border-white/40 space-y-5">
 
                     <div className="flex p-1 bg-black/5 rounded-2xl gap-1">
                         {rangeModes.map((mode) => (

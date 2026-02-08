@@ -8,29 +8,33 @@ function MapUpdater({ radiusInKm, center }: any) {
     const map = useMap();
 
     useEffect(() => {
-        // ブラウザ環境かつ、半径がある程度決まっている時に実行
         if (typeof window === "undefined" || !radiusInKm) return;
 
-        // GPSが取れていない場合は東京（仮）を中心にする
+        // 現在地、またはデフォルトの東京
         const currentCenter = center || { lat: 35.6812, lng: 139.7671 };
 
-        try {
-            const L = require("leaflet");
-            const circle = L.circle([currentCenter.lat, currentCenter.lng], { radius: radiusInKm * 1000 });
+        // スライダーの動きに地図の計算を同期させるためのタイマー
+        const timer = setTimeout(() => {
+            try {
+                const L = require("leaflet");
+                const circle = L.circle([currentCenter.lat, currentCenter.lng], { radius: radiusInKm * 1000 });
 
-            // ⑤ 自動縮尺 & ④ 中心地を上に押し上げる設定
-            map.fitBounds(circle.getBounds(), {
-                // [左, 上] の余白
-                paddingTopLeft: [40, 80],
-                // [右, 下] の余白。ここを大きく（500〜600）すると、中心が上に上がります
-                paddingBottomRight: [40, 550],
-                animate: true,
-                duration: 0.8
-            });
-        } catch (e) {
-            console.error("Zoom Error:", e);
-        }
-    }, [map, radiusInKm, center]); // 半径か中心が変わるたびに実行
+                // 地図の状態をリセットしてからズーム（これでズームが効かない問題を回避）
+                map.invalidateSize();
+
+                map.fitBounds(circle.getBounds(), {
+                    paddingTopLeft: [40, 100],     // [左の余白, 上（タイトル入力）の余白]
+                    paddingBottomRight: [40, 750], // [右の余白, 下（メニュー）の余白] ※さらに大きくしました
+                    animate: true,
+                    duration: 0.6
+                });
+            } catch (e) {
+                console.error("Map Update Error:", e);
+            }
+        }, 100); // 0.1秒待ってから実行
+
+        return () => clearTimeout(timer);
+    }, [map, radiusInKm, center]);
 
     return null;
 }
@@ -45,7 +49,13 @@ export default function MapComponent({ radiusInKm, userLocation, themeColor }: a
 
     return (
         <div className="h-full w-full">
-            <MapContainer center={centerPos} zoom={13} style={{ height: "100%", width: "100%" }} zoomControl={false} attributionControl={false}>
+            <MapContainer
+                center={centerPos}
+                zoom={13}
+                style={{ height: "100%", width: "100%" }}
+                zoomControl={false}
+                attributionControl={false}
+            >
                 <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
                 <MapUpdater radiusInKm={radiusInKm} center={userLocation} />
                 {userLocation && (
