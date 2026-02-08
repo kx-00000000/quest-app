@@ -4,9 +4,17 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { getPlans, savePlan, type Plan, type Item } from "@/lib/storage";
-import { ArrowLeft, CheckCircle, Map as MapIcon, Plane } from "lucide-react";
+import { ArrowLeft, CheckCircle, Package, Navigation, Trophy } from "lucide-react";
 import Compass from "@/components/Compass";
 import { calculateBearing, calculateDistance, getLocationName, type LatLng } from "@/lib/geo";
+import LazyMap from "@/components/Map/LazyMap";
+
+// 距離フォーマッター
+const formatDistance = (m: number): string => {
+    if (m < 1000) return `${Math.floor(m).toLocaleString()} m`;
+    const km = m / 1000;
+    return `${km.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`;
+};
 
 export default function AdventurePage() {
     const { t } = useTranslation();
@@ -21,302 +29,151 @@ export default function AdventurePage() {
     const [allCollected, setAllCollected] = useState(false);
     const [collectedItem, setCollectedItem] = useState<Item | null>(null);
 
-    // Load Plan Logic
+    // データ読み込みロジック (既存ロジックを継承)
     useEffect(() => {
         if (!params.id) return;
-        const plans = getPlans();
-        const found = plans.find(p => p.id === params.id);
+        const found = getPlans().find(p => p.id === params.id);
         if (found) {
             setPlan(found);
-            checkNextItem(found);
+            const next = found.items?.find(i => !i.isCollected);
+            if (next) { setCurrentItem(next); setAllCollected(false); }
+            else { setAllCollected(true); }
         }
     }, [params.id]);
 
-    // Check for next uncollected item
-    const checkNextItem = (currentPlan: Plan) => {
-        if (!currentPlan.items) return;
-        const next = currentPlan.items.find(i => !i.isCollected);
-        if (next) {
-            setCurrentItem(next);
-            setAllCollected(false);
-        } else {
-            setCurrentItem(null);
-            setAllCollected(true);
-        }
-    };
-
-    // Real Location Tracking & Calc
+    // 位置追跡ロジック (既存ロジックを継承)
     useEffect(() => {
-        if (!currentItem) return;
-
-        if (navigator.geolocation) {
-            const watchId = navigator.geolocation.watchPosition(
-                (pos) => {
-                    const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                    setUserLoc(newLoc);
-
-                    // Update Path (Throttle? For now, just add if moved significantly or simple push)
-                    // In React strict mode or high freq GPS this might be too much, but for prototype it's fine.
-                    // We need to update the plan object live? Or just local state?
-                    // Let's update local state 'path' and save on acquire events to avoid excessive IO.
-                    // Actually, if we want the "Live" path in the end, we should update a ref or state.
-
-                    if (plan) {
-                        setPlan(prev => {
-                            if (!prev) return null;
-                            const currentPath = prev.path || [];
-                            const lastPos = currentPath.length > 0 ? currentPath[currentPath.length - 1] : null;
-
-                            let distDelta = 0;
-                            if (lastPos) {
-                                distDelta = calculateDistance(lastPos.lat, lastPos.lng, newLoc.lat, newLoc.lng);
-                            }
-
-                            // Minimal threshold to avoid noise (optional, but good for "accurate" GPS)
-                            // But for "test mode" jumps, we accept all.
-
-                            return {
-                                ...prev,
-                                path: [...currentPath, newLoc],
-                                totalDistance: (prev.totalDistance || 0) + distDelta
-                            };
-                        });
-                    }
-
-                    if (currentItem) {
-                        const d = calculateDistance(newLoc.lat, newLoc.lng, currentItem.lat, currentItem.lng);
-                        const b = calculateBearing(newLoc.lat, newLoc.lng, currentItem.lat, currentItem.lng);
-                        setDistance(Math.round(d * 1000));
-                        setBearing(b);
-                    }
-                },
-                (err) => console.warn("Geolocation Error/Waiting:", err),
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-            );
-            return () => navigator.geolocation.clearWatch(watchId);
-        }
-    }, [currentItem]); // plan dependency removed to avoid loop, handle inside
+        if (!currentItem || typeof window === "undefined") return;
+        const watchId = navigator.geolocation.watchPosition(
+            (pos) => {
+                const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                setUserLoc(newLoc);
+                const d = calculateDistance(newLoc.lat, newLoc.lng, currentItem.lat, currentItem.lng);
+                const b = calculateBearing(newLoc.lat, newLoc.lng, currentItem.lat, currentItem.lng);
+                setDistance(d * 1000); // メートル変換
+                setBearing(b);
+            },
+            (err) => console.warn(err),
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+        return () => navigator.geolocation.clearWatch(watchId);
+    }, [currentItem]);
 
     const handleAcquire = async () => {
         if (!plan || !currentItem) return;
-
-        // Show Modal instead of Alert
         setCollectedItem(currentItem);
-        // Note: The actual data update happens after user closes modal or immediately?
-        // User flow: Click -> Modal "Got It!" -> Close Modal -> Show next item
-        // So we should probably update data *after* modal or *during* modal but keep modal open.
-
-        // Let's update data immediately for simplicity, but maybe wait to switch 'currentItem' until modal validation?
-        // Actually, if we update state immediately, 'currentItem' changes, and the main view updates.
-        // We want to persist the "You found X" modal even if currentItem switches to Y behind the scenes.
-
-        // Get Location Name
-        let locName = "Unknown Location";
-        let lat = userLoc?.lat;
-        let lng = userLoc?.lng;
-
-        if (!lat || !lng) {
-            // Try to force get current position
-            try {
-                const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-                    navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000, enableHighAccuracy: true });
-                });
-                lat = pos.coords.latitude;
-                lng = pos.coords.longitude;
-            } catch (e) {
-                console.warn("GPS Force Fail", e);
-                // Fallback to Item Location (User suggestion for PC testing)
-                // This assumes we are "at" the item location.
-                lat = currentItem.lat;
-                lng = currentItem.lng;
-            }
-        }
-
-        if (lat && lng) {
-            locName = await getLocationName(lat, lng);
-        } else {
-            locName = "Unknown Location";
-        }
-
-        // Update Data
         const now = new Date().toISOString();
-        const updatedItems = plan.items?.map(i => i.id === currentItem.id ? {
-            ...i,
-            isCollected: true,
-            collectedAt: now,
-            collectedLocation: locName
-        } : i);
-
+        const updatedItems = plan.items?.map(i => i.id === currentItem.id ? { ...i, isCollected: true, collectedAt: now } : i);
         const isCompleted = updatedItems?.every(i => i.isCollected);
-
-        const updatedPlan = {
-            ...plan,
-            items: updatedItems,
-            collectedCount: (plan.collectedCount || 0) + 1,
-            // If all collected, complete
-            status: isCompleted ? 'completed' : 'active',
-            completedAt: isCompleted ? now : undefined,
-            // Ensure current path/distance from state is preserved
-            path: plan.path,
-            totalDistance: plan.totalDistance
-        };
-
-        // Save
-        savePlan(updatedPlan);
-        setPlan(updatedPlan);
-        // checkNextItem(updatedPlan); // Delay this until modal close? NO, updatedPlan is needed.
-        // If we switch currentItem now, the background compass might swing. That's fine.
-        checkNextItem(updatedPlan);
+        const updatedPlan = { ...plan, items: updatedItems, collectedCount: (plan.collectedCount || 0) + 1, status: isCompleted ? 'completed' : 'active' };
+        savePlan(updatedPlan as any);
+        setPlan(updatedPlan as any);
+        const next = updatedItems?.find(i => !i.isCollected);
+        if (next) { setCurrentItem(next); } else { setAllCollected(true); }
     };
 
-    const handleCloseModal = () => {
-        setCollectedItem(null);
-    };
+    if (!plan) return <div className="h-screen bg-white flex items-center justify-center font-black text-pink-500 italic">LOADING...</div>;
 
-    if (!plan) return <div className="p-10 text-white">Loading Adventure...</div>;
-
+    // --- 全収集完了画面 ---
     if (allCollected) {
         return (
-            <div className="flex flex-col h-screen bg-quest-green-900 text-white items-center justify-center p-6 text-center relative overflow-hidden">
-                {/* Left Bottom Burst */}
-                {[...Array(30)].map((_, i) => {
-                    // Shoot towards top-right
-                    const tx = Math.random() * 400 + 100 + "px"; // 100 to 500
-                    const ty = -1 * (Math.random() * 600 + 200) + "px"; // -200 to -800
-                    const rot = Math.random() * 360 + "deg";
-                    const delay = Math.random() * 0.2 + "s";
-                    return (
-                        <div
-                            key={`left-${i}`}
-                            className="confetti-piece"
-                            style={{
-                                bottom: "25%",
-                                left: "0",
-                                background: ["#FCD34D", "#34D399", "#60A5FA", "#F87171"][Math.floor(Math.random() * 4)],
-                                animation: `confetti-burst 1.5s ease-out forwards ${delay}`,
-                                ["--tx" as any]: tx,
-                                ["--ty" as any]: ty,
-                                ["--rot" as any]: rot
-                            }}
-                        />
-                    );
-                })}
-
-                {/* Right Bottom Burst */}
-                {[...Array(30)].map((_, i) => {
-                    // Shoot towards top-left
-                    const tx = -1 * (Math.random() * 400 + 100) + "px"; // -100 to -500
-                    const ty = -1 * (Math.random() * 600 + 200) + "px"; // -200 to -800
-                    const rot = Math.random() * 360 + "deg";
-                    const delay = Math.random() * 0.2 + "s";
-                    return (
-                        <div
-                            key={`right-${i}`}
-                            className="confetti-piece"
-                            style={{
-                                bottom: "25%",
-                                right: "0",
-                                background: ["#FCD34D", "#34D399", "#60A5FA", "#F87171"][Math.floor(Math.random() * 4)],
-                                animation: `confetti-burst 1.5s ease-out forwards ${delay}`,
-                                ["--tx" as any]: tx,
-                                ["--ty" as any]: ty,
-                                ["--rot" as any]: rot
-                            }}
-                        />
-                    );
-                })}
-
-                <div className="relative z-10 animate-fade-in-up">
-                    <CheckCircle size={80} className="mb-6 text-quest-green-400 mx-auto" />
-                    <h1 className="text-4xl font-bold font-puffy mb-2">{t("congratulations")}</h1>
-                    <p className="text-quest-green-200 mb-8">All items collected!</p>
-                    <button onClick={() => router.push('/log')} className="bg-white text-quest-green-900 font-bold py-3 px-8 rounded-full shadow-lg hover:scale-105 transition-transform">
-                        {t("go_to_log")}
+            <div className="flex flex-col h-screen bg-gradient-to-br from-[#F06292] to-[#FF8A65] text-white items-center justify-center p-8 text-center">
+                <div className="bg-white/20 backdrop-blur-3xl rounded-[3rem] p-10 shadow-2xl border border-white/30 animate-fade-in-up">
+                    <Trophy size={80} className="mb-6 mx-auto text-yellow-300 drop-shadow-lg" />
+                    <h1 className="text-4xl font-black mb-2 italic">COMPLETED!</h1>
+                    <p className="opacity-80 font-bold mb-8">すべてのアイテムを見つけた！</p>
+                    <button onClick={() => router.push('/log')} className="w-full bg-white text-pink-600 font-black py-4 px-8 rounded-2xl shadow-xl active:scale-95 transition-all">
+                        冒険の記録を見る
                     </button>
                 </div>
             </div>
-        )
+        );
     }
 
     return (
-        <div className="flex flex-col h-screen bg-quest-green-900 text-white relative overflow-hidden">
+        <div className="flex flex-col h-screen relative overflow-hidden bg-white">
+            {/* 1. 背景地図：全画面表示 */}
+            <div className="absolute inset-0 z-0">
+                <LazyMap
+                    items={plan.items}
+                    userLocation={userLoc}
+                    themeColor="#F06292"
+                    center={plan.center}
+                />
+                <div className="absolute inset-0 bg-gradient-to-b from-white/10 via-transparent to-black/20 pointer-events-none" />
+            </div>
 
-            {/* Header */}
-            <header className="flex justify-between items-center p-6 z-10">
-                <button
-                    onClick={() => router.back()}
-                    className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full backdrop-blur-md hover:bg-white/20 transition text-sm font-bold"
-                >
-                    <ArrowLeft size={16} /> {t("back_button")}
+            {/* 2. ヘッダー：すりガラス */}
+            <header className="relative z-10 flex justify-between items-center p-6 pt-12">
+                <button onClick={() => router.back()} className="w-12 h-12 bg-white/40 backdrop-blur-xl rounded-2xl flex items-center justify-center text-gray-800 shadow-lg border border-white/30 active:scale-90 transition-all">
+                    <ArrowLeft size={20} />
                 </button>
-                <div className="text-right">
-                    <div className="text-xs text-quest-green-200">{t("progress_label")}</div>
-                    <div className="font-bold font-puffy text-xl">{plan.collectedCount} / {plan.itemCount}</div>
+                <div className="bg-white/40 backdrop-blur-xl px-6 py-2 rounded-2xl border border-white/30 shadow-lg text-right">
+                    <p className="text-[9px] font-black text-pink-600 uppercase tracking-widest leading-none mb-1">Items Found</p>
+                    <p className="font-black text-gray-800 text-lg leading-none">{plan.collectedCount} / {plan.itemCount}</p>
                 </div>
             </header>
 
-            {/* Main Content: Info & Compass */}
-            <main className="flex-1 flex flex-col items-center justify-center p-6 relative z-10">
-                {collectedItem && (
-                    <div className="fixed inset-0 bg-quest-green-900/90 backdrop-blur-md flex items-center justify-center p-6 z-50 animate-fade-in">
-                        <div className="relative z-10 flex flex-col items-center">
-                            <div className="w-24 h-24 bg-quest-green-100 rounded-full flex items-center justify-center mb-6 shadow-inner animate-bounce">
-                                <CheckCircle size={48} className="text-quest-green-600" />
-                            </div>
-
-                            <h2 className="text-2xl font-black font-puffy mb-2">アイテムを拾った！</h2>
-                            <p className="text-quest-green-700 font-medium mb-8 text-lg">{collectedItem.name}</p>
-
-                            <button
-                                onClick={handleCloseModal}
-                                className="w-full bg-quest-green-600 hover:bg-quest-green-700 text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all text-lg"
-                            >
-                                次へ
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                <div className="text-center mb-12">
-                    <p className="text-quest-green-200 text-sm mb-1">{t("nearest_item_label")}</p>
-                    <h1 className="text-6xl font-black font-puffy tracking-tight drop-shadow-lg">
-                        {distance} <span className="text-2xl font-medium">m</span>
+            {/* 3. メイン：コンパスと距離 */}
+            <main className="flex-1 flex flex-col items-center justify-center relative z-10 px-6">
+                <div className="text-center mb-8 bg-white/30 backdrop-blur-md p-6 rounded-[2.5rem] border border-white/20 shadow-2xl">
+                    <p className="text-[10px] font-black text-pink-600 uppercase tracking-widest mb-1">Distance to Target</p>
+                    <h1 className="text-5xl font-black text-gray-900 tracking-tighter italic drop-shadow-sm">
+                        {formatDistance(distance)}
                     </h1>
                 </div>
 
-                <Compass bearing={bearing} />
-
-                <div className="mt-12 text-center text-quest-green-300 text-sm animate-pulse">
-                    {t("get_closer_message")}
+                {/* コンパス本体 (以前のコンポーネントを使用) */}
+                <div className="relative group active:scale-95 transition-all">
+                    <div className="absolute inset-0 bg-pink-500/20 blur-3xl rounded-full animate-pulse" />
+                    <Compass bearing={bearing} />
                 </div>
 
-                {/* Test Action */}
-                <button
-                    onClick={handleAcquire}
-                    className="mt-6 bg-yellow-500 hover:bg-yellow-400 text-yellow-950 font-bold py-3 px-8 rounded-full shadow-lg transform active:scale-95 transition-all text-sm"
-                >
-                    ⚡ {t("test_measure_button")}
-                </button>
+                <div className="mt-8 bg-black/80 backdrop-blur-md px-6 py-2 rounded-full border border-white/10">
+                    <p className="text-[10px] font-bold text-white uppercase tracking-widest animate-pulse italic">
+                        Keep walking towards the needle...
+                    </p>
+                </div>
 
+                {/* ⚡ テストボタン：ピンクのデザインに統合 */}
+                <button onClick={handleAcquire} className="mt-6 bg-white/20 hover:bg-white/40 backdrop-blur-md text-gray-800 font-black py-2 px-6 rounded-full border border-white/30 shadow-lg active:scale-95 transition-all text-[10px] uppercase tracking-widest">
+                    ⚡ Debug: Simulate Acquire
+                </button>
             </main>
 
-            {/* Bottom Sheet: Item List Preview (Simplified) */}
-            <div className="bg-white/10 backdrop-blur-md rounded-t-3xl p-6 pb-12 z-10 border-t border-white/5">
-                <h3 className="text-sm font-bold text-quest-green-100 mb-4">{t("item_list_label")}</h3>
-                <div className="flex gap-4 overflow-x-auto pb-2">
-                    {plan.items?.map((item, idx) => (
-                        <div key={item.id} className={`w-16 h-16 flex-shrink-0 rounded-2xl flex items-center justify-center border transition-all ${item.isCollected
-                            ? "bg-quest-green-800 text-quest-green-300 border-quest-green-600/50"
-                            : item.id === currentItem?.id
-                                ? "bg-quest-green-500 text-white shadow-lg shadow-quest-green-500/50 ring-2 ring-white/50 border-transparent scale-110"
-                                : "bg-quest-green-800/50 text-quest-green-700 border-quest-green-800"
-                            }`}>
-                            {item.isCollected ? <CheckCircle size={24} /> : <Plane size={24} />}
-                        </div>
-                    ))}
+            {/* 4. ボトム：アイテムリストプレビュー */}
+            <div className="relative z-10 px-4 mb-4">
+                <div className="bg-white/40 backdrop-blur-3xl rounded-[3rem] p-6 shadow-2xl border border-white/30">
+                    <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+                        {plan.items?.map((item) => (
+                            <div key={item.id} className={`w-14 h-14 flex-shrink-0 rounded-2xl flex items-center justify-center border-2 transition-all ${item.isCollected
+                                    ? "bg-pink-100 border-pink-200 text-pink-500"
+                                    : item.id === currentItem?.id
+                                        ? "bg-white border-pink-500 text-pink-600 shadow-lg scale-105 animate-bounce"
+                                        : "bg-white/50 border-gray-100 text-gray-300"
+                                }`}>
+                                {item.isCollected ? <CheckCircle size={22} /> : <Package size={22} />}
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
 
+            {/* 獲得モーダル：オーバーレイ */}
+            {collectedItem && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-8 bg-black/40 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white rounded-[3rem] p-10 w-full max-w-sm text-center shadow-2xl animate-scale-up">
+                        <div className="w-24 h-24 bg-gradient-to-tr from-[#F06292] to-[#FF8A65] rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl">
+                            <Navigation className="text-white w-12 h-12" />
+                        </div>
+                        <h2 className="text-2xl font-black text-gray-800 mb-2 italic uppercase">Got It!</h2>
+                        <p className="text-gray-500 font-bold mb-8">{collectedItem.name}</p>
+                        <button onClick={() => setCollectedItem(null)} className="w-full bg-gray-900 text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all">
+                            NEXT TARGET
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
