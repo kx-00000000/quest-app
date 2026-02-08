@@ -13,12 +13,10 @@ function MapUpdater({ radiusInKm, center }: any) {
             const L = require("leaflet");
             const circle = L.circle([center.lat, center.lng], { radius: radiusInKm * 1000 });
 
-            // paddingBottomを大きく設定することで、現在地を画面の上半分（メニューに被らない位置）に移動させます
+            // fitBoundsのオプションを修正（[横方向, 縦方向] の順で指定します）
             map.fitBounds(circle.getBounds(), {
-                paddingTop: 120,    // 名前入力欄の回避
-                paddingBottom: 380, // 下部巨大メニューの回避
-                paddingLeft: 40,
-                paddingRight: 40,
+                paddingTopLeft: [40, 120],     // [左の余白, 上の余白]
+                paddingBottomRight: [40, 380], // [右の余白, 下の余白]
                 animate: true
             });
         } catch (e) {
@@ -43,7 +41,6 @@ export default function MapComponent({ radiusInKm, userLocation, themeColor }: a
                 <MapUpdater radiusInKm={radiusInKm} center={userLocation} />
                 {userLocation && (
                     <>
-                        {/* 中心地をテーマカラーのピンクに変更 */}
                         <CircleMarker center={[userLocation.lat, userLocation.lng]} radius={10} pathOptions={{ color: 'white', fillColor: displayColor, fillOpacity: 1, weight: 3 }} />
                         <Circle center={[userLocation.lat, userLocation.lng]} radius={radiusInKm * 1000} pathOptions={{ color: displayColor, fillColor: displayColor, fillOpacity: 0.1, weight: 2 }} />
                     </>
