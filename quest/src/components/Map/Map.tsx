@@ -18,7 +18,7 @@ function MapUpdater({ radiusInKm, center }: any) {
             // 円全体が収まるように地図を動かす
             map.fitBounds(circle.getBounds(), {
                 paddingTopLeft: [40, 100],     // ③ タイトル入力欄を避ける余白
-                paddingBottomRight: [40, 500], // ④ メニューパネルを避けるための余白（ここを増やすと中心が上がります）
+                paddingBottomRight: [40, 1000], // ④ メニューパネルを避けるための余白（ここを増やすと中心が上がります）
                 animate: true,
                 duration: 0.5 // スルスルと動くアニメーションの時間
             });
