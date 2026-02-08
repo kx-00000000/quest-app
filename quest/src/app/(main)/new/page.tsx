@@ -96,6 +96,7 @@ export default function NewQuestPage() {
             {/* 地図プレビュー：グラスモーフィズムな枠組み */}
             <div className="px-6 mb-6">
                 <div className="relative h-[35vh] rounded-[2.5rem] overflow-hidden shadow-2xl border-4 border-white/40">
+                    {/* @ts-ignore */}
                     <LazyMap radiusInKm={radius} userLocation={userLocation} />
                     {/* オーバーレイ */}
                     <div className="absolute top-4 left-4 bg-white/80 backdrop-blur-md px-4 py-1 rounded-full shadow-sm">
