@@ -4,17 +4,17 @@ import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Circle, Polyline, useMap, CircleMarker } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
-// 1. 地図のズームやアイコン設定を管理する部品
-function MapController({ radiusInKm, center }: { radiusInKm?: number, center?: { lat: number, lng: number } | null }) {
+// 1. 地図のアイコンと動きを管理するサブ部品
+function MapContent({ radiusInKm, center, color }: any) {
     const map = useMap();
 
     useEffect(() => {
         if (typeof window === "undefined" || !center || !radiusInKm) return;
 
-        // Leafletを動的に読み込み
+        // Leaflet本体をブラウザで動的に読み込み
         const L = require("leaflet");
 
-        // アイコンの初期化（これをしないとマーカーが消える）
+        // アイコンの初期化（これをしないとマーカー表示でエラーが出る）
         delete L.Icon.Default.prototype._getIconUrl;
         L.Icon.Default.mergeOptions({
             iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
@@ -22,7 +22,7 @@ function MapController({ radiusInKm, center }: { radiusInKm?: number, center?: {
             shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
         });
 
-        // 探索円に合わせて自動ズーム
+        // 円の範囲に合わせて地図をズーム
         const circle = L.circle([center.lat, center.lng], { radius: radiusInKm * 1000 });
         map.fitBounds(circle.getBounds(), { padding: [40, 40], animate: true });
     }, [map, radiusInKm, center]);
@@ -31,23 +31,26 @@ function MapController({ radiusInKm, center }: { radiusInKm?: number, center?: {
 }
 
 export default function MapComponent({ radiusInKm, items, path, center, userLocation, themeColor }: any) {
+    const [mounted, setMounted] = useState(false);
     const [L, setL] = useState<any>(null);
 
     useEffect(() => {
-        // ブラウザ側でのみLeaflet本体をロードする
+        // コンポーネントがブラウザに表示されてからLeafletを読み込む
+        setMounted(true);
         setL(require("leaflet"));
     }, []);
 
-    // Leaflet本体が読み込まれるまでは何も表示しない（エラー防止）
-    if (!L) return <div className="h-full w-full bg-gray-100" />;
+    // ブラウザの準備ができるまでは、エラー回避のために何も表示しない
+    if (!mounted || !L) return <div className="h-full w-full bg-gray-50" />;
 
     const displayColor = themeColor || "#F06292";
+    // 中心点の決定
     const mapCenter: [number, number] = userLocation
         ? [userLocation.lat, userLocation.lng]
         : (center ? [center.lat, center.lng] : [35.6812, 139.7671]);
 
     return (
-        <div className="h-full w-full relative">
+        <div className="h-full w-full">
             <MapContainer
                 center={mapCenter}
                 zoom={13}
@@ -57,12 +60,11 @@ export default function MapComponent({ radiusInKm, items, path, center, userLoca
             >
                 <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
 
-                {/* ズームとアイコンの制御 */}
-                <MapController radiusInKm={radiusInKm} center={userLocation || center} />
+                <MapContent radiusInKm={radiusInKm} center={userLocation || center} color={displayColor} />
 
-                {/* 現在地の青いドット */}
                 {userLocation && (
                     <>
+                        {/* 現在地のドット */}
                         <CircleMarker
                             center={[userLocation.lat, userLocation.lng]}
                             radius={10}
@@ -81,10 +83,13 @@ export default function MapComponent({ radiusInKm, items, path, center, userLoca
 
                 {/* 軌跡 */}
                 {path && path.length > 0 && (
-                    <Polyline positions={path.map((p: any) => [p.lat, p.lng])} pathOptions={{ color: displayColor, weight: 6, opacity: 0.8 }} />
+                    <Polyline
+                        positions={path.map((p: any) => [p.lat, p.lng])}
+                        pathOptions={{ color: displayColor, weight: 6, opacity: 0.8 }}
+                    />
                 )}
 
-                {/* アイテムマーカー */}
+                {/* マーカー */}
                 {items && items.map((item: any, idx: number) => (
                     <Marker
                         key={idx}
