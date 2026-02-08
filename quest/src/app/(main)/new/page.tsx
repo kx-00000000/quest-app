@@ -84,120 +84,65 @@ export default function NewQuestPage() {
     };
 
     return (
-        <div className="flex flex-col h-full min-h-screen pb-24 relative bg-gradient-to-br from-[#FFF59D] via-[#F48FB1] to-[#CE93D8] overflow-x-hidden">
-            {/* ヘッダーエリア */}
-            <div className="p-8 pb-4">
-                <h1 className="text-3xl font-black text-white drop-shadow-md flex items-center gap-3 italic">
+        <div className="flex flex-col h-full min-h-screen pb-24 relative overflow-hidden">
+            {/* 1. 地図を背景いっぱいに表示 */}
+            <div className="absolute inset-0 z-0">
+                <LazyMap
+                    radiusInKm={radius}
+                    userLocation={userLocation}
+                    themeColor="#F48FB1" // ピンクを渡す
+                />
+                {/* 地図の上に少しグラデーションを重ねて文字を見やすくする */}
+                <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/40 pointer-events-none" />
+            </div>
+
+            {/* 2. ヘッダー（地図の上に浮かす） */}
+            <div className="relative z-10 p-8 pb-4">
+                <h1 className="text-3xl font-black text-white drop-shadow-lg flex items-center gap-3 italic">
                     <MapIcon className="w-8 h-8" />
                     {t("new_quest_title").toUpperCase()}
                 </h1>
             </div>
 
-            {/* 地図プレビュー：グラスモーフィズムな枠組み */}
-            <div className="px-6 mb-6">
-                <div className="relative h-[35vh] rounded-[2.5rem] overflow-hidden shadow-2xl border-4 border-white/40">
-                    {/* @ts-ignore */}
-                    <LazyMap radiusInKm={radius} userLocation={userLocation} />
-                    {/* オーバーレイ */}
-                    <div className="absolute top-4 left-4 bg-white/80 backdrop-blur-md px-4 py-1 rounded-full shadow-sm">
-                        <span className="text-xs font-bold text-pink-600">PREVIEW</span>
-                    </div>
-                </div>
-            </div>
+            {/* 3. 設定エリア（下からスライドアップするカード風） */}
+            <div className="mt-auto relative z-10 px-6 mb-4">
+                <div className="bg-white/40 backdrop-blur-2xl rounded-[3rem] p-8 shadow-2xl border border-white/30 space-y-6">
 
-            {/* 設定エリア：グラスモーフィズム・カード */}
-            <div className="px-6 space-y-4">
-                <div className="bg-white/30 backdrop-blur-xl rounded-[2.5rem] p-8 shadow-xl border border-white/20 space-y-8">
-
-                    {/* 1. 名前入力 */}
-                    <div className="space-y-3">
-                        <label className="text-xs font-black text-pink-800/60 uppercase tracking-widest ml-1">
-                            {t("adventure_name_label")}
-                        </label>
+                    {/* 名前入力 */}
+                    <div className="space-y-2">
                         <input
                             type="text"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             placeholder={t("adventure_name_placeholder")}
-                            className="w-full px-6 py-4 rounded-2xl bg-white/50 border-none focus:ring-4 focus:ring-white/50 outline-none transition-all text-gray-800 font-bold placeholder:text-gray-400"
+                            className="w-full px-6 py-4 rounded-2xl bg-white/60 border-none outline-none text-gray-800 font-bold placeholder:text-gray-500"
                         />
                     </div>
 
-                    {/* 2. 半径選択 */}
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-end px-1">
-                            <label className="text-xs font-black text-pink-800/60 uppercase tracking-widest">
-                                {t("radius_label")}
-                            </label>
-                            <span className="text-3xl font-black text-gray-800 tracking-tighter">
-                                {formatDistance(radius)}
-                            </span>
+                    {/* 半径とアイテム数（横並びにしてスッキリさせる） */}
+                    <div className="grid grid-cols-1 gap-6">
+                        <div className="space-y-2">
+                            <div className="flex justify-between items-center px-1">
+                                <label className="text-[10px] font-black text-pink-900 uppercase tracking-tighter">RADIUS</label>
+                                <span className="text-xl font-black text-gray-900">{formatDistance(radius)}</span>
+                            </div>
+                            <input
+                                type="range"
+                                min={activeRangeMode.min} max={activeRangeMode.max} step={activeRangeMode.step}
+                                value={radius}
+                                onChange={(e) => setRadius(parseFloat(e.target.value))}
+                                className="w-full h-1.5 bg-black/10 rounded-lg appearance-none cursor-pointer accent-pink-600"
+                            />
                         </div>
-
-                        {/* 範囲切り替えタブ */}
-                        <div className="flex p-1 bg-black/5 rounded-2xl">
-                            {[
-                                { id: 'neighborhood', label: t('range_neighborhood'), min: 0.5, max: 15, step: 0.5 },
-                                { id: 'excursion', label: t('range_excursion'), min: 15, max: 200, step: 5 },
-                                { id: 'grand', label: t('range_grand'), min: 200, max: 40000, step: 100 }
-                            ].map((range) => (
-                                <button
-                                    key={range.id}
-                                    onClick={() => {
-                                        setActiveRangeMode(range);
-                                        setRadius(range.min);
-                                    }}
-                                    className={`flex-1 py-2 rounded-xl text-[10px] font-black transition-all ${activeRangeMode.id === range.id
-                                        ? "bg-white text-pink-600 shadow-sm"
-                                        : "text-pink-900/40 hover:text-pink-900/60"
-                                        }`}
-                                >
-                                    {range.label.split(' ')[0]}
-                                </button>
-                            ))}
-                        </div>
-
-                        <input
-                            type="range"
-                            min={activeRangeMode.min}
-                            max={activeRangeMode.max}
-                            step={activeRangeMode.step}
-                            value={radius}
-                            onChange={(e) => setRadius(parseFloat(e.target.value))}
-                            className="w-full h-2 bg-black/10 rounded-lg appearance-none cursor-pointer accent-pink-600"
-                        />
-                    </div>
-
-                    {/* 3. アイテム数 */}
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-end px-1">
-                            <label className="text-xs font-black text-pink-800/60 uppercase tracking-widest">
-                                {t("item_count_label")}
-                            </label>
-                            <span className="text-3xl font-black text-gray-800 tracking-tighter">
-                                {itemCount} <span className="text-sm font-normal text-gray-500">個</span>
-                            </span>
-                        </div>
-                        <input
-                            type="range"
-                            min="1" max="20" step="1"
-                            value={itemCount}
-                            onChange={(e) => setItemCount(parseInt(e.target.value))}
-                            className="w-full h-2 bg-black/10 rounded-lg appearance-none cursor-pointer accent-pink-600"
-                        />
                     </div>
 
                     {/* 作成ボタン */}
                     <button
                         onClick={handleCreate}
                         disabled={isCreating}
-                        className="w-full py-5 bg-gradient-to-r from-[#F06292] to-[#FF8A65] text-white rounded-[2rem] font-black text-lg shadow-xl shadow-pink-500/20 active:scale-95 transition-all flex items-center justify-center gap-3 border-b-4 border-black/10"
+                        className="w-full py-5 bg-gradient-to-r from-[#F06292] to-[#FF8A65] text-white rounded-[2rem] font-black text-lg shadow-xl active:scale-95 transition-all border-b-4 border-black/10"
                     >
-                        {isCreating ? (
-                            <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" />
-                        ) : (
-                            t("create_button").toUpperCase()
-                        )}
+                        {isCreating ? "CREATING..." : t("create_button").toUpperCase()}
                     </button>
                 </div>
             </div>
