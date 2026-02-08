@@ -1,12 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useRouter } from "next/navigation";
 import { savePlan } from "@/lib/storage";
 import { generateRandomPoint } from "@/lib/geo";
 import LazyMap from "@/components/Map/LazyMap";
-import { Sliders } from "lucide-react";
+import { Map as MapIcon, Sliders } from "lucide-react";
+
+// 距離表示をフォーマットする関数
+const formatDistance = (km: number): string => {
+    const meters = km * 1000;
+    if (meters < 1000) {
+        // 1km未満: m単位、整数、3桁カンマ
+        return `${Math.floor(meters).toLocaleString()} m`;
+    } else {
+        // 1km以上: km単位、小数点第1位、3桁カンマ
+        return `${km.toLocaleString(undefined, {
+            minimumFractionDigits: 1,
+            maximumFractionDigits: 1
+        })} km`;
+    }
+};
 
 export default function NewQuestPage() {
     const router = useRouter();
@@ -14,47 +29,33 @@ export default function NewQuestPage() {
 
     const [name, setName] = useState("");
     const [radius, setRadius] = useState(1); // km
-    const [activeRangeMode, setActiveRangeMode] = useState({ id: 'neighborhood', min: 0, max: 15, step: 0.1 });
+    const [activeRangeMode, setActiveRangeMode] = useState({ id: 'neighborhood', min: 0.5, max: 15, step: 0.1 });
     const [itemCount, setItemCount] = useState(3);
     const [isCreating, setIsCreating] = useState(false);
+    const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
+
+    // 画面表示時に現在地を取得
+    useEffect(() => {
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                (err) => console.warn("Location access denied", err)
+            );
+        }
+    }, []);
 
     const handleCreate = async () => {
         setIsCreating(true);
-
-        // Simulate "Processing"
         await new Promise(r => setTimeout(r, 800));
 
-        // Simple UUID generator for compatibility
-        const generateId = () => {
-            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-                var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-                return v.toString(16);
-            });
-        };
+        const generateId = () => Math.random().toString(36).substring(2, 15);
 
-        // Determine center (current location or Tokyo default)
-        let center = { lat: 35.6812, lng: 139.7671 };
+        // 現在地が取得できていればそれを使用、できなければデフォルト（東京駅）
+        let center = userLocation || { lat: 35.6812, lng: 139.7671 };
 
-        try {
-            const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-                navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
-            });
-            center = { lat: position.coords.latitude, lng: position.coords.longitude };
-        } catch (e) {
-            console.warn("Could not get location, using default", e);
-        }
-
-        // Generate Items using RandomCoordinateGenerator
         const items = [];
-        // Dynamic import logic or simple usage since we are in async
-        // We can just use the imported functions if they are top-level
-        // But we need to make sure we import them at top of file
-
         for (let i = 0; i < itemCount; i++) {
-            // Generate point
             const point = generateRandomPoint(center, radius);
-            // TODO: Verify land (skip for now to avoid async/slow loop in prototype UI thread without loading state)
-            // In real app, we would do this in a worker or server action.
             items.push({
                 id: generateId(),
                 lat: point.lat,
@@ -77,38 +78,39 @@ export default function NewQuestPage() {
             items
         };
 
-
         savePlan(newPlan);
-
         setIsCreating(false);
         router.push("/plan");
     };
 
     return (
-        <div className="flex flex-col h-full min-h-screen pb-20 relative">
-            <div className="absolute top-0 left-0 right-0 z-10 p-6 bg-gradient-to-b from-white/90 to-transparent pointer-events-none">
-                <h1 className="text-2xl font-bold text-quest-green-900 drop-shadow-sm font-puffy flex items-center gap-2">
-                    <MapIcon /> {t("new_quest_title")}
+        <div className="flex flex-col h-full min-h-screen pb-24 relative bg-gradient-to-br from-[#FFF59D] via-[#F48FB1] to-[#CE93D8] overflow-x-hidden">
+            {/* ヘッダーエリア */}
+            <div className="p-8 pb-4">
+                <h1 className="text-3xl font-black text-white drop-shadow-md flex items-center gap-3 italic">
+                    <MapIcon className="w-8 h-8" />
+                    {t("new_quest_title").toUpperCase()}
                 </h1>
             </div>
 
-            {/* Map Background Preview */}
-            <div className="absolute inset-0 z-0 h-[60vh] mask-image-b">
-                <LazyMap radiusInKm={radius} />
-                {/* Gradient Overlay for bottom blending */}
-                <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white to-transparent pointer-events-none" />
+            {/* 地図プレビュー：グラスモーフィズムな枠組み */}
+            <div className="px-6 mb-6">
+                <div className="relative h-[35vh] rounded-[2.5rem] overflow-hidden shadow-2xl border-4 border-white/40">
+                    <LazyMap radiusInKm={radius} userLocation={userLocation} />
+                    {/* オーバーレイ */}
+                    <div className="absolute top-4 left-4 bg-white/80 backdrop-blur-md px-4 py-1 rounded-full shadow-sm">
+                        <span className="text-xs font-bold text-pink-600">PREVIEW</span>
+                    </div>
+                </div>
             </div>
 
-            {/* Content Area (Scrollable overlay) */}
-            <div className="mt-[55vh] relative z-10 px-6 pb-6 bg-white rounded-t-3xl shadow-lg border-t border-gray-100 min-h-[45vh]">
+            {/* 設定エリア：グラスモーフィズム・カード */}
+            <div className="px-6 space-y-4">
+                <div className="bg-white/30 backdrop-blur-xl rounded-[2.5rem] p-8 shadow-xl border border-white/20 space-y-8">
 
-                {/* Drag Handle */}
-                <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mt-3 mb-6" />
-
-                <div className="space-y-8">
-                    {/* 1. Name Input */}
-                    <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                    {/* 1. 名前入力 */}
+                    <div className="space-y-3">
+                        <label className="text-xs font-black text-pink-800/60 uppercase tracking-widest ml-1">
                             {t("adventure_name_label")}
                         </label>
                         <input
@@ -116,44 +118,37 @@ export default function NewQuestPage() {
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             placeholder={t("adventure_name_placeholder")}
-                            className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:border-quest-green-500 focus:ring-2 focus:ring-quest-green-200 outline-none transition-all font-puffy"
+                            className="w-full px-6 py-4 rounded-2xl bg-white/50 border-none focus:ring-4 focus:ring-white/50 outline-none transition-all text-gray-800 font-bold placeholder:text-gray-400"
                         />
                     </div>
 
-                    {/* 2. Radius Slider with Tabs */}
-                    <div>
-                        <div className="flex justify-between items-end mb-2">
-                            <label className="text-sm font-bold text-gray-700">{t("radius_label")}</label>
-                            <span className="text-2xl font-black text-quest-green-900 font-puffy">{radius} <span className="text-base font-normal text-gray-500">km</span></span>
+                    {/* 2. 半径選択 */}
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-end px-1">
+                            <label className="text-xs font-black text-pink-800/60 uppercase tracking-widest">
+                                {t("radius_label")}
+                            </label>
+                            <span className="text-3xl font-black text-gray-800 tracking-tighter">
+                                {formatDistance(radius)}
+                            </span>
                         </div>
 
-                        {/* Range Tabs */}
-                        <div className="flex gap-2 mb-4">
+                        {/* 範囲切り替えタブ */}
+                        <div className="flex p-1 bg-black/5 rounded-2xl">
                             {[
-                                { id: 'neighborhood', label: t('range_neighborhood'), min: 0, max: 15, step: 0.1 },
+                                { id: 'neighborhood', label: t('range_neighborhood'), min: 0.5, max: 15, step: 0.5 },
                                 { id: 'excursion', label: t('range_excursion'), min: 15, max: 200, step: 5 },
                                 { id: 'grand', label: t('range_grand'), min: 200, max: 40000, step: 100 }
                             ].map((range) => (
                                 <button
                                     key={range.id}
                                     onClick={() => {
-                                        // Set a default value within the new range if current radius is out of bounds
-                                        // Or just set to min/mid? Let's auto-clamp or set to min.
-                                        if (radius < range.min || radius > range.max) {
-                                            setRadius(range.min);
-                                        }
-                                        // We store the current "active range config" in state or derived?
-                                        // Let's just use the radius value to determine active, or explicit state?
-                                        // Existing code uses 'radius' state. We need 'activeTab' state to know which bounds to apply?
-                                        // Actually user changing tab implies they want to set radius in that band.
-                                        // Only tricky part is overlap (e.g. 15km).
-                                        // Let's use an explicit state for the active range mode to control the slider props.
                                         setActiveRangeMode(range);
                                         setRadius(range.min);
                                     }}
-                                    className={`flex-1 py-2 px-1 rounded-lg text-xs font-bold transition-all border ${activeRangeMode.id === range.id
-                                        ? "bg-quest-green-100 text-quest-green-800 border-quest-green-300 shadow-inner"
-                                        : "bg-gray-50 text-gray-400 border-transparent hover:bg-gray-100"
+                                    className={`flex-1 py-2 rounded-xl text-[10px] font-black transition-all ${activeRangeMode.id === range.id
+                                        ? "bg-white text-pink-600 shadow-sm"
+                                        : "text-pink-900/40 hover:text-pink-900/60"
                                         }`}
                                 >
                                     {range.label.split(' ')[0]}
@@ -168,57 +163,43 @@ export default function NewQuestPage() {
                             step={activeRangeMode.step}
                             value={radius}
                             onChange={(e) => setRadius(parseFloat(e.target.value))}
-                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-quest-green-900"
+                            className="w-full h-2 bg-black/10 rounded-lg appearance-none cursor-pointer accent-pink-600"
                         />
-                        <div className="flex justify-between text-xs text-gray-400 mt-1">
-                            <span>{activeRangeMode.min} km</span>
-                            <span>{activeRangeMode.max} km</span>
-                        </div>
                     </div>
 
-                    {/* 3. Item Count Slider */}
-                    <div>
-                        <div className="flex justify-between items-end mb-2">
-                            <label className="text-sm font-bold text-gray-700">{t("item_count_label")}</label>
-                            <span className="text-2xl font-black text-quest-green-900 font-puffy">{itemCount} <span className="text-base font-normal text-gray-500">{t("items_collected_label").replace("Items Collected", "items").replace("収集数", "個")}</span></span>
+                    {/* 3. アイテム数 */}
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-end px-1">
+                            <label className="text-xs font-black text-pink-800/60 uppercase tracking-widest">
+                                {t("item_count_label")}
+                            </label>
+                            <span className="text-3xl font-black text-gray-800 tracking-tighter">
+                                {itemCount} <span className="text-sm font-normal text-gray-500">個</span>
+                            </span>
                         </div>
                         <input
                             type="range"
-                            min="1"
-                            max="20"
-                            step="1"
+                            min="1" max="20" step="1"
                             value={itemCount}
                             onChange={(e) => setItemCount(parseInt(e.target.value))}
-                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-quest-green-900"
+                            className="w-full h-2 bg-black/10 rounded-lg appearance-none cursor-pointer accent-pink-600"
                         />
-                        <div className="flex justify-between text-xs text-gray-400 mt-1">
-                            <span>1</span>
-                            <span>20</span>
-                        </div>
                     </div>
 
-                    {/* Create Button */}
+                    {/* 作成ボタン */}
                     <button
                         onClick={handleCreate}
                         disabled={isCreating}
-                        className="w-full py-4 bg-quest-green-900 hover:bg-quest-green-800 text-white rounded-2xl font-bold text-lg shadow-lg shadow-quest-green-900/30 transform active:scale-95 transition-all flex items-center justify-center gap-2"
+                        className="w-full py-5 bg-gradient-to-r from-[#F06292] to-[#FF8A65] text-white rounded-[2rem] font-black text-lg shadow-xl shadow-pink-500/20 active:scale-95 transition-all flex items-center justify-center gap-3 border-b-4 border-black/10"
                     >
                         {isCreating ? (
-                            <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></span>
+                            <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" />
                         ) : (
-                            <>
-                                {t("create_button")}
-                            </>
+                            t("create_button").toUpperCase()
                         )}
                     </button>
                 </div>
             </div>
         </div>
     );
-}
-
-function MapIcon() {
-    return (
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-map"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21 3 6" /><line x1="9" x2="9" y1="3" y2="18" /><line x1="15" x2="15" y1="6" y2="21" /></svg>
-    )
 }
