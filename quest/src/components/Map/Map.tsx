@@ -6,26 +6,32 @@ import "leaflet/dist/leaflet.css";
 
 function MapUpdater({ radiusInKm, center }: any) {
     const map = useMap();
+
     useEffect(() => {
-        // 緯度経度と半径が揃っているときだけ実行
-        if (typeof window === "undefined" || !center || !radiusInKm) return;
+        // ブラウザ環境かつ、半径がある程度決まっている時に実行
+        if (typeof window === "undefined" || !radiusInKm) return;
+
+        // GPSが取れていない場合は東京（仮）を中心にする
+        const currentCenter = center || { lat: 35.6812, lng: 139.7671 };
 
         try {
             const L = require("leaflet");
-            // 半径に基づいた円の範囲を計算
-            const circle = L.circle([center.lat, center.lng], { radius: radiusInKm * 1000 });
+            const circle = L.circle([currentCenter.lat, currentCenter.lng], { radius: radiusInKm * 1000 });
 
-            // 円全体が収まるように地図を動かす
+            // ⑤ 自動縮尺 & ④ 中心地を上に押し上げる設定
             map.fitBounds(circle.getBounds(), {
-                paddingTopLeft: [40, 100],     // ③ タイトル入力欄を避ける余白
-                paddingBottomRight: [40, 1000], // ④ メニューパネルを避けるための余白（ここを増やすと中心が上がります）
+                // [左, 上] の余白
+                paddingTopLeft: [40, 80],
+                // [右, 下] の余白。ここを大きく（500〜600）すると、中心が上に上がります
+                paddingBottomRight: [40, 550],
                 animate: true,
-                duration: 0.5 // スルスルと動くアニメーションの時間
+                duration: 0.8
             });
         } catch (e) {
-            console.error(e);
+            console.error("Zoom Error:", e);
         }
-    }, [map, radiusInKm, center]);
+    }, [map, radiusInKm, center]); // 半径か中心が変わるたびに実行
+
     return null;
 }
 
@@ -41,7 +47,6 @@ export default function MapComponent({ radiusInKm, userLocation, themeColor }: a
         <div className="h-full w-full">
             <MapContainer center={centerPos} zoom={13} style={{ height: "100%", width: "100%" }} zoomControl={false} attributionControl={false}>
                 <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
-                {/* ⑤ 縮尺と位置を自動調整する部品 */}
                 <MapUpdater radiusInKm={radiusInKm} center={userLocation} />
                 {userLocation && (
                     <>
