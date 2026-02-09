@@ -1,20 +1,27 @@
 "use client";
 
-import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Polyline, Circle, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useEffect, useMemo } from "react";
-import MissionBriefing from "./MissionBriefing"; // ★新規作成するコンポーネント
+import MissionBriefing from "./MissionBriefing";
 
-// アイコンのセットアップ
+// アイコン設定
 const createIcon = (color: string, isStart = false) => L.divIcon({
     className: "custom-icon",
-    html: `<div style="background-color: ${color}; width: ${isStart ? '12px' : '10px'}; height: ${isStart ? '12px' : '10px'}; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></div>`,
+    html: `<div style="background-color: ${color}; width: ${isStart ? '14px' : '10px'}; height: ${isStart ? '14px' : '10px'}; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></div>`,
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+});
+
+// 現在地用ブルーアイコン（航空計器風）
+const userIcon = L.divIcon({
+    className: "user-icon",
+    html: `<div style="background-color: #3B82F6; width: 12px; height: 12px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(59,130,246,0.5);"></div>`,
     iconSize: [12, 12],
     iconAnchor: [6, 6],
 });
 
-// 地図の表示範囲を自動調整する部品
 function MapBounds({ points }: { points: [number, number][] }) {
     const map = useMap();
     useEffect(() => {
@@ -26,58 +33,71 @@ function MapBounds({ points }: { points: [number, number][] }) {
     return null;
 }
 
-// プロップスに isBriefingActive と onBriefingComplete を追加
 export default function Map({
     items = [],
     center,
+    userLocation,     // NEWページから渡される現在地
+    radiusInKm = 1,   // NEWページから渡される探索半径
     themeColor = "#f06292",
     isLogMode = false,
-    isBriefingActive = false,    // ★追加
-    onBriefingComplete           // ★追加
+    isBriefingActive = false,
+    onBriefingComplete
 }: any) {
 
-    // 1. 軌跡用のポイント配列を作成
+    // 軌跡用ポイント
     const trackPoints = useMemo(() => {
         if (!isLogMode) return [];
-
         const start: [number, number] = center ? [center.lat, center.lng] : [0, 0];
         const collected = items
             .filter((i: any) => i.isCollected)
             .sort((a: any, b: any) => new Date(a.collectedAt).getTime() - new Date(b.collectedAt).getTime())
             .map((i: any) => [i.lat, i.lng] as [number, number]);
-
         return [start, ...collected];
     }, [items, center, isLogMode]);
 
-    const mapCenter: [number, number] = center ? [center.lat, center.lng] : [35.6812, 139.7671];
+    // 地図の初期中心点（ユーザーがいればそこを、いなければ東京を）
+    const initialCenter: [number, number] = userLocation
+        ? [userLocation.lat, userLocation.lng]
+        : [35.6812, 139.7671];
 
     return (
-        <MapContainer center={mapCenter} zoom={15} className="w-full h-full z-0" zoomControl={false}>
+        <MapContainer center={initialCenter} zoom={14} className="w-full h-full z-0" zoomControl={false}>
             <TileLayer
                 url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
                 attribution='&copy; <a href="https://carto.com/">CARTO</a>'
             />
 
-            {/* 2. 出発地点のプロット（ログモード時） */}
+            {/* A. NEWページ用：探索範囲の円 */}
+            {!isLogMode && userLocation && (
+                <>
+                    <Circle
+                        center={[userLocation.lat, userLocation.lng]}
+                        radius={radiusInKm * 1000}
+                        pathOptions={{
+                            fillColor: themeColor,
+                            fillOpacity: 0.1,
+                            color: themeColor,
+                            weight: 1,
+                            dashArray: "5, 5"
+                        }}
+                    />
+                    <Marker position={[userLocation.lat, userLocation.lng]} icon={userIcon} />
+                </>
+            )}
+
+            {/* B. LOGモード：出発地点と軌跡 */}
             {isLogMode && center && (
                 <Marker position={[center.lat, center.lng]} icon={createIcon("#333", true)} />
             )}
-
-            {/* 3. 軌跡（線）の描画（ログモード時） */}
             {isLogMode && trackPoints.length > 1 && (
                 <Polyline
                     positions={trackPoints}
-                    pathOptions={{
-                        color: themeColor,
-                        weight: 3,
-                        opacity: 0.6,
-                        dashArray: "5, 10"
-                    }}
+                    pathOptions={{ color: themeColor, weight: 3, opacity: 0.6, dashArray: "5, 10" }}
                 />
             )}
 
-            {/* 4. アイテム地点のプロット */}
-            {items.map((item: any) => (
+            {/* C. アイテム地点（ブリーフィング中、またはログモードで表示） */}
+            {(isBriefingActive || isLogMode) && items.map((item: any) => (
                 <Marker
                     key={item.id}
                     position={[item.lat, item.lng]}
@@ -85,15 +105,11 @@ export default function Map({
                 />
             ))}
 
-            {/* 5. ミッション・ブリーフィング演出（アクティブ時のみ） */}
+            {/* D. ブリーフィング演出 */}
             {isBriefingActive && (
-                <MissionBriefing
-                    items={items}
-                    onComplete={onBriefingComplete}
-                />
+                <MissionBriefing items={items} onComplete={onBriefingComplete} />
             )}
 
-            {/* 自動ズーム調整 */}
             {isLogMode && <MapBounds points={trackPoints} />}
         </MapContainer>
     );
