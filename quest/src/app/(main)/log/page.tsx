@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getPlans } from "@/lib/storage";
-import { ArrowLeft, MapPin, CheckCircle, Award, Package, Navigation } from "lucide-react";
+import { MapPin, CheckCircle, Package, Navigation } from "lucide-react";
 import { calculateDistance } from "@/lib/geo";
 import dynamic from "next/dynamic";
 
@@ -27,8 +27,9 @@ export default function LogPage() {
                         .sort((a: any, b: any) => new Date(a.collectedAt || 0).getTime() - new Date(b.collectedAt || 0).getTime());
 
                     let totalDistance = 0;
-                    // 型エラー修正: plan.center が無い場合に備えてデフォルト値を設定
-                    let prevPoint: [number, number] = Array.isArray(plan.center) ? [plan.center[0], plan.center[1]] : [0, 0];
+                    let prevPoint: [number, number] = (Array.isArray(plan.center) && plan.center.length >= 2)
+                        ? [plan.center[0], plan.center[1]]
+                        : [0, 0];
 
                     collectedItems.forEach((item: any) => {
                         totalDistance += calculateDistance(prevPoint[0], prevPoint[1], item.lat, item.lng);
@@ -46,68 +47,50 @@ export default function LogPage() {
 
             setCompletedPlans(logs);
         } catch (e) {
-            console.error("Log calculation error", e);
+            console.error(e);
         }
     }, []);
 
     return (
-        <div className="min-h-screen bg-gray-50 text-gray-900 font-sans pb-32">
-            {/* ヘッダー：PLANページ同様、力強いイタリックタイポグラフィ */}
-            <header className="p-8 pt-16 flex justify-between items-center sticky top-0 z-30 bg-gray-50/80 backdrop-blur-md">
-                <h1 className="text-3xl font-black italic tracking-tighter text-gray-800 uppercase">
-                    Adventure <span className="text-pink-500">Log</span>
-                </h1>
-                <button
-                    onClick={() => router.push('/')}
-                    className="w-12 h-12 bg-white shadow-sm rounded-2xl flex items-center justify-center border border-gray-100 active:scale-90 transition-all"
-                >
-                    <ArrowLeft className="text-gray-400" size={20} />
-                </button>
-            </header>
-
-            <main className="px-6 mt-4 space-y-10">
+        <div className="min-h-screen bg-gray-50 text-gray-900 font-sans pb-20">
+            {/* タイトルとボタンを削除し、PLANページのようなカードリストから開始 */}
+            <main className="px-6 pt-16 space-y-10">
                 {completedPlans.length > 0 ? (
                     completedPlans.map((plan) => (
                         <div key={plan.id} className="bg-white rounded-[3rem] shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden flex flex-col">
 
-                            {/* 1. 上部：PLANページと全く同じタイトル・メトリクス */}
+                            {/* カード上部：NEW/PLANページとフォント・余白を統一 */}
                             <div className="p-8 pb-6">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div>
-                                        <p className="text-[10px] font-black text-pink-500 uppercase tracking-widest mb-1">Mission Completed</p>
-                                        <h2 className="text-3xl font-black italic tracking-tighter text-gray-800 uppercase leading-none">
-                                            {plan.name}
-                                        </h2>
-                                    </div>
-                                    <div className="bg-gray-50 p-3 rounded-2xl">
-                                        <Award className="text-pink-500" size={24} />
-                                    </div>
-                                </div>
+                                <p className="text-[10px] font-bold text-pink-500 uppercase tracking-widest mb-1">Mission Completed</p>
+                                <h2 className="text-3xl font-black tracking-tighter text-gray-800 uppercase leading-none mb-6">
+                                    {plan.name}
+                                </h2>
 
-                                <div className="grid grid-cols-3 gap-4 pt-4 border-t border-gray-100">
+                                {/* 3カラムメトリクス */}
+                                <div className="grid grid-cols-3 gap-4 pt-6 border-t border-gray-100">
                                     <div>
-                                        <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest mb-1">Date</p>
-                                        <p className="text-xs font-black italic text-gray-600 leading-none">
-                                            {new Date(plan.completionDate).toLocaleDateString('ja-JP')}
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Completed</p>
+                                        <p className="text-sm font-bold text-gray-700">
+                                            {new Date(plan.completionDate).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' })}
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest mb-1">Travel</p>
-                                        <p className="text-xs font-black italic text-gray-600 leading-none">
-                                            {plan.totalDistanceKm} <span className="text-[10px]">km</span>
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Distance</p>
+                                        <p className="text-sm font-bold text-gray-700">
+                                            {plan.totalDistanceKm}km
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest mb-1">Items</p>
-                                        <p className="text-xs font-black italic text-pink-500 leading-none">
-                                            {plan.collectedCount} / {plan.itemCount}
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Items</p>
+                                        <p className="text-sm font-bold text-pink-500">
+                                            {plan.collectedCount}/{plan.itemCount}
                                         </p>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* 2. 地図：ベベルなし、カードの左右端までいっぱい（w-full） */}
-                            <div className="w-full h-64 relative border-y border-gray-50">
+                            {/* 地図：左右端までいっぱい、ベベルなし */}
+                            <div className="w-full h-64 relative">
                                 <LazyMap
                                     items={plan.items}
                                     userLocation={null}
@@ -116,30 +99,28 @@ export default function LogPage() {
                                 />
                             </div>
 
-                            {/* 3. タイムライン：いつどこで獲得したか */}
-                            <div className="p-8 space-y-6 bg-gray-50/10">
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Discovery Timeline</p>
-                                <div className="space-y-4">
+                            {/* タイムライン */}
+                            <div className="p-8 space-y-6 bg-gray-50/20">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Discovery Timeline</p>
+                                <div className="space-y-5">
                                     {plan.collectedItems.map((item: any, idx: number) => (
                                         <div key={item.id} className="flex gap-4">
                                             <div className="flex flex-col items-center">
-                                                <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm border border-gray-100 z-10">
-                                                    <CheckCircle size={16} className="text-pink-500" />
-                                                </div>
+                                                <div className="w-2 h-2 bg-pink-500 rounded-full mt-1.5" />
                                                 {idx !== plan.collectedItems.length - 1 && (
-                                                    <div className="w-[1.5px] flex-1 bg-gray-200/40 my-1" />
+                                                    <div className="w-[1px] flex-1 bg-gray-200 my-1" />
                                                 )}
                                             </div>
-                                            <div className="flex-1 pb-4">
+                                            <div className="flex-1">
                                                 <div className="flex justify-between items-baseline">
-                                                    <h4 className="text-sm font-black italic text-gray-700 uppercase tracking-tight">{item.name}</h4>
-                                                    <span className="text-[10px] font-bold text-gray-400 tabular-nums">
+                                                    <h4 className="text-sm font-bold text-gray-800 uppercase tracking-tight">{item.name}</h4>
+                                                    <span className="text-[10px] font-bold text-gray-400">
                                                         {new Date(item.collectedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
                                                     </span>
                                                 </div>
-                                                <div className="flex items-center gap-1 text-[9px] font-bold text-gray-300 uppercase tracking-wider mt-0.5">
-                                                    <Navigation size={8} className="rotate-45" />
-                                                    Lat: {item.lat.toFixed(4)} / Lng: {item.lng.toFixed(4)}
+                                                <div className="flex items-center gap-1 text-[9px] font-bold text-gray-300 uppercase mt-0.5">
+                                                    <MapPin size={8} />
+                                                    {item.lat.toFixed(4)}, {item.lng.toFixed(4)}
                                                 </div>
                                             </div>
                                         </div>
@@ -150,9 +131,9 @@ export default function LogPage() {
                         </div>
                     ))
                 ) : (
-                    <div className="text-center py-24 bg-white rounded-[4rem] border border-gray-100 shadow-sm">
-                        <Package size={64} className="text-gray-100 mx-auto mb-6" />
-                        <p className="text-gray-400 font-black italic uppercase tracking-[0.2em] text-sm">No Missions Logged Yet</p>
+                    <div className="text-center py-24">
+                        <Package size={48} className="text-gray-200 mx-auto mb-4" />
+                        <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">No Records</p>
                     </div>
                 )}
             </main>
