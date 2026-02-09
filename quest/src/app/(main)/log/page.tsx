@@ -3,119 +3,140 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getPlans } from "@/lib/storage";
-// Package をインポートに追加しました
-import { ArrowLeft, Calendar, MapPin, CheckCircle, Award, Package } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, CheckCircle, Award, Package, Clock, Flag } from "lucide-react";
+import dynamic from "next/dynamic";
+
+// 地図をプレビュー用に読み込み（スクロール等の操作はオフにする設定が望ましい）
+const LazyMap = dynamic(() => import("@/components/Map/LazyMap"), {
+    ssr: false,
+    loading: () => <div className="h-48 w-full bg-gray-100 rounded-[2rem] animate-pulse" />
+});
 
 export default function LogPage() {
     const router = useRouter();
-    const [completedItems, setCompletedItems] = useState<any[]>([]);
+    const [completedPlans, setCompletedPlans] = useState<any[]>([]);
 
     useEffect(() => {
-        try {
-            const allPlans = getPlans();
-            const items = allPlans.flatMap(plan =>
-                (plan.items || [])
-                    .filter((item: any) => item.isCollected)
-                    .map((item: any) => ({
-                        ...item,
-                        planName: plan.name
-                    }))
-            );
+        const allPlans = getPlans();
+        // 少なくとも1つ以上アイテムを獲得しているプランだけを抽出
+        const logs = allPlans
+            .filter(plan => (plan.items || []).some((i: any) => i.isCollected))
+            .map(plan => {
+                const collectedItems = (plan.items || [])
+                    .filter((i: any) => i.isCollected)
+                    .sort((a: any, b: any) => new Date(a.collectedAt).getTime() - new Date(b.collectedAt).getTime());
 
-            setCompletedItems(items.sort((a, b) =>
-                new Date(b.collectedAt).getTime() - new Date(a.collectedAt).getTime()
-            ));
-        } catch (e) {
-            console.error("Log loading error:", e);
-        }
+                return {
+                    ...plan,
+                    collectedItems,
+                    lastActivity: collectedItems[collectedItems.length - 1]?.collectedAt
+                };
+            })
+            .sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime());
+
+        setCompletedPlans(logs);
     }, []);
 
     return (
-        <div className="min-h-screen bg-[#FAFAFA] text-slate-800 font-sans pb-20">
-            {/* ヘッダー：品格のあるタイポグラフィ */}
-            <header className="p-6 pt-12 flex justify-between items-end">
-                <button
-                    onClick={() => router.push('/')}
-                    className="w-11 h-11 bg-white shadow-sm rounded-2xl flex items-center justify-center border border-gray-100 active:scale-95 transition-all"
-                >
-                    <ArrowLeft size={18} className="text-slate-400" />
-                </button>
-                <div className="text-right">
-                    <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest leading-none mb-1">Travel Journal</p>
-                    <h1 className="text-2xl font-light text-slate-900 tracking-tight italic">Adventure Log</h1>
+        <div className="min-h-screen bg-gray-50 text-gray-900 font-sans pb-32">
+            {/* ヘッダー：力強いデザインを維持 */}
+            <header className="p-8 pt-16 flex justify-between items-center bg-white/80 backdrop-blur-md sticky top-0 z-30 border-b border-gray-100">
+                <h1 className="text-3xl font-black italic tracking-tighter text-gray-800 uppercase">
+                    Adventure <span className="text-pink-500">Log</span>
+                </h1>
+                <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center">
+                    <Award className="text-pink-500" size={24} />
                 </div>
             </header>
 
-            <main className="px-6 mt-8">
-                {/* サマリー：実績のハイライト */}
-                <div className="bg-white p-6 rounded-[2rem] border border-gray-50 shadow-sm mb-10 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-pink-50 rounded-2xl flex items-center justify-center text-pink-400">
-                            <Award size={24} />
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Discoveries</p>
-                            <p className="text-xl font-light text-slate-800 tracking-tight">
-                                {completedItems.length} <span className="text-sm text-slate-400">Items</span>
-                            </p>
-                        </div>
-                    </div>
-                    <div className="h-10 w-[1px] bg-slate-100" />
-                    <div className="text-right">
-                        <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Status</p>
-                        <p className="text-xs font-medium text-pink-500 italic">Active Explorer</p>
-                    </div>
-                </div>
+            <main className="px-6 mt-8 space-y-12">
+                {completedPlans.length > 0 ? (
+                    completedPlans.map((plan) => (
+                        <div key={plan.id} className="bg-white rounded-[3.5rem] shadow-xl shadow-gray-200/50 border border-gray-50 overflow-hidden flex flex-col">
 
-                {/* 記録のタイムライン */}
-                <div className="space-y-6">
-                    {completedItems.length > 0 ? (
-                        completedItems.map((item, idx) => (
-                            <div key={idx} className="relative pl-8 group">
-                                <div className="absolute left-[11px] top-0 bottom-[-24px] w-[2px] bg-slate-100 group-last:bg-transparent" />
-                                <div className="absolute left-0 top-1 w-6 h-6 bg-white border-2 border-pink-100 rounded-full flex items-center justify-center z-10">
-                                    <div className="w-2 h-2 bg-pink-400 rounded-full" />
+                            {/* カード上部：旅の情報 */}
+                            <div className="p-8 pb-4">
+                                <div className="flex justify-between items-start mb-2">
+                                    <p className="text-[10px] font-black text-pink-500 uppercase tracking-widest">Completed Journey</p>
+                                    <div className="flex items-center gap-1 bg-orange-50 px-3 py-1 rounded-full text-orange-500">
+                                        <Clock size={10} />
+                                        <span className="text-[9px] font-black uppercase italic">{new Date(plan.lastActivity).toLocaleDateString()}</span>
+                                    </div>
+                                </div>
+                                <h2 className="text-3xl font-black italic tracking-tighter text-gray-800 uppercase leading-none mb-4">
+                                    {plan.name}
+                                </h2>
+                            </div>
+
+                            {/* 地図セクション：軌跡を表示 */}
+                            <div className="px-6 relative h-60">
+                                <div className="w-full h-full rounded-[2.5rem] overflow-hidden border border-gray-100 shadow-inner">
+                                    <LazyMap
+                                        items={plan.items}
+                                        userLocation={null}
+                                        themeColor="#f06292"
+                                        center={plan.center}
+                                    />
+                                    {/* 地図を触れなくして「プレビュー」として扱うための透明レイヤー（任意） */}
+                                    <div className="absolute inset-0 z-10 pointer-events-none rounded-[2.5rem] border-[12px] border-white/10" />
+                                </div>
+                            </div>
+
+                            {/* 獲得アイテム詳細リスト */}
+                            <div className="p-8 pt-6 space-y-6">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Flag size={14} className="text-gray-300" />
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Discovery Timeline</p>
                                 </div>
 
-                                <div className="bg-white p-5 rounded-[1.8rem] border border-gray-50 shadow-sm group-active:scale-[0.98] transition-all">
-                                    <div className="flex justify-between items-start mb-3">
-                                        <div>
-                                            <h3 className="text-base font-medium text-slate-800 leading-tight mb-1">{item.name}</h3>
-                                            <div className="flex items-center gap-1 text-slate-400">
-                                                <MapPin size={10} />
-                                                <span className="text-[10px] font-medium uppercase tracking-wider">{item.planName}</span>
+                                <div className="space-y-4">
+                                    {plan.collectedItems.map((item: any, idx: number) => (
+                                        <div key={item.id} className="flex items-center gap-4 group">
+                                            <div className="flex flex-col items-center">
+                                                <div className="w-10 h-10 bg-gradient-to-br from-[#f06292] to-[#ff8a65] rounded-xl flex items-center justify-center text-white shadow-md">
+                                                    <CheckCircle size={20} />
+                                                </div>
+                                                {idx !== plan.collectedItems.length - 1 && (
+                                                    <div className="w-[2px] h-6 bg-gray-100 mt-2" />
+                                                )}
+                                            </div>
+                                            <div className="flex-1 bg-gray-50 rounded-2xl p-4 border border-gray-100/50">
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <h4 className="font-black italic text-gray-800 tracking-tight">{item.name}</h4>
+                                                    <span className="text-[9px] font-bold text-gray-400 bg-white px-2 py-1 rounded-lg border border-gray-100">
+                                                        {new Date(item.collectedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-1 text-gray-400">
+                                                    <MapPin size={10} />
+                                                    <span className="text-[9px] font-bold uppercase tracking-wider">
+                                                        {item.lat.toFixed(4)}, {item.lng.toFixed(4)}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-1 bg-pink-50 px-3 py-1 rounded-full text-pink-400">
-                                            <CheckCircle size={10} />
-                                            <span className="text-[9px] font-bold uppercase tracking-tighter italic">Found</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-50 text-slate-300">
-                                        <Calendar size={12} />
-                                        <span className="text-[10px] font-medium">
-                                            {new Date(item.collectedAt).toLocaleDateString('ja-JP', {
-                                                year: 'numeric',
-                                                month: 'long',
-                                                day: 'numeric',
-                                                hour: '2-digit',
-                                                minute: '2-digit'
-                                            })}
-                                        </span>
-                                    </div>
+                                    ))}
                                 </div>
+
+                                {/* 旅の要約ボタン */}
+                                <button className="w-full mt-4 bg-gray-900 text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all uppercase tracking-widest text-xs">
+                                    Review Full Route
+                                </button>
                             </div>
-                        ))
-                    ) : (
-                        <div className="text-center py-20">
-                            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100">
-                                <Package size={24} className="text-gray-200" />
-                            </div>
-                            <p className="text-slate-400 text-sm font-light italic">記録された冒険はまだありません</p>
                         </div>
-                    )}
-                </div>
+                    ))
+                ) : (
+                    <div className="text-center py-24 bg-white rounded-[4rem] border border-gray-100 shadow-sm">
+                        <Package size={64} className="text-gray-100 mx-auto mb-6" />
+                        <p className="text-gray-400 font-black italic uppercase tracking-[0.2em] text-sm">No Missions Logged Yet</p>
+                        <button
+                            onClick={() => router.push('/')}
+                            className="mt-8 px-8 py-4 bg-pink-500 text-white font-black rounded-2xl shadow-lg shadow-pink-100 uppercase text-xs"
+                        >
+                            Start New Quest
+                        </button>
+                    </div>
+                )}
             </main>
         </div>
     );
