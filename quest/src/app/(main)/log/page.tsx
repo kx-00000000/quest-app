@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { getPlans } from "@/lib/storage";
 import { calculateDistance } from "@/lib/geo";
-import { CheckCircle, MapPin, ChevronDown, ChevronUp, Package } from "lucide-react";
+import { MapPin, ChevronDown, ChevronUp, Package } from "lucide-react";
 import dynamic from "next/dynamic";
 
 const LazyMap = dynamic(() => import("@/components/Map/LazyMap"), {
@@ -18,8 +18,6 @@ const formatDistance = (km: number): string => {
     }
     return `${km.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`;
 };
-
-
 
 export default function LogPage() {
     const [completedPlans, setCompletedPlans] = useState<any[]>([]);
@@ -59,41 +57,43 @@ export default function LogPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50/50 p-6 pb-24 font-sans">
+        <div className="min-h-screen bg-gray-50/50 p-6 pb-24">
             <div className="pt-8" />
-            <div className="space-y-4">
+            <div className="space-y-6">
                 {completedPlans.length > 0 ? (
                     completedPlans.map((plan) => {
                         const isExpanded = expandedId === plan.id;
                         return (
-                            <div key={plan.id} className="bg-white/70 backdrop-blur-xl rounded-[2.5rem] shadow-xl border border-white/60 overflow-hidden transition-all duration-300">
-                                {/* タップ可能なヘッダー */}
+                            <div key={plan.id} className="bg-white/70 backdrop-blur-xl rounded-[2.5rem] shadow-xl border border-white/60 overflow-hidden">
+
+                                {/* 1. タップ可能なヘッダー：フォント指定をPLANページと完全に同期 */}
                                 <div
-                                    className="p-8 cursor-pointer flex justify-between items-start"
+                                    className="p-6 cursor-pointer flex justify-between items-start"
                                     onClick={() => toggleExpand(plan.id)}
                                 >
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-1">
+                                    <div className="flex-1 pr-4">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            {/* フォント修正：tracking-tighterを削除 */}
                                             <h3 className="text-xl font-black text-gray-800 leading-tight">{plan.name}</h3>
                                             <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black tracking-tighter uppercase bg-blue-100 text-blue-600">
                                                 DONE
                                             </span>
                                         </div>
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">
+                                        <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest leading-none">
                                             {new Date(plan.completionDate).toLocaleDateString('ja-JP')}
                                         </p>
                                     </div>
-                                    <div className="text-gray-300 ml-4">
-                                        {isExpanded ? <ChevronUp size={20} strokeWidth={3} /> : <ChevronDown size={20} strokeWidth={3} />}
+                                    <div className="text-gray-300">
+                                        {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                                     </div>
                                 </div>
 
-                                {/* 展開される詳細コンテンツ */}
+                                {/* 2. 詳細セクション：開いている時だけ表示 */}
                                 {isExpanded && (
-                                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                                        <div className="grid grid-cols-2 gap-3 px-8 mb-6">
+                                    <div className="animate-in fade-in duration-300">
+                                        <div className="grid grid-cols-2 gap-3 px-6 mb-6">
                                             <div className="bg-black/5 rounded-2xl p-4">
-                                                <div className="text-[9px] font-black text-pink-600 uppercase tracking-widest mb-1">TRAVEL</div>
+                                                <div className="text-[9px] font-black text-pink-600 uppercase tracking-widest mb-1">TOTAL TRAVEL</div>
                                                 <div className="text-lg font-black text-gray-800">{formatDistance(plan.totalDistance)}</div>
                                             </div>
                                             <div className="bg-black/5 rounded-2xl p-4">
@@ -102,18 +102,21 @@ export default function LogPage() {
                                             </div>
                                         </div>
 
-                                        <div className="mx-0 h-52 relative border-y border-gray-100">
+                                        {/* 地図：左右の余白を打ち消して表示 (mx-[-1.5rem]) */}
+                                        <div className="mx-[-1.5rem] h-52 relative border-y border-gray-100">
                                             <LazyMap items={plan.items} themeColor="#f06292" center={plan.center} isLogMode={true} />
                                         </div>
 
-                                        <div className="p-8 space-y-5 bg-gray-50/20">
-                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2">Discovery Timeline</p>
-                                            <div className="space-y-4">
+                                        <div className="p-6 space-y-5">
+                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 px-1">Discovery Timeline</p>
+                                            <div className="space-y-4 px-1">
                                                 {plan.collectedItems.map((item: any, idx: number) => (
                                                     <div key={item.id} className="flex gap-4">
                                                         <div className="flex flex-col items-center">
                                                             <div className="w-2 h-2 bg-pink-400 rounded-full mt-1.5" />
-                                                            {idx !== plan.collectedItems.length - 1 && <div className="w-[1px] flex-1 bg-gray-100 my-1" />}
+                                                            {idx !== plan.collectedItems.length - 1 && (
+                                                                <div className="w-[1px] flex-1 bg-gray-100 my-1" />
+                                                            )}
                                                         </div>
                                                         <div className="flex-1">
                                                             <div className="flex justify-between items-baseline">
@@ -123,7 +126,8 @@ export default function LogPage() {
                                                                 </span>
                                                             </div>
                                                             <div className="flex items-center gap-1 text-[9px] font-bold text-gray-300 uppercase mt-0.5">
-                                                                <MapPin size={10} /> {item.lat.toFixed(4)}, {item.lng.toFixed(4)}
+                                                                <MapPin size={10} />
+                                                                {item.lat.toFixed(4)}, {item.lng.toFixed(4)}
                                                             </div>
                                                         </div>
                                                     </div>
