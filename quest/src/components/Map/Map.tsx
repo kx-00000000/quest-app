@@ -1,70 +1,82 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Circle, useMap, CircleMarker } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
+import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { useEffect, useMemo } from "react";
 
-function MapUpdater({ radiusInKm, center }: any) {
+// アイコンのセットアップ
+const createIcon = (color: string, isStart = false) => L.divIcon({
+    className: "custom-icon",
+    html: `<div style="background-color: ${color}; width: ${isStart ? '12px' : '10px'}; height: ${isStart ? '12px' : '10px'}; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></div>`,
+    iconSize: [12, 12],
+    iconAnchor: [6, 6],
+});
+
+// 地図の表示範囲を自動調整する部品
+function MapBounds({ points }: { points: [number, number][] }) {
     const map = useMap();
-
     useEffect(() => {
-        if (typeof window === "undefined" || !radiusInKm) return;
-
-        // 現在地、またはデフォルトの東京
-        const currentCenter = center || { lat: 35.6812, lng: 139.7671 };
-
-        // スライダーの動きに地図の計算を同期させるためのタイマー
-        const timer = setTimeout(() => {
-            try {
-                const L = require("leaflet");
-                const circle = L.circle([currentCenter.lat, currentCenter.lng], { radius: radiusInKm * 1000 });
-
-                // 地図の状態をリセットしてからズーム（これでズームが効かない問題を回避）
-                map.invalidateSize();
-
-                map.fitBounds(circle.getBounds(), {
-                    paddingTopLeft: [40, 100],     // [左の余白, 上（タイトル入力）の余白]
-                    paddingBottomRight: [40, 750], // [右の余白, 下（メニュー）の余白] ※さらに大きくしました
-                    animate: true,
-                    duration: 0.6
-                });
-            } catch (e) {
-                console.error("Map Update Error:", e);
-            }
-        }, 100); // 0.1秒待ってから実行
-
-        return () => clearTimeout(timer);
-    }, [map, radiusInKm, center]);
-
+        if (points.length > 0) {
+            const bounds = L.latLngBounds(points);
+            map.fitBounds(bounds, { padding: [30, 30] });
+        }
+    }, [points, map]);
     return null;
 }
 
-export default function MapComponent({ radiusInKm, userLocation, themeColor }: any) {
-    const [isReady, setIsReady] = useState(false);
-    useEffect(() => { setIsReady(true); }, []);
-    if (!isReady) return null;
+export default function Map({ items = [], center, themeColor = "#f06292", isLogMode = false }: any) {
+    // 1. 軌跡用のポイント配列を作成 (Start -> Item1 -> Item2...)
+    const trackPoints = useMemo(() => {
+        if (!isLogMode) return [];
 
-    const displayColor = themeColor || "#F06292";
-    const centerPos: [number, number] = userLocation ? [userLocation.lat, userLocation.lng] : [35.6812, 139.7671];
+        const start: [number, number] = center ? [center.lat, center.lng] : [0, 0];
+        const collected = items
+            .filter((i: any) => i.isCollected)
+            .sort((a: any, b: any) => new Date(a.collectedAt).getTime() - new Date(b.collectedAt).getTime())
+            .map((i: any) => [i.lat, i.lng] as [number, number]);
+
+        return [start, ...collected];
+    }, [items, center, isLogMode]);
+
+    const mapCenter: [number, number] = center ? [center.lat, center.lng] : [35.6812, 139.7671];
 
     return (
-        <div className="h-full w-full">
-            <MapContainer
-                center={centerPos}
-                zoom={13}
-                style={{ height: "100%", width: "100%" }}
-                zoomControl={false}
-                attributionControl={false}
-            >
-                <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
-                <MapUpdater radiusInKm={radiusInKm} center={userLocation} />
-                {userLocation && (
-                    <>
-                        <CircleMarker center={[userLocation.lat, userLocation.lng]} radius={10} pathOptions={{ color: 'white', fillColor: displayColor, fillOpacity: 1, weight: 3 }} />
-                        <Circle center={[userLocation.lat, userLocation.lng]} radius={radiusInKm * 1000} pathOptions={{ color: displayColor, fillColor: displayColor, fillOpacity: 0.1, weight: 2 }} />
-                    </>
-                )}
-            </MapContainer>
-        </div>
+        <MapContainer center={mapCenter} zoom={15} className="w-full h-full z-0">
+            <TileLayer
+                url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+            />
+
+            {/* 2. 出発地点のプロット */}
+            {isLogMode && center && (
+                <Marker position={[center.lat, center.lng]} icon={createIcon("#333", true)} />
+            )}
+
+            {/* 3. 軌跡（線）の描画 */}
+            {isLogMode && trackPoints.length > 1 && (
+                <Polyline
+                    positions={trackPoints}
+                    pathOptions={{
+                        color: themeColor,
+                        weight: 3,
+                        opacity: 0.6,
+                        dashArray: "5, 10" // 点線にして「歩いた感」を演出
+                    }}
+                />
+            )}
+
+            {/* 4. アイテム地点のプロット */}
+            {items.map((item: any) => (
+                <Marker
+                    key={item.id}
+                    position={[item.lat, item.lng]}
+                    icon={createIcon(item.isCollected ? themeColor : "#ccc")}
+                />
+            ))}
+
+            {/* 自動ズーム調整 */}
+            {isLogMode && <MapBounds points={trackPoints} />}
+        </MapContainer>
     );
 }
