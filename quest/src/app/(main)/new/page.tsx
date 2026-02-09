@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { savePlan } from "@/lib/storage";
 import { generateRandomPoint } from "@/lib/geo";
 import LazyMap from "@/components/Map/LazyMap";
+import MissionBriefing from "@/components/Map/MissionBriefing"; // ★追加
 
 const rangeModes = [
     { id: 'neighborhood', label: 'NEIGHBORHOOD', min: 0.5, max: 15, step: 0.1 },
@@ -29,6 +30,10 @@ export default function NewQuestPage() {
     const [isCreating, setIsCreating] = useState(false);
     const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
 
+    // ★追加ステート
+    const [briefingItems, setBriefingItems] = useState<any[]>([]);
+    const [isBriefingActive, setIsBriefingActive] = useState(false);
+
     useEffect(() => {
         navigator.geolocation.getCurrentPosition(
             (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
@@ -38,69 +43,58 @@ export default function NewQuestPage() {
 
     const handleCreate = async () => {
         setIsCreating(true);
-        await new Promise(r => setTimeout(r, 600));
+
         let center = userLocation || { lat: 35.6812, lng: 139.7671 };
+
+        // アイテム生成
         const items = Array.from({ length: itemCount }).map((_, i) => {
             const point = generateRandomPoint(center, radius);
-            return { id: Math.random().toString(36).substr(2, 9), lat: point.lat, lng: point.lng, isCollected: false, name: `Item #${i + 1}` };
+            return {
+                id: Math.random().toString(36).substr(2, 9),
+                lat: point.lat,
+                lng: point.lng,
+                isCollected: false,
+                name: `Item #${i + 1}`
+            };
         });
-        savePlan({ id: Math.random().toString(36).substr(2, 9), name: name || "NEW QUEST", radius, itemCount, status: "ready", createdAt: new Date().toLocaleDateString(), totalDistance: 0, collectedCount: 0, center, items });
-        router.push("/plan");
+
+        // データを保存
+        savePlan({
+            id: Math.random().toString(36).substr(2, 9),
+            name: name || "NEW QUEST",
+            radius,
+            itemCount,
+            status: "ready",
+            createdAt: new Date().toLocaleDateString(),
+            totalDistance: 0,
+            collectedCount: 0,
+            center,
+            items
+        });
+
+        // ★即座に遷移せず、ブリーフィングを開始
+        setBriefingItems(items);
+        setIsBriefingActive(true);
     };
 
     return (
         <div className="flex flex-col h-full min-h-screen pb-20 relative overflow-hidden bg-white">
+
             <div className="absolute inset-0 z-0">
-                <LazyMap radiusInKm={radius} userLocation={userLocation} themeColor="#F06292" />
+                {/* LazyMapにアイテムを渡すように修正 */}
+                <LazyMap
+                    radiusInKm={radius}
+                    userLocation={userLocation}
+                    themeColor="#F06292"
+                    items={briefingItems} // ★追加
+                    isBriefingActive={isBriefingActive} // ★追加
+                    onBriefingComplete={() => router.push("/plan")} // ★終了時に遷移
+                />
             </div>
 
-            {/* ③ タイトル位置： top-8 (約2cm程度アップ) */}
-            <div className="absolute top-8 left-6 right-6 z-20">
-                <div className="bg-white/40 backdrop-blur-2xl rounded-[2rem] border border-white/40 shadow-xl px-6 py-3">
-                    <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("adventure_name_placeholder")} className="w-full bg-transparent border-none outline-none text-gray-800 font-bold placeholder:text-gray-400 text-center" />
-                </div>
-            </div>
-
-            <div className="mt-auto relative z-10 px-4 mb-4">
-                <div className="bg-white/30 backdrop-blur-3xl rounded-[3rem] p-6 shadow-2xl border border-white/40 space-y-5">
-
-                    <div className="flex p-1 bg-black/5 rounded-2xl gap-1">
-                        {rangeModes.map((mode) => (
-                            <button
-                                key={mode.id}
-                                onClick={() => { setActiveMode(mode); setRadius(mode.min); }}
-                                className={`flex-1 py-2 text-[9px] font-black rounded-xl transition-all ${activeMode.id === mode.id ? 'bg-white text-pink-600 shadow-sm' : 'text-gray-500'
-                                    }`}
-                            >
-                                {mode.label}
-                            </button>
-                        ))}
-                    </div>
-
-                    <div className="space-y-4 px-1">
-                        <div className="space-y-1">
-                            {/* ② フォントサイズ： text-sm (約2サイズアップ) */}
-                            <div className="flex justify-between text-sm font-black text-pink-600 uppercase tracking-widest">
-                                <span>Radius Range</span>
-                                <span className="text-gray-800">{formatDistance(radius)}</span>
-                            </div>
-                            {/* ① バーの色： accent-gray-400 & bg-black/10 (グレー系) */}
-                            <input type="range" min={activeMode.min} max={activeMode.max} step={activeMode.step} value={radius} onChange={(e) => setRadius(parseFloat(e.target.value))} className="w-full h-1.5 accent-gray-400 bg-black/10 rounded-full appearance-none" />
-                        </div>
-                        <div className="space-y-1">
-                            <div className="flex justify-between text-sm font-black text-pink-600 uppercase tracking-widest">
-                                <span>Items Count</span>
-                                <span className="text-gray-800">{itemCount}</span>
-                            </div>
-                            <input type="range" min="1" max="10" step="1" value={itemCount} onChange={(e) => setItemCount(parseInt(e.target.value))} className="w-full h-1.5 accent-gray-400 bg-black/10 rounded-full appearance-none" />
-                        </div>
-                    </div>
-
-                    <button onClick={handleCreate} disabled={isCreating} className="w-full py-4 bg-gradient-to-r from-[#F06292] to-[#FF8A65] text-white rounded-[2rem] font-black text-lg shadow-lg active:scale-95 transition-all border-b-4 border-black/10">
-                        {isCreating ? "..." : "作成"}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
+            {/* UIパーツ：ブリーフィング中は隠す演出 */}
+            {!isBriefingActive && (
+                <>
+                    <div className="absolute top-8 left-6 right-6 z-20 animate-in fade-in duration-500">
+                        <div className="bg-white/40 backdrop-blur-2xl rounded-[2rem] border border-white/40 shadow-xl px-6 py-3">
+                            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("adventure_name_placeholder")} className="w-full bg

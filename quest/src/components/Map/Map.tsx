@@ -4,6 +4,7 @@ import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useEffect, useMemo } from "react";
+import MissionBriefing from "./MissionBriefing"; // ★新規作成するコンポーネント
 
 // アイコンのセットアップ
 const createIcon = (color: string, isStart = false) => L.divIcon({
@@ -25,8 +26,17 @@ function MapBounds({ points }: { points: [number, number][] }) {
     return null;
 }
 
-export default function Map({ items = [], center, themeColor = "#f06292", isLogMode = false }: any) {
-    // 1. 軌跡用のポイント配列を作成 (Start -> Item1 -> Item2...)
+// プロップスに isBriefingActive と onBriefingComplete を追加
+export default function Map({
+    items = [],
+    center,
+    themeColor = "#f06292",
+    isLogMode = false,
+    isBriefingActive = false,    // ★追加
+    onBriefingComplete           // ★追加
+}: any) {
+
+    // 1. 軌跡用のポイント配列を作成
     const trackPoints = useMemo(() => {
         if (!isLogMode) return [];
 
@@ -42,18 +52,18 @@ export default function Map({ items = [], center, themeColor = "#f06292", isLogM
     const mapCenter: [number, number] = center ? [center.lat, center.lng] : [35.6812, 139.7671];
 
     return (
-        <MapContainer center={mapCenter} zoom={15} className="w-full h-full z-0">
+        <MapContainer center={mapCenter} zoom={15} className="w-full h-full z-0" zoomControl={false}>
             <TileLayer
                 url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
                 attribution='&copy; <a href="https://carto.com/">CARTO</a>'
             />
 
-            {/* 2. 出発地点のプロット */}
+            {/* 2. 出発地点のプロット（ログモード時） */}
             {isLogMode && center && (
                 <Marker position={[center.lat, center.lng]} icon={createIcon("#333", true)} />
             )}
 
-            {/* 3. 軌跡（線）の描画 */}
+            {/* 3. 軌跡（線）の描画（ログモード時） */}
             {isLogMode && trackPoints.length > 1 && (
                 <Polyline
                     positions={trackPoints}
@@ -61,7 +71,7 @@ export default function Map({ items = [], center, themeColor = "#f06292", isLogM
                         color: themeColor,
                         weight: 3,
                         opacity: 0.6,
-                        dashArray: "5, 10" // 点線にして「歩いた感」を演出
+                        dashArray: "5, 10"
                     }}
                 />
             )}
@@ -71,9 +81,17 @@ export default function Map({ items = [], center, themeColor = "#f06292", isLogM
                 <Marker
                     key={item.id}
                     position={[item.lat, item.lng]}
-                    icon={createIcon(item.isCollected ? themeColor : "#ccc")}
+                    icon={createIcon(item.isCollected ? themeColor : (isBriefingActive ? themeColor : "#ccc"))}
                 />
             ))}
+
+            {/* 5. ミッション・ブリーフィング演出（アクティブ時のみ） */}
+            {isBriefingActive && (
+                <MissionBriefing
+                    items={items}
+                    onComplete={onBriefingComplete}
+                />
+            )}
 
             {/* 自動ズーム調整 */}
             {isLogMode && <MapBounds points={trackPoints} />}
