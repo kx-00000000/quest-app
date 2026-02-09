@@ -3,33 +3,36 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getPlans } from "@/lib/storage";
-import { ArrowLeft, Calendar, MapPin, CheckCircle, Award } from "lucide-react";
+// Package をインポートに追加しました
+import { ArrowLeft, Calendar, MapPin, CheckCircle, Award, Package } from "lucide-react";
 
 export default function LogPage() {
     const router = useRouter();
     const [completedItems, setCompletedItems] = useState<any[]>([]);
 
     useEffect(() => {
-        // 全てのプランから、獲得済みのアイテムだけを抽出
-        const allPlans = getPlans();
-        const items = allPlans.flatMap(plan =>
-            (plan.items || [])
-                .filter((item: any) => item.isCollected)
-                .map((item: any) => ({
-                    ...item,
-                    planName: plan.name // どの冒険で見つけたかも記録
-                }))
-        );
+        try {
+            const allPlans = getPlans();
+            const items = allPlans.flatMap(plan =>
+                (plan.items || [])
+                    .filter((item: any) => item.isCollected)
+                    .map((item: any) => ({
+                        ...item,
+                        planName: plan.name
+                    }))
+            );
 
-        // 獲得日時が新しい順に並び替え
-        setCompletedItems(items.sort((a, b) =>
-            new Date(b.collectedAt).getTime() - new Date(a.collectedAt).getTime()
-        ));
+            setCompletedItems(items.sort((a, b) =>
+                new Date(b.collectedAt).getTime() - new Date(a.collectedAt).getTime()
+            ));
+        } catch (e) {
+            console.error("Log loading error:", e);
+        }
     }, []);
 
     return (
         <div className="min-h-screen bg-[#FAFAFA] text-slate-800 font-sans pb-20">
-            {/* ヘッダー */}
+            {/* ヘッダー：品格のあるタイポグラフィ */}
             <header className="p-6 pt-12 flex justify-between items-end">
                 <button
                     onClick={() => router.push('/')}
@@ -44,7 +47,7 @@ export default function LogPage() {
             </header>
 
             <main className="px-6 mt-8">
-                {/* サマリーカード */}
+                {/* サマリー：実績のハイライト */}
                 <div className="bg-white p-6 rounded-[2rem] border border-gray-50 shadow-sm mb-10 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <div className="w-12 h-12 bg-pink-50 rounded-2xl flex items-center justify-center text-pink-400">
@@ -64,14 +67,12 @@ export default function LogPage() {
                     </div>
                 </div>
 
-                {/* タイムラインリスト */}
+                {/* 記録のタイムライン */}
                 <div className="space-y-6">
                     {completedItems.length > 0 ? (
                         completedItems.map((item, idx) => (
                             <div key={idx} className="relative pl-8 group">
-                                {/* タイムラインの線 */}
                                 <div className="absolute left-[11px] top-0 bottom-[-24px] w-[2px] bg-slate-100 group-last:bg-transparent" />
-                                {/* タイムラインの点 */}
                                 <div className="absolute left-0 top-1 w-6 h-6 bg-white border-2 border-pink-100 rounded-full flex items-center justify-center z-10">
                                     <div className="w-2 h-2 bg-pink-400 rounded-full" />
                                 </div>
