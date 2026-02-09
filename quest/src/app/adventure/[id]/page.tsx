@@ -1,17 +1,13 @@
 "use client";
 
-import dynamic from "next/dynamic";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 
-// ロジックとUIをすべて含んだ「AdventureView」を、ブラウザ専用として読み込む
+// SSR（サーバー側での計算）を完全に禁止して、ブラウザが落ち着いてから読み込む
 const AdventureView = dynamic(() => import("./AdventureView"), {
     ssr: false,
-    loading: () => (
-        <div className="h-screen bg-white flex items-center justify-center font-black text-pink-500 italic">
-            PREPARING ADVENTURE...
-        </div>
-    ),
+    loading: () => <div className="h-screen bg-white flex items-center justify-center font-black text-pink-500 italic">PREPARING...</div>,
 });
 
 export default function AdventurePage() {
@@ -22,7 +18,6 @@ export default function AdventurePage() {
         setIsClient(true);
     }, []);
 
-    // ブラウザでマウントされるまでは絶対に何も描画しない
     if (!isClient || !params?.id) return null;
 
     return <AdventureView id={params.id as string} />;
