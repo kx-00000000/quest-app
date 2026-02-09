@@ -62,7 +62,7 @@ export default function LogPage() {
                             {/* カード上部：NEW/PLANページとフォント・余白を統一 */}
                             <div className="p-8 pb-6">
                                 <p className="text-[10px] font-bold text-pink-500 uppercase tracking-widest mb-1">Mission Completed</p>
-                                <h2 className="text-3xl font-black tracking-tighter text-gray-800 uppercase leading-none mb-6">
+                                <h2 className="text-xl font-black tracking-tighter text-gray-800 uppercase leading-none mb-6">
                                     {plan.name}
                                 </h2>
 
