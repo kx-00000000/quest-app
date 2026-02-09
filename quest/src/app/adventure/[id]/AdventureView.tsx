@@ -3,8 +3,11 @@
 import { useEffect, useState, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { getPlans, savePlan } from "@/lib/storage";
-import { ArrowLeft, Navigation, Sparkles, Zap, Trophy, CheckCircle, Package } from "lucide-react";
+import { ArrowLeft, Navigation, Sparkles, CheckCircle, Package, Trophy, Zap } from "lucide-react";
 import { calculateBearing, calculateDistance } from "@/lib/geo";
+import dynamic from "next/dynamic";
+
+const LazyMap = dynamic(() => import("@/components/Map/LazyMap"), { ssr: false });
 
 export default function AdventureView({ id }: { id: string }) {
     const router = useRouter();
@@ -12,9 +15,9 @@ export default function AdventureView({ id }: { id: string }) {
     const [isTracking, setIsTracking] = useState(false);
     const [isFound, setIsFound] = useState(false);
 
-    const distanceRef = useRef<HTMLHeadingElement>(null);
+    // 直接操作用Ref（Reactの再レンダリングを介さず爆速更新）
+    const distanceRef = useRef<HTMLDivElement>(null);
     const compassRef = useRef<HTMLDivElement>(null);
-    const proximityOverlayRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const found = getPlans().find((p) => p.id === id);
@@ -23,17 +26,6 @@ export default function AdventureView({ id }: { id: string }) {
 
     const items = useMemo(() => plan?.items || [], [plan]);
     const currentItem = useMemo(() => items.find((i: any) => !i.isCollected) || null, [items]);
-
-    // 接近時の演出：上品な「呼吸」のような光り方に
-    const updateEffects = (meters: number) => {
-        if (!proximityOverlayRef.current) return;
-        if (meters < 50) {
-            proximityOverlayRef.current.style.opacity = "1";
-            proximityOverlayRef.current.style.backgroundColor = `rgba(240, 98, 146, ${Math.max(0.05, 0.15 - meters / 500)})`;
-        } else {
-            proximityOverlayRef.current.style.opacity = "0";
-        }
-    };
 
     const handleStart = async () => {
         if (typeof window === "undefined") return;
@@ -59,8 +51,9 @@ export default function AdventureView({ id }: { id: string }) {
                     const d = calculateDistance(pos.coords.latitude, pos.coords.longitude, currentItem.lat, currentItem.lng);
                     currentBearing = calculateBearing(pos.coords.latitude, pos.coords.longitude, currentItem.lat, currentItem.lng);
                     const meters = Math.floor(d * 1000);
+
+                    // 直接書き換え
                     distanceRef.current.innerText = `${meters.toLocaleString()} m`;
-                    updateEffects(meters);
                 }
             },
             (err) => console.warn(err),
@@ -68,8 +61,7 @@ export default function AdventureView({ id }: { id: string }) {
         );
     };
 
-    const debugAcquire = (e: React.MouseEvent) => {
-        e.stopPropagation(); // イベントの伝播を止める
+    const debugAcquire = () => {
         if (!currentItem) return;
         const now = new Date().toISOString();
         const updatedItems = items.map((i: any) => i.id === currentItem.id ? { ...i, isCollected: true, collectedAt: now } : i);
@@ -82,107 +74,101 @@ export default function AdventureView({ id }: { id: string }) {
     if (!plan) return null;
 
     return (
-        <div className="flex flex-col h-screen relative overflow-hidden bg-[#FAFAFA] text-slate-800 font-sans">
-            {/* 接近時の柔らかい光 */}
-            <div ref={proximityOverlayRef} className="absolute inset-0 opacity-0 transition-opacity duration-1000 pointer-events-none z-0" />
+        <div className="min-h-screen bg-gray-50/50 relative overflow-hidden font-sans">
+            {/* 1. 背景地図（固定表示で負荷を最小化） */}
+            <div className="absolute inset-0 z-0">
+                <LazyMap items={items} userLocation={null} themeColor="#f06292" center={plan.center} />
+                <div className="absolute inset-0 bg-white/20 backdrop-blur-[2px]" />
+            </div>
 
-            {/* ヘッダー */}
-            <header className="relative z-20 p-6 pt-12 flex justify-between items-end">
-                <button onClick={() => router.back()} className="w-11 h-11 bg-white shadow-sm rounded-2xl flex items-center justify-center border border-gray-100 active:scale-95 transition-all">
-                    <ArrowLeft size={18} className="text-slate-400" />
+            {/* 2. ヘッダー：Plan/Logと共通の「←」ボタン */}
+            <header className="relative z-10 p-6 pt-12 flex justify-between items-center">
+                <button onClick={() => router.back()} className="w-12 h-12 bg-white/80 backdrop-blur-xl rounded-2xl flex items-center justify-center shadow-lg border border-white/60 active:scale-90 transition-all">
+                    <ArrowLeft className="text-gray-400" size={20} />
                 </button>
-                <div className="text-right">
-                    <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest leading-none mb-1">Mission Progress</p>
-                    <p className="text-xl font-light text-pink-500 tracking-tighter italic">
-                        {plan.collectedCount || 0} <span className="text-slate-300 mx-1">/</span> {plan.itemCount}
-                    </p>
+                <div className="bg-white/80 backdrop-blur-xl px-4 py-2 rounded-xl border border-white/60 shadow-sm">
+                    <p className="text-[9px] font-black text-pink-500 uppercase tracking-tighter leading-none mb-0.5">Progress</p>
+                    <p className="text-sm font-black text-gray-800 leading-none">{plan.collectedCount} / {plan.itemCount}</p>
                 </div>
             </header>
 
-            <main className="flex-1 flex flex-col items-center justify-center relative z-10 px-6">
+            <main className="flex-1 flex flex-col items-center justify-center relative z-10 px-6 h-[60vh]">
                 {!isTracking ? (
-                    <div className="text-center max-w-xs animate-in fade-in duration-700">
-                        <div className="w-20 h-20 bg-white rounded-[2.2rem] flex items-center justify-center mx-auto mb-8 shadow-sm border border-gray-50">
-                            <Sparkles size={32} className="text-pink-300" />
+                    <div className="bg-white/70 backdrop-blur-2xl p-10 rounded-[2.5rem] shadow-2xl border border-white/60 text-center w-full max-w-xs">
+                        <div className="w-20 h-20 bg-pink-50 rounded-[2rem] flex items-center justify-center mx-auto mb-8 text-pink-400">
+                            <Sparkles size={32} />
                         </div>
-                        <h2 className="text-2xl font-light mb-2 tracking-tight text-slate-900">Adventure Starts</h2>
-                        <p className="text-slate-400 text-sm mb-10 leading-relaxed font-light">羅針盤を起動して、目的地までの<br />距離と方角を確認してください。</p>
+                        <h2 className="text-xl font-black text-gray-800 mb-2">Ready to Start?</h2>
+                        <p className="text-gray-400 text-xs mb-8 font-bold uppercase tracking-widest">Connect to Compass</p>
                         <button
                             onClick={handleStart}
-                            className="w-full py-4 bg-slate-900 text-white font-medium rounded-2xl shadow-lg active:scale-98 transition-all tracking-wide text-sm"
+                            className="w-full bg-gradient-to-r from-[#F06292] to-[#FF8A65] text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all text-sm uppercase tracking-widest border-b-4 border-black/10"
                         >
-                            Start Radar
+                            Start Adventure
                         </button>
                     </div>
                 ) : (
-                    <div className="flex flex-col items-center space-y-12 w-full max-w-sm">
-                        {/* 距離表示パネル */}
-                        <div className="text-center w-full py-10 bg-white/40 backdrop-blur-md rounded-[3rem] border border-white/60 shadow-sm">
-                            <p className="text-[10px] font-bold text-slate-300 uppercase tracking-[0.4em] mb-4">Distance</p>
-                            <h1 ref={distanceRef} className="text-6xl font-light tracking-tighter tabular-nums text-slate-800 italic">
+                    <div className="flex flex-col items-center space-y-10 w-full">
+                        {/* 距離計：PlanPageのスタッツボックスを応用 */}
+                        <div className="bg-white/70 backdrop-blur-2xl p-8 rounded-[3rem] shadow-2xl border border-white/60 text-center w-full max-w-sm">
+                            <p className="text-[10px] font-black text-pink-600 uppercase tracking-[0.3em] mb-4">Target Distance</p>
+                            <div ref={distanceRef} className="text-6xl font-black text-gray-800 tracking-tighter">
                                 --- m
-                            </h1>
+                            </div>
                         </div>
 
-                        {/* 精密な方位磁石 */}
-                        <div className="relative w-72 h-72 flex items-center justify-center">
-                            {/* 外側の繊細な目盛り */}
-                            <div className="absolute inset-0 rounded-full border border-slate-100" />
-                            <div className="absolute inset-[2px] rounded-full border border-slate-50 border-dashed animate-[spin_60s_linear_infinite]" />
+                        {/* 羅針盤：洗練されたミニマリズム */}
+                        <div className="relative w-64 h-64 flex items-center justify-center">
+                            <div className="absolute inset-0 rounded-full border-2 border-white/40" />
+                            <div className="absolute inset-4 rounded-full border border-pink-100 border-dashed animate-[spin_30s_linear_infinite]" />
+                            <div className="absolute inset-10 rounded-full bg-white/20 backdrop-blur-md border border-white/60 shadow-inner" />
 
-                            {/* 中心のすりガラス */}
-                            <div className="absolute inset-12 rounded-full bg-white/30 backdrop-blur-sm border border-white/50 shadow-sm" />
-
-                            <div ref={compassRef} className="relative transition-transform duration-500 ease-out z-10">
-                                <Navigation size={64} fill="currentColor" className="text-pink-500 opacity-90" />
+                            <div ref={compassRef} className="relative transition-transform duration-300 ease-out z-10">
+                                <Navigation size={80} fill="currentColor" className="text-pink-500 drop-shadow-xl" />
                             </div>
                         </div>
                     </div>
                 )}
             </main>
 
-            {/* フッター：コレクション・トレイ */}
-            <footer className="relative z-20 p-6 pb-12">
-                <div className="bg-white/80 backdrop-blur-xl rounded-[2.5rem] p-5 border border-white shadow-sm">
+            {/* 3. ボトム：コレクション・トレイ (Logページと統一) */}
+            <footer className="fixed bottom-10 left-6 right-6 z-10">
+                <div className="bg-white/70 backdrop-blur-2xl rounded-[2.5rem] p-5 shadow-2xl border border-white/60">
                     <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
                         {items.map((item: any) => (
                             <div key={item.id} className={`w-11 h-11 flex-shrink-0 rounded-xl flex items-center justify-center border transition-all ${item.isCollected ? "bg-pink-50 border-pink-100 text-pink-400" :
-                                    (item.id === currentItem?.id && isTracking ? "bg-white border-pink-300 text-pink-500 shadow-sm" : "bg-gray-50/50 border-gray-100 text-gray-200")
+                                    (item.id === currentItem?.id && isTracking ? "bg-white border-pink-300 text-pink-500 shadow-md animate-bounce" : "bg-gray-100/50 border-gray-100 text-gray-200")
                                 }`}>
                                 {item.isCollected ? <CheckCircle size={18} /> : <Package size={18} />}
                             </div>
                         ))}
                     </div>
-                    <div className="mt-4 px-2 flex justify-between items-center">
-                        <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest leading-none">
-                            {currentItem ? `Next: ${currentItem.name}` : "Complete"}
+                    <div className="mt-4 flex justify-between items-center px-2">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">
+                            {currentItem ? `Next: ${currentItem.name}` : "Complete!"}
                         </p>
-                        {/* 稲妻ボタンをここに配置して確実に押せるように */}
-                        <button
-                            onClick={debugAcquire}
-                            className="w-8 h-8 flex items-center justify-center text-slate-200 hover:text-pink-200 transition-colors"
-                            title="Test: Acquire"
-                        >
+                        {/* テスト用ボタン：控えめに配置 */}
+                        <button onClick={debugAcquire} className="text-gray-200 hover:text-pink-200 transition-colors">
                             <Zap size={14} />
                         </button>
                     </div>
                 </div>
             </footer>
 
-            {/* 獲得モーダル：プレミアム・トーン */}
+            {/* 獲得モーダル：Plan/Logと共通の品格 */}
             {isFound && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-8 bg-slate-900/10 backdrop-blur-md animate-in fade-in duration-300">
-                    <div className="text-center bg-white p-12 rounded-[3.5rem] shadow-2xl border border-white w-full max-w-xs scale-in-center">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-8 bg-gray-900/10 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="text-center bg-white p-12 rounded-[3.5rem] shadow-2xl border border-white w-full max-w-xs">
                         <div className="w-20 h-20 bg-pink-50 rounded-[2rem] flex items-center justify-center mx-auto mb-8 text-pink-400 border border-pink-100">
                             <Trophy size={36} />
                         </div>
-                        <h2 className="text-2xl font-light mb-2 tracking-tight text-slate-800 italic">Found!</h2>
-                        <p className="text-slate-400 mb-10 text-xs font-light tracking-wide uppercase">目的地に到達しました</p>
+                        <h2 className="text-2xl font-black mb-2 text-gray-800">FOUND!</h2>
+                        <p className="text-gray-400 mb-10 text-[10px] font-black tracking-widest uppercase">Target has been secured</p>
                         <button
                             onClick={() => { setIsFound(false); if (!currentItem) router.push('/log'); }}
-                            className="w-full py-4 bg-slate-900 text-white font-medium rounded-2xl shadow-sm active:scale-95 transition-all tracking-wide text-xs"
+                            className="w-full py-4 bg-gray-900 text-white font-black rounded-2xl shadow-lg active:scale-95 transition-all uppercase tracking-widest text-xs"
                         >
-                            {currentItem ? "Next Mission" : "Adventure Log"}
+                            {currentItem ? "Next Mission" : "Show Results"}
                         </button>
                     </div>
                 </div>
