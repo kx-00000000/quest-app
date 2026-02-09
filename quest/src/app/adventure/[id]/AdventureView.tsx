@@ -2,22 +2,19 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { getPlans, savePlan } from "@/lib/storage";
-import { ArrowLeft, Navigation, Sparkles } from "lucide-react";
+import { getPlans } from "@/lib/storage";
+import { ArrowLeft, Navigation, Sparkles, Map as MapIcon } from "lucide-react";
 import { calculateBearing, calculateDistance } from "@/lib/geo";
-import dynamic from "next/dynamic";
-
-const LazyMap = dynamic(() => import("@/components/Map/LazyMap"), { ssr: false });
 
 export default function AdventureView({ id }: { id: string }) {
     const router = useRouter();
     const [plan, setPlan] = useState<any>(null);
     const [isTracking, setIsTracking] = useState(false);
 
-    // DOMを直接操作するための「手（Ref）」を用意
+    // Reactを介さない直接操作用のRef
     const distanceRef = useRef<HTMLHeadingElement>(null);
     const compassRef = useRef<HTMLDivElement>(null);
-    const userLocRef = useRef<{ lat: number, lng: number } | null>(null);
+    const backgroundRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const found = getPlans().find((p) => p.id === id);
@@ -37,32 +34,33 @@ export default function AdventureView({ id }: { id: string }) {
 
         setIsTracking(true);
 
-        // --- ここから React を通さない「直接操作」 ---
         let currentHeading = 0;
         let currentBearing = 0;
 
-        // 1. 方位センサーの直接監視
+        // 1. 方位センサー監視（直接DOM操作）
         window.addEventListener("deviceorientation", (event: any) => {
             currentHeading = event.webkitCompassHeading || (event.alpha ? Math.abs(event.alpha - 360) : 0);
             if (compassRef.current) {
-                // Reactを介さず、CSSの回転だけを直接書き換える
                 compassRef.current.style.transform = `rotate(${currentBearing - currentHeading}deg)`;
             }
         });
 
-        // 2. GPS監視
+        // 2. GPS監視（直接DOM操作）
         navigator.geolocation.watchPosition(
             (pos) => {
-                const lat = pos.coords.latitude;
-                const lng = pos.coords.longitude;
-                userLocRef.current = { lat, lng };
-
+                const { latitude: lat, longitude: lng } = pos.coords;
                 if (currentItem && distanceRef.current) {
                     const d = calculateDistance(lat, lng, currentItem.lat, currentItem.lng);
                     currentBearing = calculateBearing(lat, lng, currentItem.lat, currentItem.lng);
 
-                    // Reactを介さず、文字だけを直接書き換える
-                    distanceRef.current.innerText = `${Math.floor(d * 1000).toLocaleString()} m`;
+                    const meters = Math.floor(d * 1000);
+                    distanceRef.current.innerText = `${meters.toLocaleString()} m`;
+
+                    // 【演出】近づくほど背景の色を濃くする「Hot/Cold」機能
+                    if (backgroundRef.current) {
+                        const opacity = Math.max(0.1, 1 - (meters / 500)); // 500m以内で色が変化
+                        backgroundRef.current.style.backgroundColor = `rgba(240, 98, 146, ${opacity})`;
+                    }
                 }
             },
             (err) => console.warn(err),
@@ -73,45 +71,74 @@ export default function AdventureView({ id }: { id: string }) {
     if (!plan) return null;
 
     return (
-        <div className="flex flex-col h-screen relative overflow-hidden bg-white">
-            {/* 1. 背景地図（一度描画したら、userLocationにnullを渡して固定し、負荷を下げます） */}
-            <div className="absolute inset-0 z-0">
-                <LazyMap items={plan.items || []} userLocation={null} themeColor="#F06292" center={plan.center} />
-            </div>
+        <div className="flex flex-col h-screen relative overflow-hidden bg-slate-900 text-white">
+            {/* 演出用の背景層 */}
+            <div ref={backgroundRef} className="absolute inset-0 transition-colors duration-1000" />
 
-            <header className="relative z-10 p-6 pt-12">
-                <button onClick={() => router.back()} className="w-12 h-12 bg-white/40 backdrop-blur-xl rounded-2xl flex items-center justify-center shadow-lg">
+            {/* グリッド線（冒険感を出す装飾） */}
+            <div className="absolute inset-0 opacity-10 bg-[linear-gradient(to_right,#808080_1px,transparent_1px),linear-gradient(to_bottom,#808080_1px,transparent_1px)] bg-[size:40px_40px]" />
+
+            <header className="relative z-10 p-6 pt-12 flex justify-between">
+                <button onClick={() => router.back()} className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/20">
                     <ArrowLeft size={20} />
                 </button>
+                <div className="bg-white/10 backdrop-blur-md px-6 py-2 rounded-2xl border border-white/20 font-black italic">
+                    SEARCHING...
+                </div>
             </header>
 
             <main className="flex-1 flex flex-col items-center justify-center relative z-10 px-6">
                 {!isTracking ? (
-                    <div className="bg-white/80 backdrop-blur-3xl p-10 rounded-[3rem] shadow-2xl border border-white text-center">
-                        <Sparkles className="w-12 h-12 text-pink-500 mx-auto mb-4 animate-pulse" />
-                        <h2 className="text-2xl font-black text-gray-800 mb-6 italic uppercase tracking-tighter">Start Adventure</h2>
-                        <button onClick={handleStart} className="w-full bg-pink-500 text-white font-black py-5 px-10 rounded-2xl shadow-xl uppercase text-sm">Start</button>
+                    <div className="text-center animate-in fade-in zoom-in duration-700">
+                        <div className="w-24 h-24 bg-pink-500 rounded-full flex items-center justify-center mx-auto mb-8 shadow-[0_0_50px_rgba(240,98,146,0.5)]">
+                            <Sparkles size={40} className="animate-pulse" />
+                        </div>
+                        <h2 className="text-3xl font-black mb-2 italic uppercase">Adventure</h2>
+                        <p className="text-gray-400 text-sm mb-10">羅針盤を起動してターゲットを探せ</p>
+                        <button
+                            onClick={handleStart}
+                            className="px-12 py-5 bg-white text-slate-900 font-black rounded-2xl shadow-xl active:scale-95 transition-all uppercase tracking-widest"
+                        >
+                            Start Radar
+                        </button>
                     </div>
                 ) : (
-                    <div className="flex flex-col items-center space-y-8">
-                        {/* 距離表示パネル（ID指定で直接書き換え） */}
-                        <div className="text-center bg-white/60 backdrop-blur-xl p-6 rounded-[2.5rem] shadow-2xl border border-white">
-                            <p className="text-[10px] font-black text-pink-600 uppercase mb-1 tracking-widest">Distance</p>
-                            <h1 ref={distanceRef} className="text-5xl font-black text-gray-900 italic tracking-tighter">
+                    <div className="flex flex-col items-center space-y-12">
+                        {/* 距離表示 */}
+                        <div className="text-center">
+                            <p className="text-xs font-black text-pink-400 uppercase mb-2 tracking-[0.3em]">Target Range</p>
+                            <h1 ref={distanceRef} className="text-7xl font-black italic tracking-tighter tabular-nums">
                                 --- m
                             </h1>
                         </div>
 
-                        {/* コンパス（Ref指定で直接回す） */}
-                        <div className="relative w-64 h-64 flex items-center justify-center">
-                            <div className="absolute inset-0 rounded-full border-4 border-pink-200/30 border-dashed animate-[spin_20s_linear_infinite]" />
-                            <div ref={compassRef} className="relative text-pink-500 transition-transform duration-300 ease-out">
-                                <Navigation size={80} fill="currentColor" className="drop-shadow-2xl" />
+                        {/* 羅針盤（メインビジュアル） */}
+                        <div className="relative w-80 h-80 flex items-center justify-center">
+                            {/* 装飾用のリング */}
+                            <div className="absolute inset-0 rounded-full border-2 border-white/5" />
+                            <div className="absolute inset-4 rounded-full border border-white/10 border-dashed animate-[spin_30s_linear_infinite]" />
+                            <div className="absolute inset-10 rounded-full border-2 border-pink-500/20 shadow-[0_0_30px_rgba(240,98,146,0.2)]" />
+
+                            {/* 回転する針 */}
+                            <div ref={compassRef} className="relative transition-transform duration-300 ease-out">
+                                <Navigation size={120} fill="currentColor" className="text-pink-500 drop-shadow-[0_0_20px_rgba(240,98,146,0.8)]" />
                             </div>
                         </div>
+
+                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest animate-pulse">
+                            Signal Tracking Active
+                        </p>
                     </div>
                 )}
             </main>
+
+            {/* フッター（アイテムのヒント） */}
+            <footer className="relative z-10 p-8">
+                <div className="bg-white/5 backdrop-blur-xl rounded-[2rem] p-6 border border-white/10 text-center">
+                    <p className="text-gray-400 text-xs font-bold uppercase mb-1">Target</p>
+                    <p className="text-lg font-black italic">{currentItem?.name || "???"}</p>
+                </div>
+            </footer>
         </div>
     );
 }
