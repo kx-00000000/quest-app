@@ -1,123 +1,15 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useTranslation } from "react-i18next";
-import { getPlans, savePlan, type Plan, deletePlan } from "@/lib/storage";
-import { getLocationName } from "@/lib/geo";
-import { Play, RotateCcw, Trash2 } from "lucide-react";
-
-const formatDistance = (km: number): string => {
-    if (km < 1) {
-        const meters = Math.floor(km * 1000);
-        return `${meters.toLocaleString()} m`;
-    }
-    return `${km.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`;
-};
-
-export default function PlanPage() {
-    const router = useRouter();
-    const { t } = useTranslation();
-    const [plans, setPlans] = useState<Plan[]>([]);
-
-    useEffect(() => {
-        setPlans(getPlans().filter(p => !p.isArchived));
-    }, []);
-
-    const handleDelete = (id: string) => {
-        if (confirm(t("delete_confirm_message"))) {
-            deletePlan(id);
-            setPlans(getPlans().filter(p => !p.isArchived));
-        }
-    };
-
-    return (
-        <div className="min-h-screen bg-gray-50/50 p-6 pb-24">
-            {/* ヘッダー削除：ボトムタブと重複するため、上部の余白のみ確保 */}
-            <div className="pt-8" />
-
-            <div className="space-y-6">
-                {plans.map((plan) => (
-                    <div key={plan.id} className="bg-white/70 backdrop-blur-xl rounded-[2.5rem] p-6 shadow-xl border border-white/60 relative overflow-hidden group">
-
-                        {/* 削除ボタン：右上に配置、背景透過で控えめに */}
-                        <button
-                            onClick={() => handleDelete(plan.id)}
-                            className="absolute top-7 right-7 text-gray-300 hover:text-red-400 transition-colors z-20"
-                            aria-label="Delete"
-                        >
-                            <Trash2 size={18} strokeWidth={2.5} />
-                        </button>
-
-                        {/* Title & Status Area */}
-                        <div className="mb-4 pr-10">
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <h3 className="text-xl font-black text-gray-800 leading-tight">{plan.name}</h3>
-                                {/* ステータス：タイトルの右横へ移動 */}
-                                <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black tracking-tighter uppercase ${plan.status === 'active' ? 'bg-orange-100 text-orange-600' :
-                                        plan.status === 'completed' ? 'bg-blue-100 text-blue-600' :
-                                            'bg-pink-50 text-pink-400'
-                                    }`}>
-                                    {t(`status_${plan.status}`)}
-                                </span>
-                            </div>
-                            {/* Date: "Created:" を削除して日付だけに */}
-                            <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest">{plan.createdAt}</p>
-                        </div>
-
-                        {/* Stats Grid */}
-                        <div className="grid grid-cols-2 gap-3 mb-6">
-                            <div className="bg-black/5 rounded-2xl p-4">
-                                <div className="text-[9px] font-black text-pink-600 uppercase tracking-widest mb-1">{t("radius_label")}</div>
-                                <div className="text-lg font-black text-gray-800">{formatDistance(plan.radius)}</div>
-                            </div>
-                            <div className="bg-black/5 rounded-2xl p-4">
-                                <div className="text-[9px] font-black text-pink-600 uppercase tracking-widest mb-1">{t("item_count_label")}</div>
-                                <div className="text-lg font-black text-gray-800">{plan.itemCount} <span className="text-xs">ITEMS</span></div>
-                            </div>
-                        </div>
-
-                        {/* Action Button: 横幅いっぱいに広げてメインのアクションを強調 */}
-                        <button
-                            onClick={async () => {
-                                if (plan.status === 'ready' && !plan.startedAt) {
-                                    let startLocName = "Unknown Location";
-                                    if (navigator.geolocation) {
-                                        try {
-                                            const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-                                                navigator.geolocation.getCurrentPosition(resolve, reject);
-                                            });
-                                            startLocName = await getLocationName(pos.coords.latitude, pos.coords.longitude);
-                                        } catch (e) {
-                                            if (plan.center) startLocName = await getLocationName(plan.center.lat, plan.center.lng);
-                                        }
-                                    }
-
-                                    const updated = {
-                                        ...plan,
-                                        status: 'active',
-                                        startedAt: new Date().toISOString(),
-                                        startLocation: startLocName
-                                    };
-                                    savePlan(updated as any);
-                                }
-                                router.push(`/adventure/${plan.id}`);
-                            }}
-                            className="w-full bg-gradient-to-r from-[#F06292] to-[#FF8A65] text-white font-black py-4 px-6 rounded-2xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all text-sm uppercase tracking-widest border-b-4 border-black/10"
-                        >
-                            {plan.status === 'active' || plan.status === 'paused' ? (
-                                <>
-                                    <RotateCcw size={18} /> {t("resume_adventure")}
-                                </>
-                            ) : (
-                                <>
-                                    <Play size={18} /> {t("start_adventure")}
-                                </>
-                            )}
-                        </button>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}
+// 削除ボタンの横にアーカイブボタンを追加
+<div className="absolute top-7 right-7 flex gap-4 z-20">
+    <button
+        onClick={() => handleArchive(plan.id)} // アーカイブ関数を呼ぶ
+        className="text-gray-300 hover:text-orange-400 transition-colors"
+    >
+        <Package size={18} strokeWidth={2.5} />
+    </button>
+    <button
+        onClick={() => handleDelete(plan.id)}
+        className="text-gray-300 hover:text-red-400 transition-colors"
+    >
+        <Trash2 size={18} strokeWidth={2.5} />
+    </button>
+</div>
