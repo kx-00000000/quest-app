@@ -3,83 +3,89 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getPlans } from "@/lib/storage";
-import { ArrowLeft, Crosshair } from "lucide-react"; // 大文字に修正
-import dynamic from "next/dynamic";
-
-const LazyMap = dynamic(() => import("@/components/Map/LazyMap"), {
-    ssr: false,
-    loading: () => <div className="h-full w-full bg-pink-50 animate-pulse" />
-});
+import { ArrowLeft, Navigation } from "lucide-react";
 
 export default function AdventurePage() {
     const params = useParams();
     const router = useRouter();
     const [plan, setPlan] = useState<any>(null);
     const [coords, setCoords] = useState<{ lat: number, lng: number } | null>(null);
+    const [isTracking, setIsTracking] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     useEffect(() => {
-        const id = params?.id;
-        if (id) {
-            const found = getPlans().find(p => p.id === id);
-            setPlan(found);
-        }
+        const found = getPlans().find(p => p.id === params?.id);
+        setPlan(found);
     }, [params?.id]);
 
-    // GPSの生データを取るだけの処理（計算は一切しない）
-    useEffect(() => {
-        if (typeof window === "undefined" || !navigator.geolocation) {
+    // ボタンを押した時だけGPSを起動する
+    const startGPS = () => {
+        if (!navigator.geolocation) {
             setErrorMsg("Geolocation not supported");
             return;
         }
 
-        const watchId = navigator.geolocation.watchPosition(
+        setIsTracking(true);
+        setErrorMsg(null);
+
+        navigator.geolocation.watchPosition(
             (pos) => {
                 setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
             },
             (err) => {
-                setErrorMsg(`GPS Error: ${err.code} - ${err.message}`);
+                setErrorMsg(`GPS Error: ${err.message}`);
+                setIsTracking(false);
             },
-            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
-        return () => navigator.geolocation.clearWatch(watchId);
-    }, []);
+    };
 
-    if (!plan) return <div className="p-10 text-pink-500 italic">LOADING...</div>;
+    if (!plan) return <div className="p-10">LOADING...</div>;
 
     return (
-        <div className="h-screen bg-white relative overflow-hidden">
-            {/* 背景地図 */}
-            <div className="absolute inset-0 z-0">
-                <LazyMap items={plan.items || []} userLocation={coords} themeColor="#F06292" center={plan.center} />
-            </div>
+        <div className="h-screen bg-white flex flex-col items-center justify-center p-10 text-center text-gray-900">
+            <h1 className="text-2xl font-black mb-10 italic text-pink-500 uppercase">{plan.name}</h1>
 
-            <div className="relative z-10 p-6 pt-12 flex flex-col h-full pointer-events-none text-gray-900">
-                <button onClick={() => router.back()} className="w-12 h-12 bg-white/50 backdrop-blur-xl rounded-2xl flex items-center justify-center shadow-lg border border-white/40 pointer-events-auto">
-                    <ArrowLeft size={20} />
-                </button>
+            <div className="w-full bg-gray-50 rounded-[2.5rem] p-8 border border-gray-100 shadow-inner mb-10">
+                <p className="text-[10px] font-black text-gray-400 uppercase mb-4 tracking-widest">GPS Monitor</p>
 
-                <main className="mt-auto mb-10 pointer-events-auto space-y-4">
-                    <div className="bg-white/60 backdrop-blur-3xl rounded-[2.5rem] p-8 shadow-2xl border border-white/40 text-center">
-                        <div className="flex justify-center mb-4 text-pink-500">
-                            <Crosshair className="animate-spin-slow" />
+                {coords ? (
+                    <div className="space-y-2 animate-fade-in">
+                        <p className="text-xl font-mono font-bold">LAT: {coords.lat.toFixed(6)}</p>
+                        <p className="text-xl font-mono font-bold">LNG: {coords.lng.toFixed(6)}</p>
+                        <div className="mt-4 flex items-center justify-center gap-2 text-pink-500">
+                            <span className="w-2 h-2 bg-pink-500 rounded-full animate-ping" />
+                            <span className="text-[10px] font-black uppercase">Signal Active</span>
                         </div>
-                        <p className="text-[10px] font-black text-pink-600 uppercase mb-2 tracking-widest font-sans">Raw GPS Status</p>
-
+                    </div>
+                ) : (
+                    <div className="py-4">
                         {errorMsg ? (
-                            <p className="text-red-500 font-bold text-xs">{errorMsg}</p>
-                        ) : coords ? (
-                            <div className="space-y-1">
-                                <p className="text-sm font-mono font-bold tracking-tight">LAT: {coords.lat.toFixed(6)}</p>
-                                <p className="text-sm font-mono font-bold tracking-tight">LNG: {coords.lng.toFixed(6)}</p>
-                                <p className="text-pink-500 text-[10px] font-black mt-2 animate-pulse uppercase">GPS Signal Active</p>
-                            </div>
+                            <p className="text-red-500 font-bold text-sm">{errorMsg}</p>
                         ) : (
-                            <p className="text-gray-400 font-bold animate-pulse italic text-xs uppercase">Wait for GPS...</p>
+                            <p className="text-gray-300 italic">GPS is currently idle.</p>
                         )}
                     </div>
-                </main>
+                )}
             </div>
+
+            {!isTracking ? (
+                <button
+                    onClick={startGPS}
+                    className="w-full bg-pink-500 text-white font-black py-5 rounded-2xl shadow-xl shadow-pink-200 active:scale-95 transition-all flex items-center justify-center gap-3"
+                >
+                    <Navigation size={20} fill="currentColor" />
+                    START TRACKING
+                </button>
+            ) : (
+                <p className="text-pink-300 font-black italic text-sm animate-pulse">
+                    TRACKING IN PROGRESS...
+                </p>
+            )}
+
+            <button onClick={() => router.back()} className="mt-10 text-gray-400 font-bold text-sm underline">
+                BACK TO PLANS
+            </button>
         </div>
     );
 }
