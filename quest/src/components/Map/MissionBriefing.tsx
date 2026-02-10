@@ -17,6 +17,7 @@ export default function MissionBriefing({ items, onComplete }: { items: any[], o
             const names: string[] = [];
             for (let i = 0; i < items.length; i++) {
                 const item = items[i];
+                // 個別地点へのズーム（下部に情報が出ることを考慮して中心を少し上に）
                 map.flyTo([item.lat, item.lng], 15, { duration: 1.5 });
                 const name = await getLocationName(item.lat, item.lng);
                 names.push(name);
@@ -29,12 +30,10 @@ export default function MissionBriefing({ items, onComplete }: { items: any[], o
             setCurrentIndex(-1);
 
             const bounds = L.latLngBounds(items.map(i => [i.lat, i.lng]));
-
-            // ★修正ポイント：padding を TopLeft と BottomRight に分割
-            // paddingBottomRight の 2つ目の数値（250）が、パネルを避けるための下部余白です
+            // ★修正：下部余白を 320px に拡大して地図をさらに上に押し上げる
             map.fitBounds(bounds, {
                 paddingTopLeft: [50, 50],
-                paddingBottomRight: [50, 250],
+                paddingBottomRight: [50, 320],
                 duration: 1.5
             });
 
@@ -46,11 +45,16 @@ export default function MissionBriefing({ items, onComplete }: { items: any[], o
 
     return (
         <div className="absolute inset-0 z-[1000] pointer-events-none p-6 flex flex-col">
-            {/* 巡回中の上部ステータス（シンプル版） */}
+            {/* 巡回中の上部ステータス（進捗と地名を統合） */}
             {!isFinalOverview && currentIndex !== -1 && (
-                <div className="mt-8 self-center bg-gray-900/95 backdrop-blur-2xl px-6 py-3 rounded-2xl shadow-2xl border border-white/10 animate-in fade-in slide-in-from-top-4">
-                    <div className="flex items-center gap-3">
-                        <PlaneTakeoff size={14} className="text-pink-500 animate-pulse" />
+                <div className="mt-8 self-center bg-gray-900/95 backdrop-blur-2xl px-6 py-4 rounded-[2rem] shadow-2xl border border-white/10 animate-in fade-in slide-in-from-top-4">
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2 px-3 py-1 bg-pink-500 rounded-full">
+                            <PlaneTakeoff size={12} className="text-white animate-pulse" />
+                            <span className="text-[10px] font-black text-white uppercase tracking-tighter">
+                                {currentIndex + 1} / {items.length}
+                            </span>
+                        </div>
                         <span className="text-sm font-black text-white uppercase tracking-tight">
                             {locationNames[currentIndex]}
                         </span>
@@ -58,9 +62,9 @@ export default function MissionBriefing({ items, onComplete }: { items: any[], o
                 </div>
             )}
 
-            {/* 下部に配置される「DISCOVERY REPORT」パネル */}
+            {/* ★修正：位置を上げ (mb-32)、さらにコンパクトにした「DISCOVERY REPORT」 */}
             {isFinalOverview && (
-                <div className="mt-auto mb-10 w-full max-w-sm self-center bg-gray-900/95 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl border border-white/10 p-6 animate-in slide-in-from-bottom-10 duration-700">
+                <div className="mt-auto mb-32 w-full max-w-sm self-center bg-gray-900/95 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl border border-white/10 p-6 animate-in slide-in-from-bottom-10 duration-700">
                     <h2 className="text-[10px] font-black text-pink-500 uppercase tracking-[0.3em] mb-4 text-center">
                         Discovery Report
                     </h2>
