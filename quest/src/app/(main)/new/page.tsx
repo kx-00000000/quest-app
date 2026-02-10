@@ -25,9 +25,9 @@ export default function NewQuestPage() {
     const [name, setName] = useState("");
     const [activeMode, setActiveMode] = useState(rangeModes[0]);
 
-    // 表示用の半径（即時反映）
+    // 表示用の半径
     const [radius, setRadius] = useState(1);
-    // 地図描画用の半径（遅延反映して負荷軽減）
+    // 地図描画用の半径（負荷軽減のため遅延させて更新）
     const [mapRadius, setMapRadius] = useState(1);
 
     const [itemCount, setItemCount] = useState(3);
@@ -46,13 +46,12 @@ export default function NewQuestPage() {
         return () => { if (timerRef.current) clearTimeout(timerRef.current); };
     }, []);
 
-    // スライダー操作の負荷を軽減する処理
     const handleRadiusChange = (val: number) => {
         setRadius(val);
         if (timerRef.current) clearTimeout(timerRef.current);
         timerRef.current = setTimeout(() => {
             setMapRadius(val);
-        }, 150); // 0.15秒後に地図を更新
+        }, 150);
     };
 
     const handleCreate = async () => {
@@ -102,7 +101,7 @@ export default function NewQuestPage() {
 
             {!isBriefingActive && (
                 <>
-                    <div className="absolute top-8 left-6 right-6 z-20 animate-in fade-in duration-500">
+                    <div className="absolute top-8 left-6 right-6 z-20">
                         <div className="bg-white/40 backdrop-blur-2xl rounded-[2rem] border border-white/40 shadow-xl px-6 py-3">
                             <input
                                 type="text"
@@ -114,7 +113,7 @@ export default function NewQuestPage() {
                         </div>
                     </div>
 
-                    <div className="mt-auto relative z-10 px-4 mb-4 animate-in slide-in-from-bottom-8 duration-500">
+                    <div className="mt-auto relative z-10 px-4 mb-4">
                         <div className="bg-white/30 backdrop-blur-3xl rounded-[3rem] p-6 shadow-2xl border border-white/40 space-y-5">
                             <div className="flex p-1 bg-black/5 rounded-2xl gap-1">
                                 {rangeModes.map((mode) => (
@@ -165,7 +164,7 @@ export default function NewQuestPage() {
                             </div>
 
                             <button onClick={handleCreate} disabled={isCreating} className="w-full py-4 bg-gradient-to-r from-[#F06292] to-[#FF8A65] text-white rounded-[2rem] font-black text-lg shadow-lg active:scale-95 transition-all border-b-4 border-black/10">
-                                {isCreating ? "GENERATING..." : "START SCANNING"}
+                                {isCreating ? "MISSION GENERATING..." : "START SCANNING"}
                             </button>
                         </div>
                     </div>

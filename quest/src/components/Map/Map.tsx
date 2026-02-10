@@ -3,10 +3,10 @@
 import { MapContainer, TileLayer, Marker, Polyline, Circle, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import MissionBriefing from "./MissionBriefing";
 
-// 通常のアイコン
+// 通常アイコン
 const createIcon = (color: string) => L.divIcon({
     className: "custom-icon",
     html: `<div style="background-color: ${color}; width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></div>`,
@@ -30,20 +30,8 @@ const userIcon = L.divIcon({
     iconAnchor: [6, 6],
 });
 
-function MapBounds({ points }: { points: [number, number][] }) {
-    const map = useMap();
-    useEffect(() => {
-        if (points.length > 0) {
-            const bounds = L.latLngBounds(points);
-            map.fitBounds(bounds, { padding: [30, 30] });
-        }
-    }, [points, map]);
-    return null;
-}
-
 export default function Map({
     items = [],
-    center,
     userLocation,
     radiusInKm = 1,
     themeColor = "#f06292",
@@ -74,8 +62,7 @@ export default function Map({
                             fillOpacity: 0.1,
                             color: themeColor,
                             weight: 1,
-                            dashArray: "5, 5",
-                            smoothFactor: 5 // 描画計算をラフにして負荷軽減
+                            dashArray: "5, 5"
                         }}
                     />
                     <Marker position={[userLocation.lat, userLocation.lng]} icon={userIcon} />
