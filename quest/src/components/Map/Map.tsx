@@ -1,42 +1,43 @@
 "use client";
 
-import { MapContainer, TileLayer, Marker, Circle } from "react-leaflet";
+import { MapContainer, TileLayer, Marker } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { memo } from "react";
 import MissionBriefing from "./MissionBriefing";
 
+// 数字アイコン（Discovery Reportと共通スタイル）
 const createNumberIcon = (n: number, color: string) => L.divIcon({
     className: "number-icon",
-    html: `<div style="background-color: ${color}; width: 24px; height: 24px; border-radius: 8px; border: 2px solid white; color: white; font-size: 12px; font-weight: 900; display: flex; align-items: center; justify-content: center;">${n}</div>`,
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
+    html: `<div style="background-color: ${color}; width: 22px; height: 22px; border-radius: 8px; border: 2px solid white; color: white; font-size: 11px; font-weight: 900; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">${n}</div>`,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
 });
 
-const MapContent = memo(({ items, userLocation, radiusInKm, themeColor, isLogMode, isBriefingActive, isFinalOverview, onBriefingStateChange, onBriefingComplete }: any) => {
+const userIcon = L.divIcon({
+    className: "user",
+    html: `<div style="background-color: #000; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.2);"></div>`,
+    iconSize: [12, 12],
+    iconAnchor: [6, 6]
+});
+
+const MapContent = memo(({ items, userLocation, themeColor, isLogMode, isBriefingActive, onBriefingStateChange, onBriefingComplete }: any) => {
     return (
         <>
             <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" attribution="&copy; CARTO" />
 
-            {!isLogMode && userLocation?.lat && (!isBriefingActive || isFinalOverview) && (
-                <>
-                    <Circle
-                        center={[userLocation.lat, userLocation.lng]}
-                        radius={radiusInKm * 1000}
-                        pathOptions={{
-                            fillColor: themeColor,
-                            fillOpacity: 0.15,
-                            color: themeColor,
-                            weight: 2,
-                            dashArray: "8, 8"
-                        }}
-                    />
-                    <Marker position={[userLocation.lat, userLocation.lng]} icon={L.divIcon({ className: "user", html: `<div style="background-color: #000; width: 12px; height: 12px; border-radius: 50%; border: 3px solid white;"></div>`, iconSize: [12, 12], iconAnchor: [6, 6] })} />
-                </>
+            {/* 現在地表示 */}
+            {userLocation?.lat && (
+                <Marker position={[userLocation.lat, userLocation.lng]} icon={userIcon} />
             )}
 
-            {(isBriefingActive || isLogMode) && items && items.map((item: any, idx: number) => (
-                <Marker key={item.id} position={[item.lat, item.lng]} icon={isBriefingActive ? createNumberIcon(idx + 1, themeColor) : L.divIcon({ className: "dot", html: `<div style="background-color: ${item.isCollected ? themeColor : '#ccc'}; width: 10px; height: 10px; border-radius: 50%; border: 2px solid white;"></div>`, iconSize: [12, 12], iconAnchor: [6, 6] })} />
+            {/* 目的地表示：ブリーフィング中、またはプラン/ログ画面(isLogMode)では数字を出す */}
+            {(isBriefingActive || isLogMode) && items?.map((item: any, idx: number) => (
+                <Marker
+                    key={item.id || idx}
+                    position={[item.lat, item.lng]}
+                    icon={createNumberIcon(idx + 1, themeColor)}
+                />
             ))}
 
             {isBriefingActive && <MissionBriefing items={items} onStateChange={onBriefingStateChange} onComplete={onBriefingComplete} />}
