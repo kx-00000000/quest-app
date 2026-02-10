@@ -12,7 +12,7 @@ import {
     MapPin,
     Loader2,
     ChevronRight,
-    CircleDot
+    Circle
 } from "lucide-react";
 
 export default function PlanPage() {
@@ -30,6 +30,16 @@ export default function PlanPage() {
             deletePlan(id);
             setPlans(getPlans());
         }
+    };
+
+    // ステータス判定ロジック
+    const getStatusInfo = (plan: any) => {
+        const collected = plan.collectedCount || 0;
+        const total = plan.itemCount || 0;
+
+        if (collected === 0) return { label: "準備中", color: "bg-gray-100 text-gray-500" };
+        if (collected < total) return { label: "冒険中", color: "bg-pink-50 text-pink-600 border border-pink-100" };
+        return { label: "完了", color: "bg-emerald-50 text-emerald-600 border border-emerald-100" };
     };
 
     if (!mounted) return (
@@ -54,85 +64,88 @@ export default function PlanPage() {
                 <h1 className="text-4xl font-black text-gray-900 tracking-tighter italic uppercase leading-none">Plans</h1>
             </header>
 
-            {/* スクロール可能エリア：左右余白なしのカードリスト */}
-            <div className="flex-1 overflow-y-auto bg-gray-50 pb-32">
-                {plans.map((plan) => (
-                    <div key={plan.id} className="bg-white border-b-[8px] border-gray-100 animate-in fade-in duration-500">
+            {/* スクロール可能エリア */}
+            <div className="flex-1 overflow-y-auto bg-gray-50 pb-32 px-2 md:px-4">
+                <div className="space-y-6 pt-6">
+                    {plans.map((plan) => {
+                        const status = getStatusInfo(plan);
+                        return (
+                            <div key={plan.id} className="bg-white rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden animate-in fade-in duration-500">
 
-                        {/* 1. ステータス & ヘッダーエリア */}
-                        <div className="p-6 pb-4">
-                            {/* ★冒険ステータスの復活 */}
-                            <div className="flex items-center gap-2 mb-3">
-                                <CircleDot size={12} className="text-pink-500 animate-pulse" />
-                                <span className="text-[9px] font-black text-pink-500 uppercase tracking-[0.2em]">Operational Status: Ready</span>
-                            </div>
-
-                            <div className="flex justify-between items-start">
-                                <div className="space-y-1">
-                                    <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tighter italic leading-none">{plan.name}</h2>
-                                    <div className="flex items-center gap-3 text-gray-400 mt-2">
-                                        <div className="flex items-center gap-1">
-                                            <Calendar size={12} />
-                                            <span className="text-[10px] font-bold">{plan.createdAt}</span>
+                                {/* 1. ヘッダーエリア */}
+                                <div className="p-6 pb-4">
+                                    <div className="flex justify-between items-start mb-4">
+                                        {/* 動的ステータスタグ */}
+                                        <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${status.color}`}>
+                                            {status.label}
                                         </div>
-                                        <div className="flex items-center gap-1">
-                                            <Target size={12} />
-                                            <span className="text-[10px] font-bold">{plan.items?.length} Targets</span>
+                                        <button
+                                            onClick={() => handleDelete(plan.id)}
+                                            className="p-2 text-gray-200 hover:text-red-500 transition-colors"
+                                        >
+                                            <Trash2 size={22} />
+                                        </button>
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tighter italic leading-none">{plan.name}</h2>
+                                        <div className="flex items-center gap-3 text-gray-400 mt-2">
+                                            <div className="flex items-center gap-1">
+                                                <Calendar size={12} />
+                                                <span className="text-[10px] font-bold">{plan.createdAt}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                <Target size={12} />
+                                                <span className="text-[10px] font-bold">{plan.items?.length} Targets</span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => handleDelete(plan.id)}
-                                    className="p-2 text-gray-200 hover:text-red-500 transition-colors"
-                                >
-                                    <Trash2 size={22} />
-                                </button>
-                            </div>
-                        </div>
 
-                        {/* 2. 地図：エッジ・トゥ・エッジ（左右余白なし）、角丸なし */}
-                        <div className="h-64 relative w-full border-y border-gray-100 bg-gray-50">
-                            <LazyMap
-                                userLocation={plan.center}
-                                items={plan.items}
-                                isLogMode={true}
-                                themeColor="#F06292"
-                            />
-                            {/* 範囲タグ */}
-                            <div className="absolute top-4 left-4 z-10 bg-gray-900/80 backdrop-blur-md px-3 py-1 rounded-full border border-white/20">
-                                <span className="text-[9px] font-black text-white uppercase italic tracking-widest">{plan.radius}km Range</span>
-                            </div>
-                        </div>
-
-                        {/* 3. ターゲットリスト：枠なしのクリーンなリスト */}
-                        <div className="p-6 space-y-6">
-                            <div className="space-y-4">
-                                {plan.items?.map((item: any, idx: number) => (
-                                    <div key={item.id || idx} className="flex items-center gap-4 transition-all">
-                                        <div className="w-8 h-8 bg-pink-500 rounded-lg flex items-center justify-center text-white font-black text-xs italic shadow-lg shadow-pink-500/20">
-                                            0{idx + 1}
-                                        </div>
-                                        <div className="flex-1 min-w-0 border-b border-gray-50 pb-2">
-                                            <p className="text-sm font-black text-gray-800 uppercase truncate tracking-tight">
-                                                {item.locationName || "Area Reconnaissance"}
-                                            </p>
-                                        </div>
-                                        <ChevronRight size={14} className="text-gray-100" />
+                                {/* 2. 地図：エッジ・トゥ・エッジ（カード内一杯）、角丸なし */}
+                                <div className="h-64 relative w-full border-y border-gray-100 bg-gray-50">
+                                    <LazyMap
+                                        userLocation={plan.center}
+                                        items={plan.items}
+                                        isLogMode={true}
+                                        themeColor="#F06292"
+                                    />
+                                    <div className="absolute top-4 left-4 z-10 bg-gray-900/80 backdrop-blur-md px-3 py-1 rounded-full border border-white/20">
+                                        <span className="text-[9px] font-black text-white uppercase italic tracking-widest">{plan.radius}km Range</span>
                                     </div>
-                                ))}
-                            </div>
+                                </div>
 
-                            {/* 4. アクションボタン：有効化 */}
-                            <button
-                                onClick={() => router.push(`/quest/${plan.id}`)}
-                                className="w-full py-5 bg-gray-900 text-white rounded-[1.5rem] font-black text-xs shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-[0.2em] border-b-4 border-black/20"
-                            >
-                                <Play size={14} fill="currentColor" />
-                                冒険を始める
-                            </button>
-                        </div>
-                    </div>
-                ))}
+                                {/* 3. ターゲットリスト */}
+                                <div className="p-6 space-y-6">
+                                    <div className="space-y-4">
+                                        {plan.items?.map((item: any, idx: number) => (
+                                            <div key={item.id || idx} className="flex items-center gap-4 transition-all">
+                                                <div className="w-8 h-8 bg-pink-500 rounded-lg flex items-center justify-center text-white font-black text-xs italic shadow-lg shadow-pink-500/20">
+                                                    0{idx + 1}
+                                                </div>
+                                                <div className="flex-1 min-w-0 border-b border-gray-50 pb-2">
+                                                    <p className="text-sm font-black text-gray-800 uppercase truncate tracking-tight">
+                                                        {item.locationName || "Area Reconnaissance"}
+                                                    </p>
+                                                </div>
+                                                <ChevronRight size={14} className="text-gray-200" />
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* 4. アクションボタン */}
+                                    <button
+                                        onClick={() => router.push(`/quest/${plan.id}`)}
+                                        className="w-full py-5 bg-gray-900 text-white rounded-[1.5rem] font-black text-xs shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-[0.2em] border-b-4 border-black/20"
+                                    >
+                                        <Play size={14} fill="currentColor" />
+                                        冒険を始める
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
         </div>
     );
