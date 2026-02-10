@@ -1,11 +1,13 @@
+// src/app/layout.tsx
 import type { Metadata } from "next";
-import { Nunito } from "next/font/google"; // Puffy font choice
+import { Nunito } from "next/font/google";
 import "./globals.css";
+import BottomNav from "@/components/Navigation/BottomNav"; // ★インポートを追加
 
 const nunito = Nunito({
   variable: "--font-nunito",
   subsets: ["latin"],
-  weight: ["400", "600", "700", "800"], // Varied weights for puffy headers
+  weight: ["400", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
@@ -20,10 +22,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
-      <body
-        className={`${nunito.variable} antialiased`}
-      >
+      <body className={`${nunito.variable} antialiased`}>
+        {/* ★ children の下に BottomNav を配置 */}
         {children}
+        <BottomNav />
       </body>
     </html>
   );

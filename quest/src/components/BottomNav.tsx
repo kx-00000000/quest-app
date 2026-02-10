@@ -1,44 +1,51 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Plus, Map, History, Box } from "lucide-react"; // Icons for tabs
-import { useTranslation } from "react-i18next";
-import "@/lib/i18n"; // Ensure i18n is initialized
+import { usePathname, useRouter } from "next/navigation";
+import { Plus, Map, ScrollText, LayoutGrid, UserCircle } from "lucide-react";
 
 export default function BottomNav() {
     const pathname = usePathname();
-    const { t } = useTranslation();
+    const router = useRouter();
 
-    const tabs = [
-        { name: t("tab_new"), href: "/new", icon: Plus },
-        { name: t("tab_plan"), href: "/plan", icon: Map },
-        { name: t("tab_log"), href: "/log", icon: History },
-        { name: t("tab_item"), href: "/item", icon: Box }, // "Item" collection
+    // ★ 修正：フォルダ名に合わせて判定を adventure に変更
+    // アクティブなクエスト画面（/adventure/[id]）でナビを隠すための処理です
+    if (pathname.includes("/adventure/") && pathname !== "/adventure/new") return null;
+
+    const navItems = [
+        // ★ 修正：遷移先のパスも /adventure/new に変更
+        { label: "NEW", path: "/adventure/new", icon: Plus },
+        { label: "PLAN", path: "/plan", icon: Map },
+        { label: "LOG", path: "/log", icon: ScrollText },
+        { label: "ITEM", path: "/item", icon: LayoutGrid },
+        { label: "MYPAGE", path: "/profile", icon: UserCircle },
     ];
 
     return (
-        <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 pb-safe pt-2 px-6 z-50">
-            <div className="flex justify-between items-center max-w-md mx-auto">
-                {tabs.map((tab) => {
-                    const isActive = pathname.startsWith(tab.href);
-                    const Icon = tab.icon;
+        <nav className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-gray-100 px-6 py-4 flex justify-between items-center z-[4000] pb-10">
+            {navItems.map((item) => {
+                const isActive = pathname === item.path;
+                return (
+                    <button
+                        key={item.path}
+                        onClick={() => router.push(item.path)}
+                        className={`flex flex-col items-center gap-1.5 transition-all duration-300 ${isActive ? 'text-black scale-110' : 'text-gray-300'
+                            }`}
+                    >
+                        {/* 選択されている時はアイコンを太く、色は黒に */}
+                        <item.icon size={22} strokeWidth={isActive ? 3 : 2} />
 
-                    return (
-                        <Link
-                            key={tab.href}
-                            href={tab.href}
-                            className={`flex flex-col items-center justify-center w-16 py-2 transition-colors ${isActive
-                                    ? "text-quest-green-600 font-bold"
-                                    : "text-gray-400 hover:text-gray-600"
-                                }`}
-                        >
-                            <Icon size={24} strokeWidth={isActive ? 2.5 : 2} />
-                            <span className="text-[10px] mt-1 tracking-wide">{tab.name}</span>
-                        </Link>
-                    );
-                })}
-            </div>
+                        <span className={`text-[8px] font-black tracking-widest uppercase ${isActive ? 'opacity-100' : 'opacity-60'
+                            }`}>
+                            {item.label}
+                        </span>
+
+                        {/* アクティブな時だけ下に小さなアクセント（任意） */}
+                        {isActive && (
+                            <div className="absolute -bottom-1 w-1 h-1 bg-black rounded-full" />
+                        )}
+                    </button>
+                );
+            })}
         </nav>
     );
 }
