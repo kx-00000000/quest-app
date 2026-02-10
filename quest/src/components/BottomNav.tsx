@@ -7,12 +7,10 @@ export default function BottomNav() {
     const pathname = usePathname();
     const router = useRouter();
 
-    // ★ 修正：フォルダ名に合わせて判定を adventure に変更
-    // アクティブなクエスト画面（/adventure/[id]）でナビを隠すための処理です
+    // /adventure/id のページ（探索中）はナビを隠す
     if (pathname.includes("/adventure/") && pathname !== "/adventure/new") return null;
 
     const navItems = [
-        // ★ 修正：遷移先のパスも /adventure/new に変更
         { label: "NEW", path: "/adventure/new", icon: Plus },
         { label: "PLAN", path: "/plan", icon: Map },
         { label: "LOG", path: "/log", icon: ScrollText },
@@ -31,15 +29,11 @@ export default function BottomNav() {
                         className={`flex flex-col items-center gap-1.5 transition-all duration-300 ${isActive ? 'text-black scale-110' : 'text-gray-300'
                             }`}
                     >
-                        {/* 選択されている時はアイコンを太く、色は黒に */}
                         <item.icon size={22} strokeWidth={isActive ? 3 : 2} />
-
                         <span className={`text-[8px] font-black tracking-widest uppercase ${isActive ? 'opacity-100' : 'opacity-60'
                             }`}>
                             {item.label}
                         </span>
-
-                        {/* アクティブな時だけ下に小さなアクセント（任意） */}
                         {isActive && (
                             <div className="absolute -bottom-1 w-1 h-1 bg-black rounded-full" />
                         )}
