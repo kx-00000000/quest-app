@@ -6,7 +6,6 @@ import "leaflet/dist/leaflet.css";
 import { useEffect, memo } from "react";
 import MissionBriefing from "./MissionBriefing";
 
-// 数字アイコン
 const createNumberIcon = (number: number, color: string) => L.divIcon({
     className: "number-icon",
     html: `<div style="background-color: ${color}; width: 22px; height: 22px; border-radius: 8px; border: 2px solid white; color: white; font-size: 11px; font-weight: 900; display: flex; align-items: center; justify-content: center; shadow: 0 2px 4px rgba(0,0,0,0.3); font-family: sans-serif;">${number}</div>`,
@@ -14,7 +13,6 @@ const createNumberIcon = (number: number, color: string) => L.divIcon({
     iconAnchor: [11, 11],
 });
 
-// 黒の現在地マーカー
 const userIcon = L.divIcon({
     className: "user-icon",
     html: `<div style="background-color: #000; width: 12px; height: 12px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3);"></div>`,
@@ -22,9 +20,8 @@ const userIcon = L.divIcon({
     iconAnchor: [6, 6],
 });
 
-// メインコンポーネントを memo 化して不要な再レンダリングを防止
 const MapContent = memo(({
-    items, userLocation, radiusInKm, themeColor, isLogMode, isBriefingActive, onBriefingComplete
+    items, userLocation, radiusInKm, themeColor, isLogMode, isBriefingActive, isFinalOverview, onBriefingStateChange, onBriefingComplete
 }: any) => {
     return (
         <>
@@ -34,18 +31,13 @@ const MapContent = memo(({
                 detectRetina={true}
             />
 
-            {!isLogMode && userLocation && (
+            {/* ★修正：ブリーフィングがアクティブな時は、isFinalOverviewがTrueの時だけ表示 */}
+            {!isLogMode && userLocation && (!isBriefingActive || isFinalOverview) && (
                 <>
                     <Circle
                         center={[userLocation.lat, userLocation.lng]}
                         radius={radiusInKm * 1000}
-                        pathOptions={{
-                            fillColor: themeColor,
-                            fillOpacity: 0.1,
-                            color: themeColor,
-                            weight: 1,
-                            dashArray: "5, 5"
-                        }}
+                        pathOptions={{ fillColor: themeColor, fillOpacity: 0.1, color: themeColor, weight: 1, dashArray: "5, 5" }}
                     />
                     <Marker position={[userLocation.lat, userLocation.lng]} icon={userIcon} />
                 </>
@@ -68,7 +60,11 @@ const MapContent = memo(({
             ))}
 
             {isBriefingActive && (
-                <MissionBriefing items={items} onComplete={onBriefingComplete} />
+                <MissionBriefing
+                    items={items}
+                    onStateChange={onBriefingStateChange} // ★追加
+                    onComplete={onBriefingComplete}
+                />
             )}
         </>
     );
@@ -82,13 +78,7 @@ export default function Map(props: any) {
         : [35.6812, 139.7671];
 
     return (
-        <MapContainer
-            center={initialCenter}
-            zoom={14}
-            className="w-full h-full z-0"
-            zoomControl={false}
-            preferCanvas={true} // ★追加：Canvasで描画することで極大な図形の負荷を激減
-        >
+        <MapContainer center={initialCenter} zoom={14} className="w-full h-full z-0" zoomControl={false} preferCanvas={true}>
             <MapContent {...props} />
         </MapContainer>
     );
