@@ -1,14 +1,34 @@
 "use client";
 
-import { MapContainer, TileLayer, Marker, Circle } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Circle, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { memo } from "react";
+import { memo, useEffect } from "react";
 import MissionBriefing from "./MissionBriefing";
+
+// 地図の自動ズーム調整
+function AutoFit({ userLocation, radiusInKm, isBriefingActive }: any) {
+    const map = useMap();
+    useEffect(() => {
+        if (!isBriefingActive && userLocation && radiusInKm) {
+            // 円の範囲が収まるように Bounds を計算
+            const circle = L.circle([userLocation.lat, userLocation.lng], { radius: radiusInKm * 1000 });
+            map.fitBounds(circle.getBounds(), { padding: [40, 40], animate: true });
+        }
+    }, [userLocation, radiusInKm, map, isBriefingActive]);
+    return null;
+}
+
+// 地図が準備できたら親に通知
+function MapTracker({ onReady }: any) {
+    const map = useMap();
+    useEffect(() => { onReady(map); }, [map, onReady]);
+    return null;
+}
 
 const createNumberIcon = (number: number, color: string) => L.divIcon({
     className: "number-icon",
-    html: `<div style="background-color: ${color}; width: 24px; height: 24px; border-radius: 8px; border: 2px solid white; color: white; font-size: 12px; font-weight: 900; display: flex; align-items: center; justify-content: center; shadow: 0 2px 4px rgba(0,0,0,0.3);">${number}</div>`,
+    html: `<div style="background-color: ${color}; width: 24px; height: 24px; border-radius: 8px; border: 2px solid white; color: white; font-size: 12px; font-weight: 900; display: flex; align-items: center; justify-content: center; shadow: 0 2px 4px rgba(0,0,0,0.3); font-family: sans-serif;">${number}</div>`,
     iconSize: [24, 24],
     iconAnchor: [12, 12],
 });
@@ -21,7 +41,7 @@ const userIcon = L.divIcon({
 });
 
 const MapContent = memo(({
-    items, userLocation, radiusInKm, themeColor, isLogMode, isBriefingActive, isFinalOverview, onBriefingStateChange, onBriefingComplete
+    items, userLocation, radiusInKm, themeColor, isLogMode, isBriefingActive, isFinalOverview, onBriefingStateChange, onBriefingComplete, onMapReady
 }: any) => {
     return (
         <>
@@ -30,19 +50,15 @@ const MapContent = memo(({
                 attribution='&copy; <a href="https://carto.com/">CARTO</a>'
                 detectRetina={true}
             />
+            <AutoFit userLocation={userLocation} radiusInKm={radiusInKm} isBriefingActive={isBriefingActive} />
+            <MapTracker onReady={onMapReady} />
 
             {!isLogMode && userLocation && (!isBriefingActive || isFinalOverview) && (
                 <>
                     <Circle
                         center={[userLocation.lat, userLocation.lng]}
                         radius={radiusInKm * 1000}
-                        pathOptions={{
-                            fillColor: "transparent",
-                            fillOpacity: 0,
-                            color: themeColor,
-                            weight: 2,
-                            dashArray: "8, 8"
-                        }}
+                        pathOptions={{ fillColor: "transparent", fillOpacity: 0, color: themeColor, weight: 2, dashArray: "8, 8" }}
                     />
                     <Marker position={[userLocation.lat, userLocation.lng]} icon={userIcon} />
                 </>
