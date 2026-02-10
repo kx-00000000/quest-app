@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { savePlan } from "@/lib/storage";
 import { generateRandomPoint } from "@/lib/geo";
 import LazyMap from "@/components/Map/LazyMap";
-import { CheckCircle2, Play } from "lucide-react";
+import { CheckCircle2, Play, LocateFixed, Loader2 } from "lucide-react";
 
 const rangeModes = [
     { id: 'neighborhood', label: 'NEIGHBORHOOD', min: 0.5, max: 15, step: 0.1 },
@@ -35,14 +35,17 @@ export default function NewQuestPage() {
     const [briefingItems, setBriefingItems] = useState<any[]>([]);
     const [isBriefingActive, setIsBriefingActive] = useState(false);
     const [isFinalOverview, setIsFinalOverview] = useState(false);
+    const mapInstanceRef = useRef<any>(null);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
-        navigator.geolocation.getCurrentPosition(
-            (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-            (err) => console.warn(err)
-        );
-        return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                (err) => console.warn("Geolocation error:", err),
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        }
     }, []);
 
     const handleRadiusChange = (val: number) => {
@@ -57,67 +60,65 @@ export default function NewQuestPage() {
         const validItems: any[] = [];
         let attempts = 0;
 
-        // 陸地を探すための強化された生成ループ
-        while (validItems.length < itemCount && attempts < 40) {
+        while (validItems.length < itemCount && attempts < 30) {
             attempts++;
             const point = generateRandomPoint(center, radius);
             try {
                 const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${point.lat}&lon=${point.lng}&format=json&zoom=10`);
                 const data = await res.json();
+                const hasPlace = data.address && (data.address.country || data.address.city || data.address.town || data.address.village);
+                const isWater = data.type === "water" || data.class === "natural" || data.display_name?.toLowerCase().includes("ocean");
 
-                // 住所情報（国、都市、県など）がある場合のみ陸地とみなす
-                const hasAddress = data.address && (data.address.country || data.address.city || data.address.state || data.address.town);
-                const isWater = data.type === "water" || data.class === "natural" || (data.display_name && data.display_name.toLowerCase().includes("ocean"));
-
-                if (hasAddress && !isWater) {
+                if (hasPlace && !isWater) {
                     validItems.push({
                         id: Math.random().toString(36).substr(2, 9),
-                        lat: point.lat,
-                        lng: point.lng,
-                        isCollected: false,
-                        name: `Item #${validItems.length + 1}`
+                        lat: point.lat, lng: point.lng,
+                        isCollected: false, name: `Item #${validItems.length + 1}`
                     });
                 }
-            } catch (e) {
-                // エラー時は最小限1地点だけ保証
-                if (validItems.length === 0 && attempts > 30) {
-                    validItems.push({ id: 'f-' + attempts, lat: point.lat, lng: point.lng, isCollected: false, name: `Item #1` });
-                }
-            }
+            } catch (e) { console.error(e); }
         }
 
-        const plan = {
+        if (validItems.length === 0) {
+            const fallback = generateRandomPoint(center, radius * 0.3);
+            validItems.push({ id: 'f1', lat: fallback.lat, lng: fallback.lng, isCollected: false, name: "Land Recon Target" });
+        }
+
+        savePlan({
             id: Math.random().toString(36).substr(2, 9),
-            name: name || "NEW QUEST",
-            radius,
-            itemCount: validItems.length,
-            status: "ready",
-            createdAt: new Date().toLocaleDateString(),
-            totalDistance: 0,
-            collectedCount: 0,
-            center,
-            items: validItems
-        };
-        savePlan(plan);
+            name: name || "NEW QUEST", radius, itemCount: validItems.length,
+            status: "ready", createdAt: new Date().toLocaleDateString(),
+            totalDistance: 0, collectedCount: 0, center, items: validItems
+        });
+
         setBriefingItems(validItems);
         setIsCreating(false);
         setShowConfirm(true);
+    };
+
+    const handleRecenter = () => {
+        if (mapInstanceRef.current && userLocation) {
+            mapInstanceRef.current.setView([userLocation.lat, userLocation.lng], 14, { animate: true });
+        }
     };
 
     return (
         <div className="flex flex-col h-full min-h-screen pb-20 relative overflow-hidden bg-white">
             <div className="absolute inset-0 z-0">
                 <LazyMap
-                    radiusInKm={mapRadius}
-                    userLocation={userLocation}
-                    themeColor="#F06292"
-                    items={briefingItems}
-                    isBriefingActive={isBriefingActive}
-                    isFinalOverview={isFinalOverview}
-                    onBriefingStateChange={(val: boolean) => setIsFinalOverview(val)}
+                    radiusInKm={mapRadius} userLocation={userLocation} themeColor="#F06292"
+                    items={briefingItems} isBriefingActive={isBriefingActive} isFinalOverview={isFinalOverview}
+                    onBriefingStateChange={setIsFinalOverview}
                     onBriefingComplete={() => router.push("/plan")}
+                    onMapReady={(map: any) => { mapInstanceRef.current = map; }}
                 />
             </div>
+
+            {!isBriefingActive && !showConfirm && userLocation && (
+                <button onClick={handleRecenter} className="absolute top-24 right-6 z-20 w-12 h-12 bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl flex items-center justify-center text-gray-800 border border-white active:scale-90 transition-all">
+                    <LocateFixed size={20} />
+                </button>
+            )}
 
             {!isBriefingActive && !showConfirm && (
                 <>
@@ -143,15 +144,14 @@ export default function NewQuestPage() {
                                     <input type="range" min="1" max="7" step="1" value={itemCount} onChange={(e) => setItemCount(parseInt(e.target.value))} className="w-full h-1.5 accent-gray-400 bg-black/10 rounded-full appearance-none cursor-pointer" />
                                 </div>
                             </div>
-                            <button onClick={handleCreate} disabled={isCreating} className="w-full py-4 bg-gradient-to-r from-[#F06292] to-[#FF8A65] text-white rounded-[2rem] font-black text-lg shadow-lg active:scale-95 transition-all border-b-4 border-black/10">
-                                {isCreating ? "生成中..." : "クエストを作成"}
+                            <button onClick={handleCreate} disabled={isCreating} className="w-full py-4 bg-gradient-to-r from-[#F06292] to-[#FF8A65] text-white rounded-[2rem] font-black text-lg shadow-lg active:scale-95 transition-all border-b-4 border-black/10 flex items-center justify-center gap-2">
+                                {isCreating ? <><Loader2 className="animate-spin" size={20} /> クエスト作成中...</> : "クエストを作成"}
                             </button>
                         </div>
                     </div>
                 </>
             )}
 
-            {/* 開始確認ダイアログ */}
             {showConfirm && (
                 <div className="absolute inset-0 z-[2000] flex items-center justify-center p-6 bg-black/20 backdrop-blur-sm animate-in fade-in duration-300 pointer-events-auto">
                     <div className="bg-white rounded-[3rem] p-8 shadow-2xl w-full max-w-sm text-center space-y-6">

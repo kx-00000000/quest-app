@@ -6,12 +6,10 @@ import "leaflet/dist/leaflet.css";
 import { memo, useEffect } from "react";
 import MissionBriefing from "./MissionBriefing";
 
-// 地図の自動ズーム調整
 function AutoFit({ userLocation, radiusInKm, isBriefingActive }: any) {
     const map = useMap();
     useEffect(() => {
-        if (!isBriefingActive && userLocation && radiusInKm) {
-            // 円の範囲が収まるように Bounds を計算
+        if (!isBriefingActive && userLocation?.lat && userLocation?.lng && radiusInKm) {
             const circle = L.circle([userLocation.lat, userLocation.lng], { radius: radiusInKm * 1000 });
             map.fitBounds(circle.getBounds(), { padding: [40, 40], animate: true });
         }
@@ -19,10 +17,9 @@ function AutoFit({ userLocation, radiusInKm, isBriefingActive }: any) {
     return null;
 }
 
-// 地図が準備できたら親に通知
 function MapTracker({ onReady }: any) {
     const map = useMap();
-    useEffect(() => { onReady(map); }, [map, onReady]);
+    useEffect(() => { if (onReady) onReady(map); }, [map, onReady]);
     return null;
 }
 
@@ -53,7 +50,7 @@ const MapContent = memo(({
             <AutoFit userLocation={userLocation} radiusInKm={radiusInKm} isBriefingActive={isBriefingActive} />
             <MapTracker onReady={onMapReady} />
 
-            {!isLogMode && userLocation && (!isBriefingActive || isFinalOverview) && (
+            {!isLogMode && userLocation?.lat && userLocation?.lng && (!isBriefingActive || isFinalOverview) && (
                 <>
                     <Circle
                         center={[userLocation.lat, userLocation.lng]}
@@ -64,23 +61,26 @@ const MapContent = memo(({
                 </>
             )}
 
-            {(isBriefingActive || isLogMode) && items.map((item: any, idx: number) => (
-                <Marker
-                    key={item.id}
-                    position={[item.lat, item.lng]}
-                    icon={isBriefingActive
-                        ? createNumberIcon(idx + 1, themeColor)
-                        : L.divIcon({
-                            className: "custom-icon",
-                            html: `<div style="background-color: ${item.isCollected ? themeColor : '#ccc'}; width: 10px; height: 10px; border-radius: 50%; border: 2px solid white;"></div>`,
-                            iconSize: [12, 12],
-                            iconAnchor: [6, 6],
-                        })
-                    }
-                />
-            ))}
+            {(isBriefingActive || isLogMode) && items && items.length > 0 && items.map((item: any, idx: number) => {
+                if (!item.lat || !item.lng) return null;
+                return (
+                    <Marker
+                        key={item.id}
+                        position={[item.lat, item.lng]}
+                        icon={isBriefingActive
+                            ? createNumberIcon(idx + 1, themeColor)
+                            : L.divIcon({
+                                className: "custom-icon",
+                                html: `<div style="background-color: ${item.isCollected ? themeColor : '#ccc'}; width: 10px; height: 10px; border-radius: 50%; border: 2px solid white;"></div>`,
+                                iconSize: [12, 12],
+                                iconAnchor: [6, 6],
+                            })
+                        }
+                    />
+                );
+            })}
 
-            {isBriefingActive && (
+            {isBriefingActive && items && items.length > 0 && (
                 <MissionBriefing items={items} onStateChange={onBriefingStateChange} onComplete={onBriefingComplete} />
             )}
         </>
@@ -90,9 +90,9 @@ const MapContent = memo(({
 MapContent.displayName = "MapContent";
 
 export default function Map(props: any) {
-    const initialCenter: [number, number] = props.userLocation ? [props.userLocation.lat, props.userLocation.lng] : [35.6812, 139.7671];
+    const center: [number, number] = props.userLocation?.lat ? [props.userLocation.lat, props.userLocation.lng] : [35.6812, 139.7671];
     return (
-        <MapContainer center={initialCenter} zoom={14} className="w-full h-full z-0" zoomControl={false} preferCanvas={true}>
+        <MapContainer center={center} zoom={14} className="w-full h-full z-0" zoomControl={false} preferCanvas={true}>
             <MapContent {...props} />
         </MapContainer>
     );
