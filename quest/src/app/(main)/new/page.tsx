@@ -26,7 +26,7 @@ export default function NewQuestPage() {
     const [name, setName] = useState("");
     const [activeMode, setActiveMode] = useState(rangeModes[0]);
     const [radius, setRadius] = useState(1);
-    const [itemCount, setItemCount] = useState(3);
+    const [itemCount, setItemCount] = useState(3); // ★アイテム数
     const [isCreating, setIsCreating] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
     const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
@@ -50,7 +50,7 @@ export default function NewQuestPage() {
         const validItems: any[] = [];
         let attempts = 0;
 
-        while (validItems.length < itemCount && attempts < 20) {
+        while (validItems.length < itemCount && attempts < 25) {
             attempts++;
             const point = generateRandomPoint(center, radius);
             try {
@@ -103,6 +103,11 @@ export default function NewQuestPage() {
                                     <div className="flex justify-between text-sm font-black text-pink-600 uppercase tracking-widest"><span>Radius</span><span className="text-gray-800">{formatDistance(radius)}</span></div>
                                     <input type="range" min={activeMode.min} max={activeMode.max} step={activeMode.step} value={radius} onChange={(e) => setRadius(parseFloat(e.target.value))} className="w-full h-1.5 accent-pink-500 bg-black/10 rounded-full appearance-none cursor-pointer" />
                                 </div>
+                                {/* ★復活したアイテム数スライダー */}
+                                <div className="space-y-1">
+                                    <div className="flex justify-between text-sm font-black text-pink-600 uppercase tracking-widest"><span>Items Count</span><span className="text-gray-800">{itemCount}</span></div>
+                                    <input type="range" min="1" max="7" step="1" value={itemCount} onChange={(e) => setItemCount(parseInt(e.target.value))} className="w-full h-1.5 accent-pink-500 bg-black/10 rounded-full appearance-none cursor-pointer" />
+                                </div>
                             </div>
                             <button onClick={handleCreate} disabled={isCreating} className="w-full py-4 bg-gray-900 text-white rounded-[2rem] font-black shadow-lg flex items-center justify-center gap-2">
                                 {isCreating ? <Loader2 className="animate-spin" size={20} /> : "クエストを作成"}
@@ -119,9 +124,10 @@ export default function NewQuestPage() {
                             <CheckCircle2 size={32} className="text-pink-500" />
                         </div>
                         <h3 className="text-xl font-black text-gray-800 uppercase tracking-tight">Quest Ready</h3>
+                        <p className="text-[10px] font-bold text-gray-400 mt-2 uppercase tracking-widest">ブリーフィングを開始しますか？</p>
                         <button
                             onClick={() => { setShowConfirm(false); setIsBriefingActive(true); }}
-                            className="w-full py-4 bg-gray-900 text-white rounded-[2rem] font-black flex items-center justify-center gap-2"
+                            className="w-full py-4 bg-gray-900 text-white rounded-[2rem] font-black flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-all"
                         >
                             <Play size={16} fill="currentColor" /> START BRIEFING
                         </button>
