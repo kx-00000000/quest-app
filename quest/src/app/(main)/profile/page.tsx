@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { getPlans } from "@/lib/storage";
-import { Footprints, Map as MapIcon, Target, Clock, ShieldCheck, ChevronRight, Check, X, cloudUpload } from "lucide-react";
+// ★ 修正：cloudUpload -> CloudUpload
+import { Footprints, Map as MapIcon, Target, Clock, ShieldCheck, ChevronRight, Check, X, CloudUpload } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function MyPage() {
@@ -17,8 +18,6 @@ export default function MyPage() {
     const [nickname, setNickname] = useState("Navigator");
     const [isEditing, setIsEditing] = useState(false);
     const [tempName, setTempName] = useState("");
-
-    // ★ ログイン状態の管理（現状はfalse固定。後にSupabaseのセッション確認に変更）
     const [isLoggedIn, setIsLoggedIn] = useState(false);
 
     useEffect(() => {
@@ -98,12 +97,12 @@ export default function MyPage() {
                 )}
             </header>
 
-            {/* ★ バックアップ促進バナー：ゲストユーザーにのみ表示 */}
+            {/* バックアップ促進バナー */}
             {!isLoggedIn && (
                 <div className="mb-12 p-6 bg-pink-50 rounded-[2.5rem] border border-pink-100 flex flex-col gap-4 shadow-sm animate-in slide-in-from-top duration-500">
                     <div className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                            <ShieldCheck size={18} className="text-pink-500" />
+                            <CloudUpload size={18} className="text-pink-500" />
                         </div>
                         <h3 className="text-[10px] font-black text-pink-500 uppercase tracking-widest">Data Protection</h3>
                     </div>
@@ -131,7 +130,6 @@ export default function MyPage() {
                     <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Missions</p>
                     <p className="text-2xl font-black italic">{stats.totalMissions}</p>
                 </div>
-                {/* ... 他のステータス項目はそのまま ... */}
                 <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
                     <Target size={16} className="text-gray-300 mb-4" strokeWidth={1.5} />
                     <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Discoveries</p>
