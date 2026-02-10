@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useMap } from "react-leaflet";
 import { PlaneTakeoff } from "lucide-react";
 import { getLocationName } from "@/lib/geo";
-import { getPlans, savePlan } from "@/lib/storage"; // 追加
+import { getPlans, savePlan } from "@/lib/storage";
 import L from "leaflet";
 
 export default function MissionBriefing({ items, planId, onStateChange, onComplete }: { items: any[], planId?: string | null, onStateChange: (val: boolean) => void, onComplete: () => void }) {
@@ -15,7 +15,7 @@ export default function MissionBriefing({ items, planId, onStateChange, onComple
     const hasStarted = useRef(false);
 
     useEffect(() => {
-        if (hasStarted.current) return;
+        if (hasStarted.current || !items || items.length === 0) return;
         hasStarted.current = true;
 
         const run = async () => {
@@ -29,16 +29,16 @@ export default function MissionBriefing({ items, planId, onStateChange, onComple
                 await new Promise(r => setTimeout(r, 2200));
             }
 
-            // ★解析した地名を保存
+            // ★TSエラー修正：安全なプラン更新ロジック
             if (planId) {
                 const plans = getPlans();
-                const planIndex = plans.findIndex(p => p.id === planId);
-                if (planIndex !== -1) {
-                    plans[planIndex].items = plans[planIndex].items.map((it: any, idx: number) => ({
+                const targetPlan = plans.find(p => p.id === planId);
+                if (targetPlan && targetPlan.items) {
+                    targetPlan.items = targetPlan.items.map((it: any, idx: number) => ({
                         ...it,
                         locationName: allNames[idx] || "Land Target"
                     }));
-                    savePlan(plans[planIndex]);
+                    savePlan(targetPlan);
                 }
             }
 

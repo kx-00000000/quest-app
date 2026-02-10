@@ -6,7 +6,7 @@ import "leaflet/dist/leaflet.css";
 import { memo, useEffect } from "react";
 import MissionBriefing from "./MissionBriefing";
 
-// ★地図の自動縮尺調整コンポーネント
+// 全ターゲットが収まるように自動ズーム調整
 function AutoFit({ items, userLocation, isLogMode }: any) {
     const map = useMap();
     useEffect(() => {
@@ -21,7 +21,7 @@ function AutoFit({ items, userLocation, isLogMode }: any) {
 
 const createNumberIcon = (n: number, color: string) => L.divIcon({
     className: "number-icon",
-    html: `<div style="background-color: ${color}; width: 22px; height: 22px; border-radius: 8px; border: 2px solid white; color: white; font-size: 11px; font-weight: 900; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">${n}</div>`,
+    html: `<div style="background-color: ${color}; width: 22px; height: 22px; border-radius: 8px; border: 2px solid white; color: white; font-size: 11px; font-weight: 900; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2); font-family: sans-serif;">${n}</div>`,
     iconSize: [22, 22],
     iconAnchor: [11, 11],
 });
@@ -33,14 +33,14 @@ const userIcon = L.divIcon({
     iconAnchor: [5, 5]
 });
 
-const MapContent = memo(({ items, userLocation, radiusInKm, themeColor, isLogMode, isBriefingActive, onBriefingStateChange, onBriefingComplete }: any) => {
+const MapContent = memo(({ items, userLocation, radiusInKm, themeColor, isLogMode, isBriefingActive, onBriefingStateChange, onBriefingComplete, planId }: any) => {
     return (
         <>
             <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" attribution="&copy; CARTO" />
             <AutoFit items={items} userLocation={userLocation} isLogMode={isLogMode} />
 
-            {/* 探索円の復活 */}
-            {userLocation?.lat && (!isBriefingActive || isLogMode) && (
+            {/* 探索円: 作成画面(ブリーフィング前)のみ表示。プラン/ログ画面では不要 */}
+            {userLocation?.lat && !isLogMode && !isBriefingActive && (
                 <Circle
                     center={[userLocation.lat, userLocation.lng]}
                     radius={(radiusInKm || 1) * 1000}
@@ -54,7 +54,7 @@ const MapContent = memo(({ items, userLocation, radiusInKm, themeColor, isLogMod
                 <Marker key={item.id || idx} position={[item.lat, item.lng]} icon={createNumberIcon(idx + 1, themeColor)} />
             ))}
 
-            {isBriefingActive && <MissionBriefing items={items} onStateChange={onBriefingStateChange} onComplete={onBriefingComplete} />}
+            {isBriefingActive && <MissionBriefing items={items} planId={planId} onStateChange={onBriefingStateChange} onComplete={onBriefingComplete} />}
         </>
     );
 });
