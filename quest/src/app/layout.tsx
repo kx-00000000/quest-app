@@ -1,8 +1,8 @@
-// src/app/layout.tsx
 import type { Metadata } from "next";
 import { Nunito } from "next/font/google";
 import "./globals.css";
-import BottomNav from "@/components/Navigation/BottomNav"; // ★インポートを追加
+// 相対パスに変更して、エイリアスのトラブルを回避
+import BottomNav from "../components/Navigation/BottomNav";
 
 const nunito = Nunito({
   variable: "--font-nunito",
@@ -23,7 +23,6 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body className={`${nunito.variable} antialiased`}>
-        {/* ★ children の下に BottomNav を配置 */}
         {children}
         <BottomNav />
       </body>
