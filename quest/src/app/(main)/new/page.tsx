@@ -129,7 +129,7 @@ export default function NewQuestPage() {
                                         <span>Items Count</span>
                                         <span className="text-gray-800">{itemCount}</span>
                                     </div>
-                                    <input type="range" min="1" max="10" step="1" value={itemCount} onChange={(e) => setItemCount(parseInt(e.target.value))} className="w-full h-1.5 accent-gray-400 bg-black/10 rounded-full appearance-none" />
+                                    <input type="range" min="1" max="7" step="1" value={itemCount} onChange={(e) => setItemCount(parseInt(e.target.value))} className="w-full h-1.5 accent-gray-400 bg-black/10 rounded-full appearance-none" />
                                 </div>
                             </div>
 
