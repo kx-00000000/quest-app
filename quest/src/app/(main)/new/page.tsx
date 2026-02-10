@@ -36,7 +36,7 @@ export default function NewQuestPage() {
     const [isFinalOverview, setIsFinalOverview] = useState(false);
 
     useEffect(() => {
-        if ("geolocation" in navigator) {
+        if (typeof window !== "undefined" && "geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(
                 (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
                 (err) => console.warn(err)
@@ -50,7 +50,6 @@ export default function NewQuestPage() {
         const validItems: any[] = [];
         let attempts = 0;
 
-        // 簡易的な陸地チェック（海を避ける努力は継続）
         while (validItems.length < itemCount && attempts < 20) {
             attempts++;
             const point = generateRandomPoint(center, radius);
@@ -92,7 +91,7 @@ export default function NewQuestPage() {
                             {name || "NEW QUEST"}
                         </div>
                     </div>
-                    <div className="mt-auto relative z-10 px-4 mb-4">
+                    <div className="mt-auto relative z-10 px-4 mb-4 animate-in slide-in-from-bottom-8 duration-500">
                         <div className="bg-white/80 backdrop-blur-xl rounded-[3rem] p-6 shadow-2xl border border-white space-y-5">
                             <div className="flex p-1 bg-black/5 rounded-2xl gap-1">
                                 {rangeModes.map((mode) => (
@@ -101,12 +100,12 @@ export default function NewQuestPage() {
                             </div>
                             <div className="space-y-4 px-1">
                                 <div className="space-y-1">
-                                    <div className="flex justify-between text-sm font-black text-pink-600 uppercase"><span>Radius</span><span className="text-gray-800">{formatDistance(radius)}</span></div>
+                                    <div className="flex justify-between text-sm font-black text-pink-600 uppercase tracking-widest"><span>Radius</span><span className="text-gray-800">{formatDistance(radius)}</span></div>
                                     <input type="range" min={activeMode.min} max={activeMode.max} step={activeMode.step} value={radius} onChange={(e) => setRadius(parseFloat(e.target.value))} className="w-full h-1.5 accent-pink-500 bg-black/10 rounded-full appearance-none cursor-pointer" />
                                 </div>
                             </div>
                             <button onClick={handleCreate} disabled={isCreating} className="w-full py-4 bg-gray-900 text-white rounded-[2rem] font-black shadow-lg flex items-center justify-center gap-2">
-                                {isCreating ? <Loader2 className="animate-spin" /> : "クエストを作成"}
+                                {isCreating ? <Loader2 className="animate-spin" size={20} /> : "クエストを作成"}
                             </button>
                         </div>
                     </div>
@@ -115,4 +114,20 @@ export default function NewQuestPage() {
 
             {showConfirm && (
                 <div className="absolute inset-0 z-[2000] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[3rem] p-8 shadow-2xl w-full max-w
+                    <div className="bg-white rounded-[3rem] p-8 shadow-2xl w-full max-w-sm text-center space-y-6">
+                        <div className="w-16 h-16 bg-pink-50 rounded-full flex items-center justify-center mx-auto">
+                            <CheckCircle2 size={32} className="text-pink-500" />
+                        </div>
+                        <h3 className="text-xl font-black text-gray-800 uppercase tracking-tight">Quest Ready</h3>
+                        <button
+                            onClick={() => { setShowConfirm(false); setIsBriefingActive(true); }}
+                            className="w-full py-4 bg-gray-900 text-white rounded-[2rem] font-black flex items-center justify-center gap-2"
+                        >
+                            <Play size={16} fill="currentColor" /> START BRIEFING
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}

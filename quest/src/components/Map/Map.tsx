@@ -25,7 +25,7 @@ const MapContent = memo(({ items, userLocation, radiusInKm, themeColor, isLogMod
                         radius={radiusInKm * 1000}
                         pathOptions={{
                             fillColor: themeColor,
-                            fillOpacity: 0.15, // ★塗りつぶし復活
+                            fillOpacity: 0.15,
                             color: themeColor,
                             weight: 2,
                             dashArray: "8, 8"
@@ -35,7 +35,7 @@ const MapContent = memo(({ items, userLocation, radiusInKm, themeColor, isLogMod
                 </>
             )}
 
-            {(isBriefingActive || isLogMode) && items.map((item: any, idx: number) => (
+            {(isBriefingActive || isLogMode) && items && items.map((item: any, idx: number) => (
                 <Marker key={item.id} position={[item.lat, item.lng]} icon={isBriefingActive ? createNumberIcon(idx + 1, themeColor) : L.divIcon({ className: "dot", html: `<div style="background-color: ${item.isCollected ? themeColor : '#ccc'}; width: 10px; height: 10px; border-radius: 50%; border: 2px solid white;"></div>`, iconSize: [12, 12], iconAnchor: [6, 6] })} />
             ))}
 

@@ -33,7 +33,6 @@ export default function MissionBriefing({ items, onStateChange, onComplete }: { 
             setCurrentIndex(-1);
 
             const bounds = L.latLngBounds(items.map(i => [i.lat, i.lng]));
-            // モバイルで絶対にエラーにならない安全なパディング
             map.fitBounds(bounds, { padding: [40, 100], duration: 2 });
 
             await new Promise(r => setTimeout(r, 5000));
@@ -49,7 +48,7 @@ export default function MissionBriefing({ items, onStateChange, onComplete }: { 
                     <div className="flex items-center gap-3 text-white">
                         <PlaneTakeoff size={14} className="text-pink-500 animate-pulse" />
                         <span className="text-[10px] font-black">{currentIndex + 1} / {items.length}</span>
-                        <span className="text-xs font-black truncate max-w-[140px] uppercase">{displayNames[currentIndex] || "SCANNING..."}</span>
+                        <span className="text-xs font-black truncate max-w-[140px] uppercase tracking-tight">{displayNames[currentIndex] || "SCANNING..."}</span>
                     </div>
                 </div>
             )}
