@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getPlans } from "@/lib/storage";
-import { Footprints, Map as MapIcon, Target, Clock, ShieldCheck, ChevronRight } from "lucide-react";
+import { Footprints, Map as MapIcon, Target, Clock, ShieldCheck, ChevronRight, Check, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function MyPage() {
@@ -14,7 +14,16 @@ export default function MyPage() {
         lastActive: "-"
     });
 
+    // ニックネーム管理用のステート
+    const [nickname, setNickname] = useState("Navigator");
+    const [isEditing, setIsEditing] = useState(false);
+    const [tempName, setTempName] = useState("");
+
     useEffect(() => {
+        // 保存されたニックネームをロード
+        const savedName = localStorage.getItem("user_nickname");
+        if (savedName) setNickname(savedName);
+
         const allPlans = getPlans();
         const completedLogs = allPlans.filter(p => (p.items || []).some((i: any) => i.isCollected));
 
@@ -42,14 +51,62 @@ export default function MyPage() {
         });
     }, []);
 
+    const handleStartEdit = () => {
+        setTempName(nickname);
+        setIsEditing(true);
+    };
+
+    const handleSaveNickname = () => {
+        const trimmed = tempName.trim();
+        const finalName = trimmed || "Navigator"; // 空入力時はデフォルトに戻す
+        setNickname(finalName);
+        localStorage.setItem("user_nickname", finalName);
+        setIsEditing(false);
+    };
+
     return (
         <div className="min-h-screen bg-white text-black p-8 font-sans pb-32">
-            <header className="pt-12 mb-12 text-center">
-                <p className="text-[10px] font-black text-pink-500 uppercase tracking-[0.3em] mb-2">Navigator Profile</p>
-                <h1 className="text-4xl font-black italic uppercase tracking-tighter leading-none">Status</h1>
+
+            {/* ヘッダーセクション：ニックネーム編集機能 */}
+            <header className="pt-12 mb-12 text-center min-h-[120px] flex flex-col justify-center">
+                <p className="text-[10px] font-black text-pink-500 uppercase tracking-[0.3em] mb-3">Navigator Profile</p>
+
+                {isEditing ? (
+                    <div className="flex flex-col items-center gap-4 animate-in fade-in duration-300">
+                        <input
+                            type="text"
+                            value={tempName}
+                            onChange={(e) => setTempName(e.target.value)}
+                            className="text-3xl font-black italic uppercase text-center border-b-2 border-pink-500 focus:outline-none bg-transparent w-full max-w-[240px] px-2"
+                            autoFocus
+                            onKeyDown={(e) => e.key === 'Enter' && handleSaveNickname()}
+                            maxLength={15}
+                        />
+                        <div className="flex gap-4">
+                            <button onClick={() => setIsEditing(false)} className="p-2 text-gray-300 hover:text-gray-500 transition-colors">
+                                <X size={20} />
+                            </button>
+                            <button onClick={handleSaveNickname} className="p-2 text-black hover:text-pink-500 transition-colors">
+                                <Check size={20} strokeWidth={3} />
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <div
+                        onClick={handleStartEdit}
+                        className="group cursor-pointer flex flex-col items-center"
+                    >
+                        <h1 className="text-4xl font-black italic uppercase tracking-tighter leading-none group-hover:text-pink-500 transition-colors">
+                            {nickname}
+                        </h1>
+                        <p className="text-[8px] font-bold text-gray-200 uppercase tracking-[0.2em] mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                            Tap to Edit Name
+                        </p>
+                    </div>
+                )}
             </header>
 
-            {/* 統計：無駄を削ぎ落としたグリッド */}
+            {/* 統計：統計グリッドはそのまま維持 */}
             <div className="grid grid-cols-2 gap-4 mb-12">
                 <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
                     <Footprints size={16} className="text-gray-300 mb-4" strokeWidth={1.5} />
