@@ -9,18 +9,23 @@ import {
     Loader2,
     Flag,
     ArrowUp,
-    Beaker // テスト用アイコン
+    MessageSquare,
+    Send,
+    ChevronLeft,
+    ChevronRight
 } from "lucide-react";
 
-/**
- * 距離のフォーマット関数
- * 1km未満: m単位・整数
- * 1km以上: km単位・小数点第一位
- */
+const ACQUISITION_ACTIONS = [
+    { text: "木の上から落ちてきた！" },
+    { text: "茂みの中に隠れていた..." },
+    { text: "岩の隙間で光っている！" },
+    { text: "風に吹かれて飛んできた！" },
+    { text: "足元に埋まっていた！" },
+    { text: "どこからか現れた！" }
+];
+
 const formatDistanceDisplay = (meters: number): string => {
-    if (meters < 1000) {
-        return `${Math.floor(meters).toLocaleString()}m`;
-    }
+    if (meters < 1000) return `${Math.floor(meters).toLocaleString()}m`;
     const km = meters / 1000;
     return `${km.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}km`;
 };
@@ -30,13 +35,9 @@ function calculateBearing(startLat: number, startLng: number, destLat: number, d
     const startLngRad = (startLng * Math.PI) / 180;
     const destLatRad = (destLat * Math.PI) / 180;
     const destLngRad = (destLng * Math.PI) / 180;
-
     const y = Math.sin(destLngRad - startLngRad) * Math.cos(destLatRad);
-    const x = Math.cos(startLatRad) * Math.sin(destLatRad) -
-        Math.sin(startLatRad) * Math.cos(destLatRad) * Math.cos(destLngRad - startLngRad);
-    let brng = Math.atan2(y, x);
-    brng = (brng * 180) / Math.PI;
-    return (brng + 360) % 360;
+    const x = Math.cos(startLatRad) * Math.sin(destLatRad) - Math.sin(startLatRad) * Math.cos(destLatRad) * Math.cos(destLngRad - startLngRad);
+    return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
 }
 
 export default function QuestActivePage() {
@@ -45,10 +46,19 @@ export default function QuestActivePage() {
     const [plan, setPlan] = useState<any>(null);
     const [userLoc, setUserLoc] = useState<{ lat: number, lng: number } | null>(null);
     const [userHeading, setUserHeading] = useState<number>(0);
-    const [targetBearing, setTargetBearing] = useState<number>(0);
+
+    // ターゲット管理
+    const [manualTargetId, setManualTargetId] = useState<string | null>(null);
     const [distanceToTarget, setDistanceToTarget] = useState<number>(0);
+    const [targetBearing, setTargetBearing] = useState<number>(0);
+
     const [isAcquired, setIsAcquired] = useState(false);
+    const [actionMessage, setActionMessage] = useState("");
     const [acquiredName, setAcquiredName] = useState("");
+    const [isMissionComplete, setIsMissionComplete] = useState(false);
+    const [comment, setComment] = useState("");
+    const [isSaving, setIsSaving] = useState(false);
+
     const watchId = useRef<number | null>(null);
 
     useEffect(() => {
@@ -58,149 +68,174 @@ export default function QuestActivePage() {
         setPlan(currentPlan);
 
         const handleOrientation = (event: any) => {
-            if (event.webkitCompassHeading !== undefined) {
-                setUserHeading(event.webkitCompassHeading);
-            } else if (event.alpha !== null) {
-                setUserHeading(360 - event.alpha);
-            }
+            if (event.webkitCompassHeading !== undefined) setUserHeading(event.webkitCompassHeading);
+            else if (event.alpha !== null) setUserHeading(360 - event.alpha);
         };
-
         if (typeof window !== "undefined" && window.DeviceOrientationEvent) {
             window.addEventListener('deviceorientation', handleOrientation, true);
         }
         return () => window.removeEventListener('deviceorientation', handleOrientation);
     }, [id, router]);
 
-    // アイテム獲得の共通処理
+    // ★ ターゲット選定ロジック
+    const getActiveTarget = () => {
+        if (!plan || !userLoc) return null;
+        const uncollected = plan.items.filter((i: any) => !i.isCollected);
+        if (uncollected.length === 0) return null;
+
+        // マニュアル選択されている場合
+        if (manualTargetId) {
+            const selected = uncollected.find((i: any) => i.id === manualTargetId);
+            if (selected) return selected;
+        }
+
+        // 自動：一番近い場所を探す
+        return uncollected.reduce((prev: any, curr: any) => {
+            const distPrev = calculateDistance(userLoc.lat, userLoc.lng, prev.lat, prev.lng);
+            const distCurr = calculateDistance(userLoc.lat, userLoc.lng, curr.lat, curr.lng);
+            return distPrev < distCurr ? prev : curr;
+        });
+    };
+
     const handleAcquireItem = (targetItem: any) => {
+        const randomAction = ACQUISITION_ACTIONS[Math.floor(Math.random() * ACQUISITION_ACTIONS.length)];
+        setActionMessage(randomAction.text);
+        setAcquiredName(targetItem.locationName || "Secured");
         setIsAcquired(true);
-        setAcquiredName(targetItem.locationName || "Area Secured");
 
         const updatedItems = plan.items.map((item: any) =>
             item.id === targetItem.id ? { ...item, isCollected: true, collectedAt: new Date().toISOString() } : item
         );
-        const newPlan = { ...plan, items: updatedItems, collectedCount: (plan.collectedCount || 0) + 1 };
+        const newCollectedCount = updatedItems.filter((i: any) => i.isCollected).length;
+        const newPlan = { ...plan, items: updatedItems, collectedCount: newCollectedCount };
+
         setPlan(newPlan);
         savePlan(newPlan);
+        setManualTargetId(null); // 獲得したらオートに戻す
 
-        setTimeout(() => setIsAcquired(false), 4000);
+        if (newCollectedCount === plan.itemCount) {
+            setTimeout(() => { setIsAcquired(false); setIsMissionComplete(true); }, 4000);
+        } else {
+            setTimeout(() => setIsAcquired(false), 4000);
+        }
     };
 
     useEffect(() => {
-        if (!plan) return;
-        const currentTarget = plan.items.find((i: any) => !i.isCollected);
+        if (!plan || isMissionComplete) return;
 
         if (typeof window !== "undefined" && "geolocation" in navigator) {
             watchId.current = navigator.geolocation.watchPosition((pos) => {
                 const currentLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                 setUserLoc(currentLoc);
 
-                if (currentTarget) {
-                    const distKm = calculateDistance(currentLoc.lat, currentLoc.lng, currentTarget.lat, currentTarget.lng);
-                    setDistanceToTarget(distKm * 1000);
-                    setTargetBearing(calculateBearing(currentLoc.lat, currentLoc.lng, currentTarget.lat, currentTarget.lng));
-
-                    // 50m以内に近づいた時の自動獲得
-                    if (distKm < 0.05) {
-                        handleAcquireItem(currentTarget);
+                // アクティブなターゲットを取得して方位・距離計算
+                // ここではステート更新のタイミング上、getActiveTargetをこのスコープで呼ぶ
+                const uncollected = plan.items.filter((i: any) => !i.isCollected);
+                if (uncollected.length > 0) {
+                    let target = uncollected[0];
+                    if (manualTargetId) {
+                        target = uncollected.find((i: any) => i.id === manualTargetId) || uncollected[0];
+                    } else {
+                        target = uncollected.reduce((p, c) =>
+                            calculateDistance(currentLoc.lat, currentLoc.lng, p.lat, p.lng) < calculateDistance(currentLoc.lat, currentLoc.lng, c.lat, c.lng) ? p : c
+                        );
                     }
+
+                    const distKm = calculateDistance(currentLoc.lat, currentLoc.lng, target.lat, target.lng);
+                    setDistanceToTarget(distKm * 1000);
+                    setTargetBearing(calculateBearing(currentLoc.lat, currentLoc.lng, target.lat, target.lng));
+
+                    if (distKm < 0.05 && !isAcquired) handleAcquireItem(target);
                 }
             }, (err) => console.error(err), { enableHighAccuracy: true });
         }
         return () => { if (watchId.current !== null) navigator.geolocation.clearWatch(watchId.current); };
-    }, [plan]);
+    }, [plan, isMissionComplete, isAcquired, manualTargetId]);
 
-    // 【テスト用】50m以内を擬似再現
-    const testProximity = () => {
-        setDistanceToTarget(48); // 48mに強制設定
-    };
-
-    // 【テスト用】獲得を強制実行
-    const testAcquisition = () => {
-        const currentTarget = plan?.items.find((i: any) => !i.isCollected);
-        if (currentTarget) handleAcquireItem(currentTarget);
-    };
-
-    if (!plan || !userLoc) return <div className="h-screen bg-black flex items-center justify-center"><Loader2 className="animate-spin text-pink-500" /></div>;
-
-    const currentTarget = plan.items.find((i: any) => !i.isCollected);
-    const isAllCleared = !currentTarget;
-    const arrowRotation = isAllCleared ? 0 : targetBearing - userHeading;
+    const activeTarget = getActiveTarget();
+    const arrowRotation = isMissionComplete ? 0 : targetBearing - userHeading;
 
     return (
-        <div className="h-screen bg-black flex flex-col relative overflow-hidden text-white font-sans selection:bg-pink-500">
-
-            {/* ヘッダー：名前と数字のみ */}
+        <div className="h-screen bg-black flex flex-col relative overflow-hidden text-white font-sans">
             <header className="p-8 pt-14 flex justify-between items-baseline z-20">
-                <h2 className="text-2xl font-black tracking-tighter uppercase italic truncate max-w-[70%]">
-                    {plan.name}
-                </h2>
-                <p className="text-3xl font-black italic tabular-nums">
-                    {plan.collectedCount}<span className="text-sm text-gray-700 mx-1">/</span>{plan.itemCount}
-                </p>
+                <h2 className="text-2xl font-black tracking-tighter uppercase italic truncate max-w-[70%]">{plan.name}</h2>
+                <p className="text-3xl font-black italic tabular-nums">{plan.collectedCount}<span className="text-sm text-gray-800 mx-1">/</span>{plan.itemCount}</p>
             </header>
 
-            {/* メイン：矢印と距離 */}
-            <div className="flex-1 flex flex-col items-center justify-center relative z-10">
-                {isAllCleared ? (
-                    <div className="text-center space-y-4 animate-in zoom-in">
-                        <CheckCircle2 size={80} className="text-pink-500 mx-auto" />
-                        <h3 className="text-2xl font-black uppercase italic">Mission Cleared</h3>
-                        <button onClick={() => router.push("/plan")} className="text-pink-500 font-bold text-xs uppercase tracking-widest pt-4">Back to Plans</button>
-                    </div>
-                ) : (
+            <div className="flex-1 flex flex-col items-center justify-center relative z-10 px-6">
+                {!isMissionComplete ? (
                     <>
-                        <div
-                            className="mb-12 transition-transform duration-300 ease-out"
-                            style={{ transform: `rotate(${arrowRotation}deg)` }}
-                        >
+                        <div className="mb-12 transition-transform duration-300 ease-out" style={{ transform: `rotate(${arrowRotation}deg)` }}>
                             <ArrowUp size={120} strokeWidth={2.5} className="text-pink-500 drop-shadow-[0_0_30px_rgba(240,98,146,0.3)]" />
                         </div>
+                        <p className="text-8xl font-black tracking-tighter tabular-nums leading-none mb-10">
+                            {formatDistanceDisplay(distanceToTarget)}
+                        </p>
 
-                        <div className="text-center">
-                            <p className="text-8xl font-black tracking-tighter tabular-nums leading-none">
-                                {formatDistanceDisplay(distanceToTarget)}
-                            </p>
+                        {/* ターゲット切り替えUI */}
+                        <div className="flex items-center gap-6">
+                            <button
+                                onClick={() => {
+                                    const uncollected = plan.items.filter((i: any) => !i.isCollected);
+                                    const idx = uncollected.findIndex((i: any) => i.id === activeTarget?.id);
+                                    const prevIdx = (idx - 1 + uncollected.length) % uncollected.length;
+                                    setManualTargetId(uncollected[prevIdx].id);
+                                }}
+                                className="p-2 text-gray-700 active:text-pink-500"
+                            >
+                                <ChevronLeft size={24} />
+                            </button>
+                            <div className="text-center min-w-[160px]">
+                                <h4 className="text-xl font-black uppercase tracking-tight">{activeTarget?.locationName}</h4>
+                                <p className="text-[8px] font-bold text-pink-500 uppercase tracking-widest mt-1">
+                                    {manualTargetId ? "Manual Lock" : "Auto Tracking"}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    const uncollected = plan.items.filter((i: any) => !i.isCollected);
+                                    const idx = uncollected.findIndex((i: any) => i.id === activeTarget?.id);
+                                    const nextIdx = (idx + 1) % uncollected.length;
+                                    setManualTargetId(uncollected[nextIdx].id);
+                                }}
+                                className="p-2 text-gray-700 active:text-pink-500"
+                            >
+                                <ChevronRight size={24} />
+                            </button>
                         </div>
                     </>
-                )}
-            </div>
-
-            {/* 下部：地名と中断 */}
-            <div className="p-8 pb-12 z-20 flex flex-col items-center">
-                {!isAllCleared && (
-                    <h4 className="text-xl font-black uppercase tracking-tight mb-10 text-center px-4">
-                        {currentTarget.locationName}
-                    </h4>
-                )}
-
-                <button
-                    onClick={() => router.push("/plan")}
-                    className="w-full py-4 bg-white/5 text-gray-600 rounded-2xl font-black text-[10px] uppercase tracking-[0.3em]"
-                >
-                    <Flag size={14} className="inline mr-2" /> Mission Abort
-                </button>
-
-                {/* ★テスト用ツールバー（開発時のみ使用） */}
-                <div className="mt-8 flex gap-4 opacity-30 hover:opacity-100 transition-opacity">
-                    <button onClick={testProximity} className="flex items-center gap-1 text-[8px] font-bold border border-white/20 px-2 py-1 rounded">
-                        <Beaker size={10} /> 近接テスト(50m)
-                    </button>
-                    <button onClick={testAcquisition} className="flex items-center gap-1 text-[8px] font-bold border border-white/20 px-2 py-1 rounded">
-                        <CheckCircle2 size={10} /> 獲得テスト
-                    </button>
-                </div>
-            </div>
-
-            {/* 獲得ポップアップ */}
-            {isAcquired && (
-                <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
-                    <div className="text-center space-y-4 animate-in zoom-in-95 duration-300">
-                        <div className="w-20 h-20 bg-pink-500 rounded-full flex items-center justify-center mx-auto shadow-[0_0_50px_rgba(240,98,146,0.5)]">
-                            <CheckCircle2 size={40} />
+                ) : (
+                    /* 感想入力画面（前回のものを踏襲） */
+                    <div className="w-full max-w-sm space-y-8 animate-in fade-in zoom-in duration-500 px-6">
+                        <div className="text-center">
+                            <CheckCircle2 size={60} className="text-pink-500 mx-auto mb-4" />
+                            <h3 className="text-3xl font-black uppercase italic tracking-tighter">Mission Complete</h3>
                         </div>
-                        <h3 className="text-3xl font-black italic uppercase tracking-tighter">Target Secured</h3>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">{acquiredName}</p>
+                        <textarea
+                            value={comment}
+                            onChange={(e) => setComment(e.target.value)}
+                            placeholder="今回の冒険はどうでしたか？"
+                            className="w-full h-40 bg-white/5 border border-white/10 rounded-[2rem] p-6 text-sm focus:outline-none focus:border-pink-500/50 transition-all resize-none font-bold"
+                        />
+                        <button onClick={handleFinishAdventure} disabled={isSaving} className="w-full py-5 bg-pink-500 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em]">
+                            {isSaving ? <Loader2 className="animate-spin" size={16} /> : "Log entry"}
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            {!isMissionComplete && (
+                <div className="p-8 pb-12 z-20">
+                    <button onClick={() => router.push("/plan")} className="w-full py-4 bg-white/5 text-gray-600 rounded-2xl font-black text-[10px] uppercase tracking-[0.3em]"><Flag size={14} className="inline mr-2" /> Mission Abort</button>
+                </div>
+            )}
+
+            {isAcquired && (
+                <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="text-center space-y-4 animate-in zoom-in-95 duration-300">
+                        <div className="w-20 h-20 bg-pink-500 rounded-full flex items-center justify-center mx-auto shadow-[0_0_50px_rgba(240,98,146,0.5)] animate-bounce"><CheckCircle2 size={40} /></div>
+                        <p className="text-pink-500 font-black text-sm uppercase tracking-[0.3em]">{actionMessage}</p>
+                        <h3 className="text-4xl font-black italic uppercase tracking-tighter leading-none">Secured</h3>
                     </div>
                 </div>
             )}
