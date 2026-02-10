@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ShieldAlert, Zap, Lock, Eye, Footprints } from "lucide-react";
+import { ArrowLeft, ShieldAlert, Zap, Lock, Eye } from "lucide-react";
 
 export default function SafetyPage() {
     const router = useRouter();
@@ -10,28 +10,23 @@ export default function SafetyPage() {
         {
             icon: Eye,
             title: "Safety First",
-            desc: "移動中の画面操作は大変危険です。方向を確認する際は、必ず立ち止まり、周囲の安全を確認してください。"
+            desc: "移動中の画面操作は危険です。方位を確認する際は、必ず立ち止まり、周囲の安全を確認してください。"
         },
         {
             icon: Lock,
             title: "Private Areas",
-            desc: "私有地、線路、工事現場などの立ち入り禁止区域には絶対に入らないでください。常に現地のルールと標識を優先してください。"
-        },
-        {
-            icon: Zap,
-            title: "Environment",
-            desc: "夜間や悪天候時、または不慣れな地形での探索は避けてください。自身の安全を最優先に考えた行動をお願いします。"
+            desc: "私有地、線路、立ち入り禁止区域には絶対に入らないでください。現地のルールと標識を常に優先してください。"
         },
         {
             icon: ShieldAlert,
-            title: "Data Privacy",
-            desc: "取得した位置情報やログデータは、デバイスの内部ストレージにのみ保存されます。外部サーバーに送信されることはありません。"
+            title: "Environment",
+            desc: "夜間や悪天候時、不慣れな地形での探索は避けてください。自身の安全を最優先に考えた行動をお願いします。"
         }
     ];
 
     return (
         <div className="min-h-screen bg-white text-black p-8 font-sans pb-20">
-            <button onClick={() => router.back()} className="pt-12 mb-8 text-gray-300 flex items-center gap-2 hover:text-black transition-colors">
+            <button onClick={() => router.back()} className="pt-12 mb-8 text-gray-300 flex items-center gap-2">
                 <ArrowLeft size={20} />
                 <span className="text-[10px] font-black uppercase tracking-widest">Back</span>
             </button>
@@ -49,21 +44,16 @@ export default function SafetyPage() {
                         </div>
                         <div className="space-y-1.5 pt-1">
                             <h2 className="font-black uppercase text-sm tracking-tight">{sec.title}</h2>
-                            <p className="text-[11px] text-gray-500 leading-relaxed font-bold">
-                                {sec.desc}
-                            </p>
+                            <p className="text-[11px] text-gray-500 leading-relaxed font-bold">{sec.desc}</p>
                         </div>
                     </section>
                 ))}
             </div>
 
             <div className="mt-20 space-y-4">
-                <p className="text-[9px] text-gray-300 text-center uppercase font-bold tracking-widest leading-loose">
-                    By using this application, you agree to take full responsibility for your actions in the physical world.
-                </p>
                 <button
                     onClick={() => router.back()}
-                    className="w-full py-5 bg-black text-white rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all"
+                    className="w-full py-5 bg-black text-white rounded-[1.5rem] font-black text-xs uppercase tracking-[0.3em] active:scale-95 transition-all shadow-xl"
                 >
                     了解して戻る
                 </button>

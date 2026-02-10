@@ -17,6 +17,7 @@ export default function MyPage() {
 
     useEffect(() => {
         const allPlans = getPlans();
+        // 少なくとも1つはアイテムを取得しているプランをログとして扱う
         const completedLogs = allPlans.filter(p => (p.items || []).some((i: any) => i.isCollected));
 
         let dist = 0;
@@ -25,7 +26,9 @@ export default function MyPage() {
 
         completedLogs.forEach(plan => {
             dist += plan.totalDistance || 0;
-            const collected = plan.items.filter((i: any) => i.isCollected);
+            // ★修正ポイント：plan.items が undefined の場合でもエラーにならないようガードを入れる
+            const items = plan.items || [];
+            const collected = items.filter((i: any) => i.isCollected);
             itemCount += collected.length;
             allCollected = [...allCollected, ...collected];
         });
@@ -34,11 +37,14 @@ export default function MyPage() {
             totalDistance: dist,
             totalMissions: completedLogs.length,
             totalItems: itemCount,
-            lastActive: completedLogs.length > 0 ? new Date(completedLogs[0].completionDate).toLocaleDateString('ja-JP') : "-"
+            lastActive: completedLogs.length > 0 ? new Date(completedLogs[0].completionDate || "").toLocaleDateString('ja-JP') : "-"
         });
 
-        // 直近の発見5件を表示
-        setDiscoveries(allCollected.sort((a, b) => new Date(b.collectedAt).getTime() - new Date(a.collectedAt).getTime()).slice(0, 5));
+        // 最新の発見5件をソートして表示
+        const sorted = allCollected.sort((a, b) =>
+            new Date(b.collectedAt).getTime() - new Date(a.collectedAt).getTime()
+        );
+        setDiscoveries(sorted.slice(0, 5));
     }, []);
 
     return (
@@ -48,7 +54,6 @@ export default function MyPage() {
                 <h1 className="text-4xl font-black italic uppercase tracking-tighter leading-none">Status</h1>
             </header>
 
-            {/* 統計：フライトログ風グリッド */}
             <div className="grid grid-cols-2 gap-4 mb-12">
                 <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
                     <Footprints size={16} className="text-gray-300 mb-4" />
@@ -62,11 +67,10 @@ export default function MyPage() {
                 </div>
             </div>
 
-            {/* 最新の発見（コレクション） */}
             <section className="mb-12">
                 <div className="flex justify-between items-end mb-6 px-1">
                     <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Latest Discoveries</h2>
-                    <button onClick={() => router.push('/log')} className="text-[9px] font-black text-pink-500 uppercase tracking-widest">View All</button>
+                    <button onClick={() => router.push('/item')} className="text-[9px] font-black text-pink-500 uppercase tracking-widest">View All</button>
                 </div>
                 <div className="space-y-3">
                     {discoveries.length > 0 ? discoveries.map((item, idx) => (
@@ -86,7 +90,6 @@ export default function MyPage() {
                 </div>
             </section>
 
-            {/* ガイド・安全設定 */}
             <div className="space-y-3">
                 <button
                     onClick={() => router.push('/safety')}
@@ -98,11 +101,6 @@ export default function MyPage() {
                     </div>
                     <ChevronRight size={16} className="text-gray-200" />
                 </button>
-
-                <div className="p-6 bg-gray-50 rounded-[1.5rem] flex items-center gap-4 border border-gray-100 opacity-50">
-                    <Info size={18} className="text-gray-400" />
-                    <span className="text-sm font-bold uppercase tracking-tight text-gray-400">App Version 1.0.0</span>
-                </div>
             </div>
         </div>
     );
