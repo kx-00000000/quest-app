@@ -1,11 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getPlans, deletePlan } from "@/lib/storage";
 import LazyMap from "@/components/Map/LazyMap";
-import { Calendar, Target, Trash2, Play, MapPin, Loader2, ChevronRight } from "lucide-react";
+import {
+    Calendar,
+    Target,
+    Trash2,
+    Play,
+    MapPin,
+    Loader2,
+    ChevronRight,
+    CircleDot
+} from "lucide-react";
 
 export default function PlanPage() {
+    const router = useRouter();
     const [plans, setPlans] = useState<any[]>([]);
     const [mounted, setMounted] = useState(false);
 
@@ -21,11 +32,15 @@ export default function PlanPage() {
         }
     };
 
-    if (!mounted) return <div className="flex h-screen items-center justify-center bg-white"><Loader2 className="animate-spin text-pink-500" /></div>;
+    if (!mounted) return (
+        <div className="flex h-screen items-center justify-center bg-white">
+            <Loader2 className="animate-spin text-pink-500" />
+        </div>
+    );
 
     if (plans.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center h-screen p-10 text-center text-gray-300">
+            <div className="flex flex-col items-center justify-center h-screen p-10 text-center text-gray-300 bg-white">
                 <MapPin size={48} className="mb-4 opacity-10" />
                 <p className="font-black uppercase tracking-[0.3em] text-[10px]">No active intelligence</p>
             </div>
@@ -34,35 +49,48 @@ export default function PlanPage() {
 
     return (
         <div className="h-screen bg-white flex flex-col overflow-hidden">
+            {/* 固定ヘッダー */}
             <header className="p-6 pt-10 border-b border-gray-100 bg-white z-20">
                 <h1 className="text-4xl font-black text-gray-900 tracking-tighter italic uppercase leading-none">Plans</h1>
             </header>
 
+            {/* スクロール可能エリア：左右余白なしのカードリスト */}
             <div className="flex-1 overflow-y-auto bg-gray-50 pb-32">
                 {plans.map((plan) => (
                     <div key={plan.id} className="bg-white border-b-[8px] border-gray-100 animate-in fade-in duration-500">
 
-                        {/* 1. ヘッダーエリア（地図の上） */}
-                        <div className="p-6 pb-4 flex justify-between items-start">
-                            <div className="space-y-1">
-                                <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tighter italic leading-none">{plan.name}</h2>
-                                <div className="flex items-center gap-3 text-gray-400 mt-2">
-                                    <div className="flex items-center gap-1">
-                                        <Calendar size={12} />
-                                        <span className="text-[10px] font-bold">{plan.createdAt}</span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <Target size={12} />
-                                        <span className="text-[10px] font-bold">{plan.items?.length} Targets</span>
+                        {/* 1. ステータス & ヘッダーエリア */}
+                        <div className="p-6 pb-4">
+                            {/* ★冒険ステータスの復活 */}
+                            <div className="flex items-center gap-2 mb-3">
+                                <CircleDot size={12} className="text-pink-500 animate-pulse" />
+                                <span className="text-[9px] font-black text-pink-500 uppercase tracking-[0.2em]">Operational Status: Ready</span>
+                            </div>
+
+                            <div className="flex justify-between items-start">
+                                <div className="space-y-1">
+                                    <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tighter italic leading-none">{plan.name}</h2>
+                                    <div className="flex items-center gap-3 text-gray-400 mt-2">
+                                        <div className="flex items-center gap-1">
+                                            <Calendar size={12} />
+                                            <span className="text-[10px] font-bold">{plan.createdAt}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <Target size={12} />
+                                            <span className="text-[10px] font-bold">{plan.items?.length} Targets</span>
+                                        </div>
                                     </div>
                                 </div>
+                                <button
+                                    onClick={() => handleDelete(plan.id)}
+                                    className="p-2 text-gray-200 hover:text-red-500 transition-colors"
+                                >
+                                    <Trash2 size={22} />
+                                </button>
                             </div>
-                            <button onClick={() => handleDelete(plan.id)} className="p-2 text-gray-200 hover:text-red-500 transition-colors">
-                                <Trash2 size={22} />
-                            </button>
                         </div>
 
-                        {/* 2. 地図：ベベル（角丸）なし、エッジ・トゥ・エッジ形式 */}
+                        {/* 2. 地図：エッジ・トゥ・エッジ（左右余白なし）、角丸なし */}
                         <div className="h-64 relative w-full border-y border-gray-100 bg-gray-50">
                             <LazyMap
                                 userLocation={plan.center}
@@ -70,12 +98,13 @@ export default function PlanPage() {
                                 isLogMode={true}
                                 themeColor="#F06292"
                             />
+                            {/* 範囲タグ */}
                             <div className="absolute top-4 left-4 z-10 bg-gray-900/80 backdrop-blur-md px-3 py-1 rounded-full border border-white/20">
                                 <span className="text-[9px] font-black text-white uppercase italic tracking-widest">{plan.radius}km Range</span>
                             </div>
                         </div>
 
-                        {/* 3. ターゲットリスト：枠なし、地名のみの洗練されたリスト */}
+                        {/* 3. ターゲットリスト：枠なしのクリーンなリスト */}
                         <div className="p-6 space-y-6">
                             <div className="space-y-4">
                                 {plan.items?.map((item: any, idx: number) => (
@@ -88,13 +117,16 @@ export default function PlanPage() {
                                                 {item.locationName || "Area Reconnaissance"}
                                             </p>
                                         </div>
-                                        <ChevronRight size={14} className="text-gray-200" />
+                                        <ChevronRight size={14} className="text-gray-100" />
                                     </div>
                                 ))}
                             </div>
 
-                            {/* 4. アクションボタン */}
-                            <button className="w-full py-5 bg-gray-900 text-white rounded-[1.5rem] font-black text-xs shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-[0.2em] border-b-4 border-black/20">
+                            {/* 4. アクションボタン：有効化 */}
+                            <button
+                                onClick={() => router.push(`/quest/${plan.id}`)}
+                                className="w-full py-5 bg-gray-900 text-white rounded-[1.5rem] font-black text-xs shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-[0.2em] border-b-4 border-black/20"
+                            >
                                 <Play size={14} fill="currentColor" />
                                 冒険を始める
                             </button>
