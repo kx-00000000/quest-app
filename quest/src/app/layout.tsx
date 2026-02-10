@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { Nunito } from "next/font/google";
 import "./globals.css";
-// ★ 修正：Navigationフォルダは無いので直接 components から読み込みます
 import BottomNav from "@/components/BottomNav";
+// ★ スプラッシュスクリーンのインポートを追加
+import SplashScreen from "@/components/SplashScreen";
 
 const nunito = Nunito({
   variable: "--font-nunito",
@@ -22,9 +23,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
-      <body className={`${nunito.variable} antialiased`}>
+      <body className={`${nunito.variable} antialiased relative`}>
+        {/* ★ スプラッシュスクリーンを最前面に配置 */}
+        <SplashScreen />
+
+        {/* メインコンテンツ */}
         {children}
-        {/* ボトムナビゲーションを配置 */}
+
+        {/* ボトムナビゲーション */}
         <BottomNav />
       </body>
     </html>
