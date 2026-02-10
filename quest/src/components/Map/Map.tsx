@@ -8,9 +8,9 @@ import MissionBriefing from "./MissionBriefing";
 
 const createNumberIcon = (number: number, color: string) => L.divIcon({
     className: "number-icon",
-    html: `<div style="background-color: ${color}; width: 22px; height: 22px; border-radius: 8px; border: 2px solid white; color: white; font-size: 11px; font-weight: 900; display: flex; align-items: center; justify-content: center; shadow: 0 2px 4px rgba(0,0,0,0.3); font-family: sans-serif;">${number}</div>`,
-    iconSize: [22, 22],
-    iconAnchor: [11, 11],
+    html: `<div style="background-color: ${color}; width: 24px; height: 24px; border-radius: 8px; border: 2px solid white; color: white; font-size: 12px; font-weight: 900; display: flex; align-items: center; justify-content: center; shadow: 0 2px 4px rgba(0,0,0,0.3);">${number}</div>`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
 });
 
 const userIcon = L.divIcon({
@@ -37,8 +37,8 @@ const MapContent = memo(({
                         center={[userLocation.lat, userLocation.lng]}
                         radius={radiusInKm * 1000}
                         pathOptions={{
-                            fillColor: "transparent", // ★塗りつぶしなし
-                            fillOpacity: 0,           // ★完全に透明
+                            fillColor: "transparent",
+                            fillOpacity: 0,
                             color: themeColor,
                             weight: 2,
                             dashArray: "8, 8"

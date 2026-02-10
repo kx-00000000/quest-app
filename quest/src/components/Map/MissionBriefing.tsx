@@ -25,23 +25,22 @@ export default function MissionBriefing({ items, onStateChange, onComplete }: { 
                 await new Promise(r => setTimeout(r, 2200));
             }
 
-            // ★全体俯瞰モードへの移行
             setIsFinalOverview(true);
             onStateChange(true);
             setCurrentIndex(-1);
 
             const bounds = L.latLngBounds(items.map(i => [i.lat, i.lng]));
-            // 地図の中心（現在地）もBoundsに含めることで探索円全体をカバー
+            // 現在地もBoundsに含めて探索円をカバー
             const center = map.getCenter();
             bounds.extend(center);
 
             map.fitBounds(bounds, {
                 paddingTopLeft: [60, 60],
-                paddingBottomRight: [60, 340], // レポートの高さを考慮して下部余白を確保
+                paddingBottomRight: [60, 350],
                 duration: 2
             });
 
-            await new Promise(r => setTimeout(r, 5000)); // じっくり見せる
+            await new Promise(r => setTimeout(r, 5000));
             onComplete();
         };
         runBriefing();
