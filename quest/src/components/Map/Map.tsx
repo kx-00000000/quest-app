@@ -1,9 +1,9 @@
 "use client";
 
-import { MapContainer, TileLayer, Marker, Polyline, Circle, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Circle } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { useEffect, memo } from "react";
+import { memo } from "react";
 import MissionBriefing from "./MissionBriefing";
 
 const createNumberIcon = (number: number, color: string) => L.divIcon({
@@ -31,13 +31,18 @@ const MapContent = memo(({
                 detectRetina={true}
             />
 
-            {/* ★修正：ブリーフィングがアクティブな時は、isFinalOverviewがTrueの時だけ表示 */}
             {!isLogMode && userLocation && (!isBriefingActive || isFinalOverview) && (
                 <>
                     <Circle
                         center={[userLocation.lat, userLocation.lng]}
                         radius={radiusInKm * 1000}
-                        pathOptions={{ fillColor: themeColor, fillOpacity: 0.1, color: themeColor, weight: 1, dashArray: "5, 5" }}
+                        pathOptions={{
+                            fillColor: "transparent", // ★塗りつぶしなし
+                            fillOpacity: 0,           // ★完全に透明
+                            color: themeColor,
+                            weight: 2,
+                            dashArray: "8, 8"
+                        }}
                     />
                     <Marker position={[userLocation.lat, userLocation.lng]} icon={userIcon} />
                 </>
@@ -60,11 +65,7 @@ const MapContent = memo(({
             ))}
 
             {isBriefingActive && (
-                <MissionBriefing
-                    items={items}
-                    onStateChange={onBriefingStateChange} // ★追加
-                    onComplete={onBriefingComplete}
-                />
+                <MissionBriefing items={items} onStateChange={onBriefingStateChange} onComplete={onBriefingComplete} />
             )}
         </>
     );
@@ -73,10 +74,7 @@ const MapContent = memo(({
 MapContent.displayName = "MapContent";
 
 export default function Map(props: any) {
-    const initialCenter: [number, number] = props.userLocation
-        ? [props.userLocation.lat, props.userLocation.lng]
-        : [35.6812, 139.7671];
-
+    const initialCenter: [number, number] = props.userLocation ? [props.userLocation.lat, props.userLocation.lng] : [35.6812, 139.7671];
     return (
         <MapContainer center={initialCenter} zoom={14} className="w-full h-full z-0" zoomControl={false} preferCanvas={true}>
             <MapContent {...props} />

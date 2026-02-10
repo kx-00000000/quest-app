@@ -18,23 +18,30 @@ export default function MissionBriefing({ items, onStateChange, onComplete }: { 
             for (let i = 0; i < items.length; i++) {
                 const item = items[i];
                 map.flyTo([item.lat, item.lng], 15, { duration: 1.5 });
-
-                // 精度向上のため、getLocationName の内部を強化することを推奨
                 const name = await getLocationName(item.lat, item.lng);
                 names.push(name);
                 setLocationNames([...names]);
                 setCurrentIndex(i);
-                await new Promise(r => setTimeout(r, 2000));
+                await new Promise(r => setTimeout(r, 2200));
             }
 
+            // ★全体俯瞰モードへの移行
             setIsFinalOverview(true);
-            onStateChange(true); // ★親（Map）に、最後の概要モードに入ったことを通知
+            onStateChange(true);
             setCurrentIndex(-1);
 
             const bounds = L.latLngBounds(items.map(i => [i.lat, i.lng]));
-            map.fitBounds(bounds, { paddingTopLeft: [50, 50], paddingBottomRight: [50, 320], duration: 1.5 });
+            // 地図の中心（現在地）もBoundsに含めることで探索円全体をカバー
+            const center = map.getCenter();
+            bounds.extend(center);
 
-            await new Promise(r => setTimeout(r, 4500));
+            map.fitBounds(bounds, {
+                paddingTopLeft: [60, 60],
+                paddingBottomRight: [60, 340], // レポートの高さを考慮して下部余白を確保
+                duration: 2
+            });
+
+            await new Promise(r => setTimeout(r, 5000)); // じっくり見せる
             onComplete();
         };
         runBriefing();
@@ -47,13 +54,9 @@ export default function MissionBriefing({ items, onStateChange, onComplete }: { 
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2 px-3 py-1 bg-pink-500 rounded-full">
                             <PlaneTakeoff size={12} className="text-white animate-pulse" />
-                            <span className="text-[10px] font-black text-white uppercase tracking-tighter">
-                                {currentIndex + 1} / {items.length}
-                            </span>
+                            <span className="text-[10px] font-black text-white uppercase tracking-tighter">{currentIndex + 1} / {items.length}</span>
                         </div>
-                        <span className="text-sm font-black text-white uppercase tracking-tight truncate max-w-[180px]">
-                            {locationNames[currentIndex]}
-                        </span>
+                        <span className="text-sm font-black text-white uppercase tracking-tight truncate max-w-[180px]">{locationNames[currentIndex]}</span>
                     </div>
                 </div>
             )}
