@@ -49,45 +49,44 @@ export default function MyPage() {
                 <h1 className="text-4xl font-black italic uppercase tracking-tighter leading-none">Status</h1>
             </header>
 
-            {/* 統計：シンプルで整然としたグリッド */}
+            {/* 統計：無駄を削ぎ落としたグリッド */}
             <div className="grid grid-cols-2 gap-4 mb-12">
                 <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
-                    <Footprints size={16} className="text-gray-300 mb-4" />
+                    <Footprints size={16} className="text-gray-300 mb-4" strokeWidth={1.5} />
                     <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Distance</p>
                     <p className="text-2xl font-black italic">{(stats.totalDistance).toFixed(1)}<span className="text-xs ml-1 font-bold">km</span></p>
                 </div>
                 <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
-                    <MapIcon size={16} className="text-gray-300 mb-4" />
+                    <MapIcon size={16} className="text-gray-300 mb-4" strokeWidth={1.5} />
                     <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Missions</p>
                     <p className="text-2xl font-black italic">{stats.totalMissions}</p>
                 </div>
                 <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
-                    <Target size={16} className="text-gray-300 mb-4" />
+                    <Target size={16} className="text-gray-300 mb-4" strokeWidth={1.5} />
                     <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Discoveries</p>
                     <p className="text-2xl font-black italic">{stats.totalItems}</p>
                 </div>
                 <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
-                    <Clock size={16} className="text-gray-300 mb-4" />
+                    <Clock size={16} className="text-gray-300 mb-4" strokeWidth={1.5} />
                     <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Last Active</p>
                     <p className="text-lg font-black italic leading-none mt-1">{stats.lastActive}</p>
                 </div>
             </div>
 
-            {/* ガイド・安全設定へのリンク */}
             <div className="space-y-3">
                 <button
                     onClick={() => router.push('/safety')}
                     className="w-full p-6 bg-white border border-gray-100 rounded-[1.5rem] flex items-center justify-between active:bg-gray-50 transition-all"
                 >
                     <div className="flex items-center gap-4">
-                        <ShieldCheck size={18} className="text-gray-400" />
+                        <ShieldCheck size={18} className="text-gray-400" strokeWidth={1.5} />
                         <span className="text-sm font-bold uppercase tracking-tight">Safety Guidelines</span>
                     </div>
                     <ChevronRight size={16} className="text-gray-200" />
                 </button>
             </div>
 
-            <p className="mt-12 text-[8px] text-center text-gray-200 font-bold uppercase tracking-[0.4em]">
+            <p className="mt-20 text-[8px] text-center text-gray-200 font-bold uppercase tracking-[0.4em]">
                 Multi-Language AI Concierge Engine
             </p>
         </div>
