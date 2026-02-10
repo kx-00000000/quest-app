@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getPlans } from "@/lib/storage";
-import { Footprints, Map as MapIcon, Target, Clock, ShieldCheck, Info, ChevronRight } from "lucide-react";
+import { Footprints, Map as MapIcon, Target, Clock, ShieldCheck, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function MyPage() {
@@ -17,19 +17,27 @@ export default function MyPage() {
 
     useEffect(() => {
         const allPlans = getPlans();
-        // 少なくとも1つはアイテムを取得しているプランをログとして扱う
+
+        // アイテムを1つ以上取得しているものを「ログ」として抽出
         const completedLogs = allPlans.filter(p => (p.items || []).some((i: any) => i.isCollected));
 
         let dist = 0;
         let itemCount = 0;
         let allCollected: any[] = [];
+        let latestDate: number = 0;
 
-        completedLogs.forEach(plan => {
+        completedLogs.forEach((plan: any) => {
             dist += plan.totalDistance || 0;
-            // ★修正ポイント：plan.items が undefined の場合でもエラーにならないようガードを入れる
             const items = plan.items || [];
             const collected = items.filter((i: any) => i.isCollected);
             itemCount += collected.length;
+
+            // 最新のアクティビティ日を計算
+            collected.forEach((item: any) => {
+                const itemTime = new Date(item.collectedAt).getTime();
+                if (itemTime > latestDate) latestDate = itemTime;
+            });
+
             allCollected = [...allCollected, ...collected];
         });
 
@@ -37,10 +45,10 @@ export default function MyPage() {
             totalDistance: dist,
             totalMissions: completedLogs.length,
             totalItems: itemCount,
-            lastActive: completedLogs.length > 0 ? new Date(completedLogs[0].completionDate || "").toLocaleDateString('ja-JP') : "-"
+            lastActive: latestDate > 0 ? new Date(latestDate).toLocaleDateString('ja-JP') : "-"
         });
 
-        // 最新の発見5件をソートして表示
+        // 最新の発見5件
         const sorted = allCollected.sort((a, b) =>
             new Date(b.collectedAt).getTime() - new Date(a.collectedAt).getTime()
         );
@@ -54,6 +62,7 @@ export default function MyPage() {
                 <h1 className="text-4xl font-black italic uppercase tracking-tighter leading-none">Status</h1>
             </header>
 
+            {/* 統計：フライトログ風グリッド */}
             <div className="grid grid-cols-2 gap-4 mb-12">
                 <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
                     <Footprints size={16} className="text-gray-300 mb-4" />
@@ -65,8 +74,19 @@ export default function MyPage() {
                     <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Missions</p>
                     <p className="text-2xl font-black italic">{stats.totalMissions}</p>
                 </div>
+                <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
+                    <Target size={16} className="text-gray-300 mb-4" />
+                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Discoveries</p>
+                    <p className="text-2xl font-black italic">{stats.totalItems}</p>
+                </div>
+                <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
+                    <Clock size={16} className="text-gray-300 mb-4" />
+                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Last Active</p>
+                    <p className="text-lg font-black italic leading-none mt-1">{stats.lastActive}</p>
+                </div>
             </div>
 
+            {/* 最新の発見（Explorer Vault への入り口） */}
             <section className="mb-12">
                 <div className="flex justify-between items-end mb-6 px-1">
                     <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Latest Discoveries</h2>
@@ -79,9 +99,6 @@ export default function MyPage() {
                             <div className="flex-1 min-w-0">
                                 <p className="text-xs font-black uppercase truncate">{item.locationName}</p>
                                 <p className="text-[8px] font-bold text-gray-400 uppercase">{item.metadata?.category || "Discovery"}</p>
-                            </div>
-                            <div className="text-[9px] font-bold text-gray-300 tabular-nums">
-                                {new Date(item.collectedAt).toLocaleDateString()}
                             </div>
                         </div>
                     )) : (

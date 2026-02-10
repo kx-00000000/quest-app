@@ -10,17 +10,17 @@ export default function SafetyPage() {
         {
             icon: Eye,
             title: "Safety First",
-            desc: "移動中の画面操作は危険です。方位を確認する際は、必ず立ち止まり、周囲の安全を確認してください。"
+            desc: "移動中の画面操作は危険です。方位を確認する際は必ず立ち止まり、周囲の安全を確認してください。"
         },
         {
             icon: Lock,
             title: "Private Areas",
-            desc: "私有地、線路、立ち入り禁止区域には絶対に入らないでください。現地のルールと標識を常に優先してください。"
+            desc: "私有地、線路、立ち入り禁止区域には絶対に入らないでください。現地のルールを最優先してください。"
         },
         {
             icon: ShieldAlert,
             title: "Environment",
-            desc: "夜間や悪天候時、不慣れな地形での探索は避けてください。自身の安全を最優先に考えた行動をお願いします。"
+            desc: "夜間や不慣れな地形での探索は避けてください。自身の安全を最優先に考えた行動をお願いします。"
         }
     ];
 
@@ -50,10 +50,10 @@ export default function SafetyPage() {
                 ))}
             </div>
 
-            <div className="mt-20 space-y-4">
+            <div className="mt-20">
                 <button
                     onClick={() => router.back()}
-                    className="w-full py-5 bg-black text-white rounded-[1.5rem] font-black text-xs uppercase tracking-[0.3em] active:scale-95 transition-all shadow-xl"
+                    className="w-full py-5 bg-black text-white rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all"
                 >
                     了解して戻る
                 </button>
