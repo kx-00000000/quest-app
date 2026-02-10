@@ -57,7 +57,7 @@ export default function QuestActivePage() {
     }, [id, router]);
 
     const handleAcquireItem = (targetItem: any) => {
-        setAcquiredName(targetItem.locationName || "Secured");
+        setAcquiredName(targetItem.locationName || "ポイント");
         setIsAcquired(true);
 
         const updatedItems = plan.items.map((item: any) =>
@@ -135,20 +135,19 @@ export default function QuestActivePage() {
                     <h2 className="text-2xl font-black tracking-tighter uppercase italic truncate max-w-[200px]">
                         {plan.name}
                     </h2>
-                    {/* ★進捗ドット：追跡中のアイテムを強調 */}
-                    <div className="flex gap-2 items-center h-4">
+                    {/* ★進捗ドット：現在追いかけているターゲットをリングで強調 */}
+                    <div className="flex gap-2.5 items-center h-4">
                         {plan.items.map((item: any, idx: number) => {
                             const isCurrent = activeTarget && item.id === activeTarget.id;
                             return (
                                 <div key={item.id || idx} className="relative flex items-center justify-center">
-                                    {/* 現在追跡中のアイテムには外側にリングを表示 */}
                                     {isCurrent && !item.isCollected && (
-                                        <div className="absolute w-5 h-5 border-2 border-pink-500/30 rounded-full animate-pulse" />
+                                        <div className="absolute w-4.5 h-4.5 border-2 border-pink-500/20 rounded-full animate-pulse" />
                                     )}
                                     {item.isCollected ? (
-                                        <div className="w-2.5 h-2.5 bg-pink-500 rounded-full transition-all duration-500" />
+                                        <div className="w-2 h-2 bg-pink-500 rounded-full" />
                                     ) : (
-                                        <div className={`w-2.5 h-2.5 rounded-full transition-all ${isCurrent ? 'bg-pink-500 scale-125' : 'bg-gray-100 border border-gray-200'}`} />
+                                        <div className={`w-2 h-2 rounded-full ${isCurrent ? 'bg-pink-500' : 'bg-gray-100 border border-gray-200'}`} />
                                     )}
                                 </div>
                             );
@@ -156,7 +155,7 @@ export default function QuestActivePage() {
                     </div>
                 </div>
                 <p className="text-3xl font-black italic tabular-nums text-gray-900">
-                    {plan.collectedCount}<span className="text-sm text-gray-300 mx-1">/</span>{plan.itemCount}
+                    {plan.collectedCount}<span className="text-sm text-gray-200 mx-1">/</span>{plan.itemCount}
                 </p>
             </header>
 
@@ -178,9 +177,9 @@ export default function QuestActivePage() {
                         </div>
                     </>
                 ) : (
-                    <div className="text-center space-y-6 animate-in fade-in duration-700 px-6">
+                    <div className="text-center space-y-6 animate-in fade-in duration-1000 px-6">
                         <CheckCircle2 size={80} className="text-pink-500 mx-auto" />
-                        <h3 className="text-3xl font-black uppercase italic text-black">Mission Complete</h3>
+                        <h3 className="text-3xl font-black uppercase italic text-black leading-none tracking-tighter">Mission Complete</h3>
                         <div className="w-full max-w-sm space-y-6">
                             <textarea
                                 value={comment}
@@ -206,7 +205,7 @@ export default function QuestActivePage() {
                     <div className="flex items-center gap-8 mb-10">
                         <button
                             onClick={() => { if (uncollectedItems.length > 1) { const idx = uncollectedItems.findIndex((i: any) => i.id === activeTarget?.id); setManualTargetId(uncollectedItems[(idx - 1 + uncollectedItems.length) % uncollectedItems.length].id); } }}
-                            className="p-3 bg-gray-50 rounded-full text-gray-300 active:text-pink-500 transition-colors"
+                            className="p-3 bg-gray-50 rounded-full text-gray-200 active:text-pink-500 transition-colors"
                         >
                             <ChevronLeft size={24} />
                         </button>
@@ -218,7 +217,7 @@ export default function QuestActivePage() {
                         </div>
                         <button
                             onClick={() => { if (uncollectedItems.length > 1) { const idx = uncollectedItems.findIndex((i: any) => i.id === activeTarget?.id); setManualTargetId(uncollectedItems[(idx + 1) % uncollectedItems.length].id); } }}
-                            className="p-3 bg-gray-50 rounded-full text-gray-300 active:text-pink-500 transition-colors"
+                            className="p-3 bg-gray-50 rounded-full text-gray-200 active:text-pink-500 transition-colors"
                         >
                             <ChevronRight size={24} />
                         </button>
@@ -233,34 +232,34 @@ export default function QuestActivePage() {
                 </div>
             )}
 
-            {/* 4. テスト用ツールバー：最下部に固定表示 */}
+            {/* 4. テスト用ツールバー：最下部に固定 */}
             {!isMissionComplete && (
-                <div className="fixed bottom-4 left-0 right-0 z-[4000] flex justify-center gap-4 px-8 pointer-events-none">
+                <div className="fixed bottom-6 left-0 right-0 z-[5000] flex justify-center gap-4 px-8 pointer-events-none">
                     <div className="bg-white/80 backdrop-blur-md border border-gray-100 p-2 rounded-full shadow-lg flex gap-2 pointer-events-auto">
                         <button
                             onClick={() => setDistanceToTarget(48)}
-                            className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-full text-[9px] font-black uppercase tracking-widest hover:bg-pink-500 transition-colors"
+                            className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-full text-[9px] font-black uppercase tracking-widest active:bg-pink-500 transition-colors"
                         >
-                            <Beaker size={12} /> 近接(50m)
+                            <Beaker size={12} /> 近接
                         </button>
                         <button
                             onClick={() => { if (activeTarget) handleAcquireItem(activeTarget); }}
-                            className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-full text-[9px] font-black uppercase tracking-widest hover:bg-pink-500 transition-colors"
+                            className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-full text-[9px] font-black uppercase tracking-widest active:bg-pink-500 transition-colors"
                         >
-                            <CheckCircle2 size={12} /> 強制獲得
+                            <CheckCircle2 size={12} /> 獲得
                         </button>
                     </div>
                 </div>
             )}
 
-            {/* 5. 獲得ポップアップ */}
+            {/* 5. 獲得ポップアップ：回転・バウンドなしのシンプルなフェード */}
             {isAcquired && (
                 <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-white/90 backdrop-blur-md animate-in fade-in duration-300">
-                    <div className="text-center space-y-4 animate-in zoom-in-95 duration-300">
-                        <div className="w-20 h-20 bg-pink-500 rounded-full flex items-center justify-center mx-auto shadow-xl shadow-pink-500/20">
+                    <div className="text-center space-y-4">
+                        <div className="w-20 h-20 bg-pink-500 rounded-full flex items-center justify-center mx-auto">
                             <CheckCircle2 size={40} className="text-white" />
                         </div>
-                        <h3 className="text-4xl font-black italic uppercase tracking-tighter leading-none text-black">Secured</h3>
+                        <h3 className="text-4xl font-black italic uppercase tracking-tighter leading-none text-black">獲得しました！</h3>
                         <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-2">{acquiredName}</p>
                     </div>
                 </div>
