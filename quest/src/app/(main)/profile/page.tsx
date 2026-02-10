@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getPlans } from "@/lib/storage";
-import { Footprints, Map as MapIcon, Target, Clock, ShieldCheck, ChevronRight, Check, X } from "lucide-react";
+import { Footprints, Map as MapIcon, Target, Clock, ShieldCheck, ChevronRight, Check, X, cloudUpload } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function MyPage() {
@@ -14,13 +14,14 @@ export default function MyPage() {
         lastActive: "-"
     });
 
-    // ニックネーム管理用のステート
     const [nickname, setNickname] = useState("Navigator");
     const [isEditing, setIsEditing] = useState(false);
     const [tempName, setTempName] = useState("");
 
+    // ★ ログイン状態の管理（現状はfalse固定。後にSupabaseのセッション確認に変更）
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
+
     useEffect(() => {
-        // 保存されたニックネームをロード
         const savedName = localStorage.getItem("user_nickname");
         if (savedName) setNickname(savedName);
 
@@ -51,14 +52,9 @@ export default function MyPage() {
         });
     }, []);
 
-    const handleStartEdit = () => {
-        setTempName(nickname);
-        setIsEditing(true);
-    };
-
     const handleSaveNickname = () => {
         const trimmed = tempName.trim();
-        const finalName = trimmed || "Navigator"; // 空入力時はデフォルトに戻す
+        const finalName = trimmed || "Navigator";
         setNickname(finalName);
         localStorage.setItem("user_nickname", finalName);
         setIsEditing(false);
@@ -67,10 +63,9 @@ export default function MyPage() {
     return (
         <div className="min-h-screen bg-white text-black p-8 font-sans pb-32">
 
-            {/* ヘッダーセクション：ニックネーム編集機能 */}
-            <header className="pt-12 mb-12 text-center min-h-[120px] flex flex-col justify-center">
+            {/* ヘッダーセクション */}
+            <header className="pt-12 mb-8 text-center min-h-[120px] flex flex-col justify-center">
                 <p className="text-[10px] font-black text-pink-500 uppercase tracking-[0.3em] mb-3">Navigator Profile</p>
-
                 {isEditing ? (
                     <div className="flex flex-col items-center gap-4 animate-in fade-in duration-300">
                         <input
@@ -92,10 +87,7 @@ export default function MyPage() {
                         </div>
                     </div>
                 ) : (
-                    <div
-                        onClick={handleStartEdit}
-                        className="group cursor-pointer flex flex-col items-center"
-                    >
+                    <div onClick={() => { setTempName(nickname); setIsEditing(true); }} className="group cursor-pointer">
                         <h1 className="text-4xl font-black italic uppercase tracking-tighter leading-none group-hover:text-pink-500 transition-colors">
                             {nickname}
                         </h1>
@@ -106,7 +98,28 @@ export default function MyPage() {
                 )}
             </header>
 
-            {/* 統計：統計グリッドはそのまま維持 */}
+            {/* ★ バックアップ促進バナー：ゲストユーザーにのみ表示 */}
+            {!isLoggedIn && (
+                <div className="mb-12 p-6 bg-pink-50 rounded-[2.5rem] border border-pink-100 flex flex-col gap-4 shadow-sm animate-in slide-in-from-top duration-500">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                            <ShieldCheck size={18} className="text-pink-500" />
+                        </div>
+                        <h3 className="text-[10px] font-black text-pink-500 uppercase tracking-widest">Data Protection</h3>
+                    </div>
+                    <p className="text-[11px] font-bold text-gray-600 leading-relaxed px-1">
+                        現在ゲストとして利用中です。機種変更時にログを引き継ぐため、クラウドバックアップを有効にしてください。
+                    </p>
+                    <button
+                        onClick={() => router.push('/auth')}
+                        className="w-full py-4 bg-white border border-pink-200 text-pink-500 rounded-2xl font-black text-[9px] uppercase tracking-[0.2em] shadow-sm active:scale-95 transition-all"
+                    >
+                        Enable Cloud Backup
+                    </button>
+                </div>
+            )}
+
+            {/* 統計グリッド */}
             <div className="grid grid-cols-2 gap-4 mb-12">
                 <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
                     <Footprints size={16} className="text-gray-300 mb-4" strokeWidth={1.5} />
@@ -118,6 +131,7 @@ export default function MyPage() {
                     <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Missions</p>
                     <p className="text-2xl font-black italic">{stats.totalMissions}</p>
                 </div>
+                {/* ... 他のステータス項目はそのまま ... */}
                 <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
                     <Target size={16} className="text-gray-300 mb-4" strokeWidth={1.5} />
                     <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Discoveries</p>
