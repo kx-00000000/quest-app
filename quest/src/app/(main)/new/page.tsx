@@ -25,11 +25,8 @@ export default function NewQuestPage() {
     const [name, setName] = useState("");
     const [activeMode, setActiveMode] = useState(rangeModes[0]);
 
-    // 表示用の半径
     const [radius, setRadius] = useState(1);
-    // 地図描画用の半径（負荷軽減のため遅延させて更新）
     const [mapRadius, setMapRadius] = useState(1);
-
     const [itemCount, setItemCount] = useState(3);
     const [isCreating, setIsCreating] = useState(false);
     const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
@@ -46,12 +43,13 @@ export default function NewQuestPage() {
         return () => { if (timerRef.current) clearTimeout(timerRef.current); };
     }, []);
 
+    // ★負荷軽減：スライダー操作中の地図更新を0.3秒遅らせる
     const handleRadiusChange = (val: number) => {
         setRadius(val);
         if (timerRef.current) clearTimeout(timerRef.current);
         timerRef.current = setTimeout(() => {
             setMapRadius(val);
-        }, 150);
+        }, 300);
     };
 
     const handleCreate = async () => {
@@ -101,7 +99,7 @@ export default function NewQuestPage() {
 
             {!isBriefingActive && (
                 <>
-                    <div className="absolute top-8 left-6 right-6 z-20">
+                    <div className="absolute top-8 left-6 right-6 z-20 animate-in fade-in duration-500">
                         <div className="bg-white/40 backdrop-blur-2xl rounded-[2rem] border border-white/40 shadow-xl px-6 py-3">
                             <input
                                 type="text"
@@ -113,7 +111,7 @@ export default function NewQuestPage() {
                         </div>
                     </div>
 
-                    <div className="mt-auto relative z-10 px-4 mb-4">
+                    <div className="mt-auto relative z-10 px-4 mb-4 animate-in slide-in-from-bottom-8 duration-500">
                         <div className="bg-white/30 backdrop-blur-3xl rounded-[3rem] p-6 shadow-2xl border border-white/40 space-y-5">
                             <div className="flex p-1 bg-black/5 rounded-2xl gap-1">
                                 {rangeModes.map((mode) => (
@@ -143,7 +141,7 @@ export default function NewQuestPage() {
                                         step={activeMode.step}
                                         value={radius}
                                         onChange={(e) => handleRadiusChange(parseFloat(e.target.value))}
-                                        className="w-full h-1.5 accent-gray-400 bg-black/10 rounded-full appearance-none"
+                                        className="w-full h-1.5 accent-gray-400 bg-black/10 rounded-full appearance-none cursor-pointer"
                                     />
                                 </div>
                                 <div className="space-y-1">
@@ -158,7 +156,7 @@ export default function NewQuestPage() {
                                         step="1"
                                         value={itemCount}
                                         onChange={(e) => setItemCount(parseInt(e.target.value))}
-                                        className="w-full h-1.5 accent-gray-400 bg-black/10 rounded-full appearance-none"
+                                        className="w-full h-1.5 accent-gray-400 bg-black/10 rounded-full appearance-none cursor-pointer"
                                     />
                                 </div>
                             </div>

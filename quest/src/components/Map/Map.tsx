@@ -3,16 +3,8 @@
 import { MapContainer, TileLayer, Marker, Polyline, Circle, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { useEffect } from "react";
+import { useEffect, memo } from "react";
 import MissionBriefing from "./MissionBriefing";
-
-// 通常アイコン
-const createIcon = (color: string) => L.divIcon({
-    className: "custom-icon",
-    html: `<div style="background-color: ${color}; width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></div>`,
-    iconSize: [12, 12],
-    iconAnchor: [6, 6],
-});
 
 // 数字アイコン
 const createNumberIcon = (number: number, color: string) => L.divIcon({
@@ -30,22 +22,12 @@ const userIcon = L.divIcon({
     iconAnchor: [6, 6],
 });
 
-export default function Map({
-    items = [],
-    userLocation,
-    radiusInKm = 1,
-    themeColor = "#f06292",
-    isLogMode = false,
-    isBriefingActive = false,
-    onBriefingComplete
-}: any) {
-
-    const initialCenter: [number, number] = userLocation
-        ? [userLocation.lat, userLocation.lng]
-        : [35.6812, 139.7671];
-
+// メインコンポーネントを memo 化して不要な再レンダリングを防止
+const MapContent = memo(({
+    items, userLocation, radiusInKm, themeColor, isLogMode, isBriefingActive, onBriefingComplete
+}: any) => {
     return (
-        <MapContainer center={initialCenter} zoom={14} className="w-full h-full z-0" zoomControl={false}>
+        <>
             <TileLayer
                 url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
                 attribution='&copy; <a href="https://carto.com/">CARTO</a>'
@@ -75,7 +57,12 @@ export default function Map({
                     position={[item.lat, item.lng]}
                     icon={isBriefingActive
                         ? createNumberIcon(idx + 1, themeColor)
-                        : createIcon(item.isCollected ? themeColor : "#ccc")
+                        : L.divIcon({
+                            className: "custom-icon",
+                            html: `<div style="background-color: ${item.isCollected ? themeColor : '#ccc'}; width: 10px; height: 10px; border-radius: 50%; border: 2px solid white;"></div>`,
+                            iconSize: [12, 12],
+                            iconAnchor: [6, 6],
+                        })
                     }
                 />
             ))}
@@ -83,6 +70,26 @@ export default function Map({
             {isBriefingActive && (
                 <MissionBriefing items={items} onComplete={onBriefingComplete} />
             )}
+        </>
+    );
+});
+
+MapContent.displayName = "MapContent";
+
+export default function Map(props: any) {
+    const initialCenter: [number, number] = props.userLocation
+        ? [props.userLocation.lat, props.userLocation.lng]
+        : [35.6812, 139.7671];
+
+    return (
+        <MapContainer
+            center={initialCenter}
+            zoom={14}
+            className="w-full h-full z-0"
+            zoomControl={false}
+            preferCanvas={true} // ★追加：Canvasで描画することで極大な図形の負荷を激減
+        >
+            <MapContent {...props} />
         </MapContainer>
     );
 }

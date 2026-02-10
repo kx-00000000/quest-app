@@ -61,7 +61,7 @@ export default function MissionBriefing({ items, onComplete }: { items: any[], o
                 </div>
             )}
 
-            {/* 下部のDiscovery Report（位置を上げてメニュー回避） */}
+            {/* Discovery Report：下部 */}
             {isFinalOverview && (
                 <div className="mt-auto mb-32 w-full max-w-sm self-center bg-gray-900/95 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl border border-white/10 p-6 animate-in slide-in-from-bottom-10 duration-700">
                     <h2 className="text-[10px] font-black text-pink-500 uppercase tracking-[0.3em] mb-4 text-center">
