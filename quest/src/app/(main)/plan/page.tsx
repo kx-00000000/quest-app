@@ -9,7 +9,8 @@ import {
     Calendar,
     Layers,
     ChevronRight,
-    CircleDot
+    CircleDot,
+    Play // ★ここに追加しました
 } from "lucide-react";
 import Link from "next/link";
 
@@ -17,6 +18,7 @@ export default function PlanPage() {
     const [plans, setPlans] = useState<any[]>([]);
 
     useEffect(() => {
+        // クライアントサイドでのみ実行
         setPlans(getPlans());
     }, []);
 
@@ -52,7 +54,7 @@ export default function PlanPage() {
                 {plans.map((plan) => (
                     <div key={plan.id} className="bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-4">
 
-                        {/* 1. ミニ地図セクション（ログの地図表示と一致） */}
+                        {/* 1. ミニ地図セクション */}
                         <div className="h-56 relative border-b border-gray-50">
                             <LazyMap
                                 userLocation={plan.center}
@@ -116,7 +118,7 @@ export default function PlanPage() {
                                 </div>
                             </div>
 
-                            {/* 4. アクションボタン：プラン独自の誘導 */}
+                            {/* 4. アクションボタン */}
                             <button className="w-full py-5 bg-gradient-to-r from-gray-900 to-gray-800 text-white rounded-[1.5rem] font-black text-xs shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3 uppercase tracking-[0.2em] border-b-4 border-black/20">
                                 <Play size={14} fill="currentColor" />
                                 Deploy to Mission
