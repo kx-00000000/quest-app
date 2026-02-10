@@ -15,6 +15,7 @@ import {
     ChevronRight
 } from "lucide-react";
 
+// 獲得時のランダムな「物語」演出
 const ACQUISITION_ACTIONS = [
     { text: "木の上から落ちてきた！" },
     { text: "茂みの中に隠れていた..." },
@@ -52,6 +53,7 @@ export default function QuestActivePage() {
     const [distanceToTarget, setDistanceToTarget] = useState<number>(0);
     const [targetBearing, setTargetBearing] = useState<number>(0);
 
+    // 演出・完了用
     const [isAcquired, setIsAcquired] = useState(false);
     const [actionMessage, setActionMessage] = useState("");
     const [acquiredName, setAcquiredName] = useState("");
@@ -61,6 +63,7 @@ export default function QuestActivePage() {
 
     const watchId = useRef<number | null>(null);
 
+    // データ初期化とコンパス監視
     useEffect(() => {
         const allPlans = getPlans();
         const currentPlan = allPlans.find((p: any) => p.id === id);
@@ -77,26 +80,7 @@ export default function QuestActivePage() {
         return () => window.removeEventListener('deviceorientation', handleOrientation);
     }, [id, router]);
 
-    // ★ ターゲット選定ロジック
-    const getActiveTarget = () => {
-        if (!plan || !userLoc) return null;
-        const uncollected = plan.items.filter((i: any) => !i.isCollected);
-        if (uncollected.length === 0) return null;
-
-        // マニュアル選択されている場合
-        if (manualTargetId) {
-            const selected = uncollected.find((i: any) => i.id === manualTargetId);
-            if (selected) return selected;
-        }
-
-        // 自動：一番近い場所を探す
-        return uncollected.reduce((prev: any, curr: any) => {
-            const distPrev = calculateDistance(userLoc.lat, userLoc.lng, prev.lat, prev.lng);
-            const distCurr = calculateDistance(userLoc.lat, userLoc.lng, curr.lat, curr.lng);
-            return distPrev < distCurr ? prev : curr;
-        });
-    };
-
+    // 獲得処理
     const handleAcquireItem = (targetItem: any) => {
         const randomAction = ACQUISITION_ACTIONS[Math.floor(Math.random() * ACQUISITION_ACTIONS.length)];
         setActionMessage(randomAction.text);
@@ -104,7 +88,7 @@ export default function QuestActivePage() {
         setIsAcquired(true);
 
         const updatedItems = plan.items.map((item: any) =>
-            item.id === targetItem.id ? { ...item, isCollected: true, collectedAt: new Date().toISOString() } : item
+            item.id === targetItem.id ? { ...item, isCollected: true, collectedAt: new Date().toISOString(), story: randomAction.text } : item
         );
         const newCollectedCount = updatedItems.filter((i: any) => i.isCollected).length;
         const newPlan = { ...plan, items: updatedItems, collectedCount: newCollectedCount };
@@ -120,6 +104,7 @@ export default function QuestActivePage() {
         }
     };
 
+    // 位置情報とターゲット計算
     useEffect(() => {
         if (!plan || isMissionComplete) return;
 
@@ -128,16 +113,16 @@ export default function QuestActivePage() {
                 const currentLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                 setUserLoc(currentLoc);
 
-                // アクティブなターゲットを取得して方位・距離計算
-                // ここではステート更新のタイミング上、getActiveTargetをこのスコープで呼ぶ
                 const uncollected = plan.items.filter((i: any) => !i.isCollected);
                 if (uncollected.length > 0) {
                     let target = uncollected[0];
                     if (manualTargetId) {
                         target = uncollected.find((i: any) => i.id === manualTargetId) || uncollected[0];
                     } else {
-                        target = uncollected.reduce((p, c) =>
-                            calculateDistance(currentLoc.lat, currentLoc.lng, p.lat, p.lng) < calculateDistance(currentLoc.lat, currentLoc.lng, c.lat, c.lng) ? p : c
+                        // ★修正点：p と c に explicit any 型を付与
+                        target = uncollected.reduce((p: any, c: any) =>
+                            calculateDistance(currentLoc.lat, currentLoc.lng, p.lat, p.lng) <
+                                calculateDistance(currentLoc.lat, currentLoc.lng, c.lat, c.lng) ? p : c
                         );
                     }
 
@@ -152,7 +137,23 @@ export default function QuestActivePage() {
         return () => { if (watchId.current !== null) navigator.geolocation.clearWatch(watchId.current); };
     }, [plan, isMissionComplete, isAcquired, manualTargetId]);
 
-    const activeTarget = getActiveTarget();
+    // ログ保存と遷移
+    const handleFinishAdventure = async () => {
+        setIsSaving(true);
+        const updatedPlan = { ...plan, comment, status: "completed", finishedAt: new Date().toISOString() };
+        savePlan(updatedPlan);
+        setTimeout(() => router.push("/log"), 800);
+    };
+
+    if (!plan || !userLoc) return <div className="h-screen bg-black flex items-center justify-center"><Loader2 className="animate-spin text-pink-500" /></div>;
+
+    const uncollectedItems = plan.items.filter((i: any) => !i.isCollected);
+    const activeTarget = manualTargetId
+        ? uncollectedItems.find((i: any) => i.id === manualTargetId) || uncollectedItems[0]
+        : uncollectedItems.reduce((p: any, c: any) =>
+            calculateDistance(userLoc.lat, userLoc.lng, p.lat, p.lng) <
+                calculateDistance(userLoc.lat, userLoc.lng, c.lat, c.lng) ? p : c, uncollectedItems[0]);
+
     const arrowRotation = isMissionComplete ? 0 : targetBearing - userHeading;
 
     return (
@@ -172,14 +173,12 @@ export default function QuestActivePage() {
                             {formatDistanceDisplay(distanceToTarget)}
                         </p>
 
-                        {/* ターゲット切り替えUI */}
                         <div className="flex items-center gap-6">
                             <button
                                 onClick={() => {
-                                    const uncollected = plan.items.filter((i: any) => !i.isCollected);
-                                    const idx = uncollected.findIndex((i: any) => i.id === activeTarget?.id);
-                                    const prevIdx = (idx - 1 + uncollected.length) % uncollected.length;
-                                    setManualTargetId(uncollected[prevIdx].id);
+                                    const idx = uncollectedItems.findIndex((i: any) => i.id === activeTarget?.id);
+                                    const prevIdx = (idx - 1 + uncollectedItems.length) % uncollectedItems.length;
+                                    setManualTargetId(uncollectedItems[prevIdx].id);
                                 }}
                                 className="p-2 text-gray-700 active:text-pink-500"
                             >
@@ -193,10 +192,9 @@ export default function QuestActivePage() {
                             </div>
                             <button
                                 onClick={() => {
-                                    const uncollected = plan.items.filter((i: any) => !i.isCollected);
-                                    const idx = uncollected.findIndex((i: any) => i.id === activeTarget?.id);
-                                    const nextIdx = (idx + 1) % uncollected.length;
-                                    setManualTargetId(uncollected[nextIdx].id);
+                                    const idx = uncollectedItems.findIndex((i: any) => i.id === activeTarget?.id);
+                                    const nextIdx = (idx + 1) % uncollectedItems.length;
+                                    setManualTargetId(uncollectedItems[nextIdx].id);
                                 }}
                                 className="p-2 text-gray-700 active:text-pink-500"
                             >
@@ -205,20 +203,20 @@ export default function QuestActivePage() {
                         </div>
                     </>
                 ) : (
-                    /* 感想入力画面（前回のものを踏襲） */
                     <div className="w-full max-w-sm space-y-8 animate-in fade-in zoom-in duration-500 px-6">
                         <div className="text-center">
                             <CheckCircle2 size={60} className="text-pink-500 mx-auto mb-4" />
-                            <h3 className="text-3xl font-black uppercase italic tracking-tighter">Mission Complete</h3>
+                            <h3 className="text-3xl font-black uppercase italic tracking-tighter leading-none">Mission Complete</h3>
+                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-4">冒険の記録を残しましょう</p>
                         </div>
                         <textarea
                             value={comment}
                             onChange={(e) => setComment(e.target.value)}
                             placeholder="今回の冒険はどうでしたか？"
-                            className="w-full h-40 bg-white/5 border border-white/10 rounded-[2rem] p-6 text-sm focus:outline-none focus:border-pink-500/50 transition-all resize-none font-bold"
+                            className="w-full h-40 bg-white/5 border border-white/10 rounded-[2rem] p-6 text-sm focus:outline-none focus:border-pink-500/50 transition-all resize-none font-bold placeholder:text-gray-700"
                         />
-                        <button onClick={handleFinishAdventure} disabled={isSaving} className="w-full py-5 bg-pink-500 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em]">
-                            {isSaving ? <Loader2 className="animate-spin" size={16} /> : "Log entry"}
+                        <button onClick={handleFinishAdventure} disabled={isSaving} className="w-full py-5 bg-pink-500 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-2">
+                            {isSaving ? <Loader2 className="animate-spin" size={16} /> : <><Send size={16} /> Log entry</>}
                         </button>
                     </div>
                 )}
@@ -234,8 +232,9 @@ export default function QuestActivePage() {
                 <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
                     <div className="text-center space-y-4 animate-in zoom-in-95 duration-300">
                         <div className="w-20 h-20 bg-pink-500 rounded-full flex items-center justify-center mx-auto shadow-[0_0_50px_rgba(240,98,146,0.5)] animate-bounce"><CheckCircle2 size={40} /></div>
-                        <p className="text-pink-500 font-black text-sm uppercase tracking-[0.3em]">{actionMessage}</p>
+                        <p className="text-pink-500 font-black text-sm uppercase tracking-[0.3em] animate-pulse">{actionMessage}</p>
                         <h3 className="text-4xl font-black italic uppercase tracking-tighter leading-none">Secured</h3>
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-2">{acquiredName}</p>
                     </div>
                 </div>
             )}
