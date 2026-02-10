@@ -1,0 +1,73 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { ArrowLeft, ShieldAlert, Zap, Lock, Eye, Footprints } from "lucide-react";
+
+export default function SafetyPage() {
+    const router = useRouter();
+
+    const sections = [
+        {
+            icon: Eye,
+            title: "Safety First",
+            desc: "移動中の画面操作は大変危険です。方向を確認する際は、必ず立ち止まり、周囲の安全を確認してください。"
+        },
+        {
+            icon: Lock,
+            title: "Private Areas",
+            desc: "私有地、線路、工事現場などの立ち入り禁止区域には絶対に入らないでください。常に現地のルールと標識を優先してください。"
+        },
+        {
+            icon: Zap,
+            title: "Environment",
+            desc: "夜間や悪天候時、または不慣れな地形での探索は避けてください。自身の安全を最優先に考えた行動をお願いします。"
+        },
+        {
+            icon: ShieldAlert,
+            title: "Data Privacy",
+            desc: "取得した位置情報やログデータは、デバイスの内部ストレージにのみ保存されます。外部サーバーに送信されることはありません。"
+        }
+    ];
+
+    return (
+        <div className="min-h-screen bg-white text-black p-8 font-sans pb-20">
+            <button onClick={() => router.back()} className="pt-12 mb-8 text-gray-300 flex items-center gap-2 hover:text-black transition-colors">
+                <ArrowLeft size={20} />
+                <span className="text-[10px] font-black uppercase tracking-widest">Back</span>
+            </button>
+
+            <header className="mb-12">
+                <h1 className="text-4xl font-black italic uppercase tracking-tighter leading-none">Safety</h1>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-2">安全のためのガイドライン</p>
+            </header>
+
+            <div className="space-y-10">
+                {sections.map((sec, idx) => (
+                    <section key={idx} className="flex gap-6">
+                        <div className="w-12 h-12 bg-pink-50 rounded-2xl flex items-center justify-center shrink-0">
+                            <sec.icon className="text-pink-500" size={24} />
+                        </div>
+                        <div className="space-y-1.5 pt-1">
+                            <h2 className="font-black uppercase text-sm tracking-tight">{sec.title}</h2>
+                            <p className="text-[11px] text-gray-500 leading-relaxed font-bold">
+                                {sec.desc}
+                            </p>
+                        </div>
+                    </section>
+                ))}
+            </div>
+
+            <div className="mt-20 space-y-4">
+                <p className="text-[9px] text-gray-300 text-center uppercase font-bold tracking-widest leading-loose">
+                    By using this application, you agree to take full responsibility for your actions in the physical world.
+                </p>
+                <button
+                    onClick={() => router.back()}
+                    className="w-full py-5 bg-black text-white rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all"
+                >
+                    了解して戻る
+                </button>
+            </div>
+        </div>
+    );
+}
