@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useRouter } from "next/navigation";
 import { savePlan } from "@/lib/storage";
@@ -24,21 +24,36 @@ export default function NewQuestPage() {
     const { t } = useTranslation();
     const [name, setName] = useState("");
     const [activeMode, setActiveMode] = useState(rangeModes[0]);
+
+    // 表示用の半径（即時反映）
     const [radius, setRadius] = useState(1);
+    // 地図描画用の半径（遅延反映して負荷軽減）
+    const [mapRadius, setMapRadius] = useState(1);
+
     const [itemCount, setItemCount] = useState(3);
     const [isCreating, setIsCreating] = useState(false);
     const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
 
-    // ブリーフィング演出用のステート
     const [briefingItems, setBriefingItems] = useState<any[]>([]);
     const [isBriefingActive, setIsBriefingActive] = useState(false);
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         navigator.geolocation.getCurrentPosition(
             (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
             (err) => console.warn(err)
         );
+        return () => { if (timerRef.current) clearTimeout(timerRef.current); };
     }, []);
+
+    // スライダー操作の負荷を軽減する処理
+    const handleRadiusChange = (val: number) => {
+        setRadius(val);
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => {
+            setMapRadius(val);
+        }, 150); // 0.15秒後に地図を更新
+    };
 
     const handleCreate = async () => {
         setIsCreating(true);
@@ -68,7 +83,6 @@ export default function NewQuestPage() {
             items
         });
 
-        // ブリーフィングを開始
         setBriefingItems(items);
         setIsBriefingActive(true);
     };
@@ -77,7 +91,7 @@ export default function NewQuestPage() {
         <div className="flex flex-col h-full min-h-screen pb-20 relative overflow-hidden bg-white">
             <div className="absolute inset-0 z-0">
                 <LazyMap
-                    radiusInKm={radius}
+                    radiusInKm={mapRadius}
                     userLocation={userLocation}
                     themeColor="#F06292"
                     items={briefingItems}
@@ -88,7 +102,6 @@ export default function NewQuestPage() {
 
             {!isBriefingActive && (
                 <>
-                    {/* タイトル入力エリア */}
                     <div className="absolute top-8 left-6 right-6 z-20 animate-in fade-in duration-500">
                         <div className="bg-white/40 backdrop-blur-2xl rounded-[2rem] border border-white/40 shadow-xl px-6 py-3">
                             <input
@@ -101,14 +114,16 @@ export default function NewQuestPage() {
                         </div>
                     </div>
 
-                    {/* 下部設定パネル */}
                     <div className="mt-auto relative z-10 px-4 mb-4 animate-in slide-in-from-bottom-8 duration-500">
                         <div className="bg-white/30 backdrop-blur-3xl rounded-[3rem] p-6 shadow-2xl border border-white/40 space-y-5">
                             <div className="flex p-1 bg-black/5 rounded-2xl gap-1">
                                 {rangeModes.map((mode) => (
                                     <button
                                         key={mode.id}
-                                        onClick={() => { setActiveMode(mode); setRadius(mode.min); }}
+                                        onClick={() => {
+                                            setActiveMode(mode);
+                                            handleRadiusChange(mode.min);
+                                        }}
                                         className={`flex-1 py-2 text-[9px] font-black rounded-xl transition-all ${activeMode.id === mode.id ? 'bg-white text-pink-600 shadow-sm' : 'text-gray-500'}`}
                                     >
                                         {mode.label}
@@ -122,23 +137,35 @@ export default function NewQuestPage() {
                                         <span>Radius Range</span>
                                         <span className="text-gray-800">{formatDistance(radius)}</span>
                                     </div>
-                                    <input type="range" min={activeMode.min} max={activeMode.max} step={activeMode.step} value={radius} onChange={(e) => setRadius(parseFloat(e.target.value))} className="w-full h-1.5 accent-gray-400 bg-black/10 rounded-full appearance-none" />
+                                    <input
+                                        type="range"
+                                        min={activeMode.min}
+                                        max={activeMode.max}
+                                        step={activeMode.step}
+                                        value={radius}
+                                        onChange={(e) => handleRadiusChange(parseFloat(e.target.value))}
+                                        className="w-full h-1.5 accent-gray-400 bg-black/10 rounded-full appearance-none"
+                                    />
                                 </div>
                                 <div className="space-y-1">
                                     <div className="flex justify-between text-sm font-black text-pink-600 uppercase tracking-widest">
                                         <span>Items Count</span>
                                         <span className="text-gray-800">{itemCount}</span>
                                     </div>
-                                    <input type="range" min="1" max="7" step="1" value={itemCount} onChange={(e) => setItemCount(parseInt(e.target.value))} className="w-full h-1.5 accent-gray-400 bg-black/10 rounded-full appearance-none" />
+                                    <input
+                                        type="range"
+                                        min="1"
+                                        max="7"
+                                        step="1"
+                                        value={itemCount}
+                                        onChange={(e) => setItemCount(parseInt(e.target.value))}
+                                        className="w-full h-1.5 accent-gray-400 bg-black/10 rounded-full appearance-none"
+                                    />
                                 </div>
                             </div>
 
-                            <button
-                                onClick={handleCreate}
-                                disabled={isCreating}
-                                className="w-full py-4 bg-gradient-to-r from-[#F06292] to-[#FF8A65] text-white rounded-[2rem] font-black text-lg shadow-lg active:scale-95 transition-all border-b-4 border-black/10"
-                            >
-                                {isCreating ? "MISSION GENERATING..." : "START SCANNING"}
+                            <button onClick={handleCreate} disabled={isCreating} className="w-full py-4 bg-gradient-to-r from-[#F06292] to-[#FF8A65] text-white rounded-[2rem] font-black text-lg shadow-lg active:scale-95 transition-all border-b-4 border-black/10">
+                                {isCreating ? "GENERATING..." : "START SCANNING"}
                             </button>
                         </div>
                     </div>

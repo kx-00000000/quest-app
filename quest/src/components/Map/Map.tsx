@@ -6,15 +6,15 @@ import "leaflet/dist/leaflet.css";
 import { useEffect, useMemo } from "react";
 import MissionBriefing from "./MissionBriefing";
 
-// 通常の丸アイコン
-const createIcon = (color: string, isStart = false) => L.divIcon({
+// 通常のアイコン
+const createIcon = (color: string) => L.divIcon({
     className: "custom-icon",
-    html: `<div style="background-color: ${color}; width: ${isStart ? '14px' : '10px'}; height: ${isStart ? '14px' : '10px'}; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></div>`,
-    iconSize: [14, 14],
-    iconAnchor: [7, 7],
+    html: `<div style="background-color: ${color}; width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></div>`,
+    iconSize: [12, 12],
+    iconAnchor: [6, 6],
 });
 
-// ★実験：数字付きアイコン
+// 数字アイコン
 const createNumberIcon = (number: number, color: string) => L.divIcon({
     className: "number-icon",
     html: `<div style="background-color: ${color}; width: 22px; height: 22px; border-radius: 8px; border: 2px solid white; color: white; font-size: 11px; font-weight: 900; display: flex; align-items: center; justify-content: center; shadow: 0 2px 4px rgba(0,0,0,0.3); font-family: sans-serif;">${number}</div>`,
@@ -22,7 +22,7 @@ const createNumberIcon = (number: number, color: string) => L.divIcon({
     iconAnchor: [11, 11],
 });
 
-// ★修正：現在地ポインター（黒に変更）
+// 黒の現在地マーカー
 const userIcon = L.divIcon({
     className: "user-icon",
     html: `<div style="background-color: #000; width: 12px; height: 12px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3);"></div>`,
@@ -69,18 +69,23 @@ export default function Map({
                     <Circle
                         center={[userLocation.lat, userLocation.lng]}
                         radius={radiusInKm * 1000}
-                        pathOptions={{ fillColor: themeColor, fillOpacity: 0.1, color: themeColor, weight: 1, dashArray: "5, 5" }}
+                        pathOptions={{
+                            fillColor: themeColor,
+                            fillOpacity: 0.1,
+                            color: themeColor,
+                            weight: 1,
+                            dashArray: "5, 5",
+                            smoothFactor: 5 // 描画計算をラフにして負荷軽減
+                        }}
                     />
                     <Marker position={[userLocation.lat, userLocation.lng]} icon={userIcon} />
                 </>
             )}
 
-            {/* アイテム地点：ブリーフィング中は数字アイコンで表示 */}
             {(isBriefingActive || isLogMode) && items.map((item: any, idx: number) => (
                 <Marker
                     key={item.id}
                     position={[item.lat, item.lng]}
-                    // ★修正：isBriefingActive なら数字アイコンを使用
                     icon={isBriefingActive
                         ? createNumberIcon(idx + 1, themeColor)
                         : createIcon(item.isCollected ? themeColor : "#ccc")
