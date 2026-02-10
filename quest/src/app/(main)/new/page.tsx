@@ -25,7 +25,7 @@ export default function NewQuestPage() {
     const { t } = useTranslation();
 
     // ステート管理
-    const [name, setName] = useState(""); // 空文字から開始
+    const [name, setName] = useState("");
     const [activeMode, setActiveMode] = useState(rangeModes[0]);
     const [radius, setRadius] = useState(1);
     const [itemCount, setItemCount] = useState(3);
@@ -56,18 +56,20 @@ export default function NewQuestPage() {
         let center = userLocation || { lat: 35.6812, lng: 139.7671 };
         const validItems: any[] = [];
         let attempts = 0;
+        const maxAttempts = 100; // ★確実に陸地を見つけるために試行回数を大幅に増加
 
-        // 陸地優先の生成ロジック
-        while (validItems.length < itemCount && attempts < 25) {
+        // ★修正：有効な地点が設定数(itemCount)に達するまでループを回し続ける
+        while (validItems.length < itemCount && attempts < maxAttempts) {
             attempts++;
             const point = generateRandomPoint(center, radius);
             try {
+                // Nominatim APIで地点を解析
                 const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${point.lat}&lon=${point.lng}&format=json&zoom=10`);
                 const data = await res.json();
 
-                // 住所情報があるか、水域でないかを確認
-                const hasPlace = data.address && (data.address.country || data.address.city || data.address.state);
-                const isWater = data.type === "water" || data.class === "natural";
+                // 住所情報があるか、海（water）などのNGワードが含まれていないかを確認
+                const hasPlace = data.address && (data.address.country || data.address.city || data.address.state || data.address.suburb);
+                const isWater = data.type === "water" || data.class === "natural" || (data.display_name && data.display_name.toLowerCase().includes("ocean"));
 
                 if (hasPlace && !isWater) {
                     validItems.push({
@@ -78,18 +80,23 @@ export default function NewQuestPage() {
                         name: `Item #${validItems.length + 1}`
                     });
                 }
-            } catch (e) { /* ignore */ }
-        }
-
-        // 陸地が見つからなかった場合のフォールバック
-        if (validItems.length === 0) {
-            const p = generateRandomPoint(center, radius * 0.2);
-            validItems.push({ id: 'f1', lat: p.lat, lng: p.lng, isCollected: false, name: "Recon Target" });
+            } catch (e) {
+                // 通信エラー等で判定不能だが、試行回数が限界に近い場合はフォールバックとして採用
+                if (attempts > 80) {
+                    validItems.push({
+                        id: 'fallback-' + attempts,
+                        lat: point.lat,
+                        lng: point.lng,
+                        isCollected: false,
+                        name: `Item #${validItems.length + 1}`
+                    });
+                }
+            }
         }
 
         const plan = {
             id: Math.random().toString(36).substr(2, 9),
-            name: name.trim() || "NEW QUEST", // 未入力ならデフォルト名
+            name: name.trim() || "NEW QUEST",
             radius,
             itemCount: validItems.length,
             status: "ready",
@@ -103,7 +110,7 @@ export default function NewQuestPage() {
         savePlan(plan);
         setBriefingItems(validItems);
         setIsCreating(false);
-        setShowConfirm(true); // 確認ダイアログを表示
+        setShowConfirm(true);
     };
 
     return (
