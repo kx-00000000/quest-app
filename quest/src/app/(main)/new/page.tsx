@@ -42,8 +42,8 @@ export default function NewQuestPage() {
         if ("geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(
                 (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                (err) => console.warn("Geolocation error:", err),
-                { enableHighAccuracy: true, timeout: 10000 }
+                (err) => console.warn(err),
+                { enableHighAccuracy: false, timeout: 5000 }
             );
         }
     }, []);
@@ -60,46 +60,27 @@ export default function NewQuestPage() {
         const validItems: any[] = [];
         let attempts = 0;
 
-        while (validItems.length < itemCount && attempts < 30) {
+        while (validItems.length < itemCount && attempts < 25) {
             attempts++;
             const point = generateRandomPoint(center, radius);
             try {
                 const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${point.lat}&lon=${point.lng}&format=json&zoom=10`);
                 const data = await res.json();
-                const hasPlace = data.address && (data.address.country || data.address.city || data.address.town || data.address.village);
-                const isWater = data.type === "water" || data.class === "natural" || data.display_name?.toLowerCase().includes("ocean");
-
-                if (hasPlace && !isWater) {
-                    validItems.push({
-                        id: Math.random().toString(36).substr(2, 9),
-                        lat: point.lat, lng: point.lng,
-                        isCollected: false, name: `Item #${validItems.length + 1}`
-                    });
+                const hasPlace = data.address && (data.address.country || data.address.city || data.address.state);
+                if (hasPlace && data.type !== "water") {
+                    validItems.push({ id: Math.random().toString(36).substr(2, 9), lat: point.lat, lng: point.lng, isCollected: false, name: `Item #${validItems.length + 1}` });
                 }
-            } catch (e) { console.error(e); }
+            } catch (e) { /* ignore */ }
         }
 
         if (validItems.length === 0) {
-            const fallback = generateRandomPoint(center, radius * 0.3);
-            validItems.push({ id: 'f1', lat: fallback.lat, lng: fallback.lng, isCollected: false, name: "Land Recon Target" });
+            validItems.push({ id: 'f1', lat: center.lat + 0.01, lng: center.lng + 0.01, isCollected: false, name: "Target Recon" });
         }
 
-        savePlan({
-            id: Math.random().toString(36).substr(2, 9),
-            name: name || "NEW QUEST", radius, itemCount: validItems.length,
-            status: "ready", createdAt: new Date().toLocaleDateString(),
-            totalDistance: 0, collectedCount: 0, center, items: validItems
-        });
-
+        savePlan({ id: Math.random().toString(36).substr(2, 9), name: name || "NEW QUEST", radius, itemCount: validItems.length, status: "ready", createdAt: new Date().toLocaleDateString(), totalDistance: 0, collectedCount: 0, center, items: validItems });
         setBriefingItems(validItems);
         setIsCreating(false);
         setShowConfirm(true);
-    };
-
-    const handleRecenter = () => {
-        if (mapInstanceRef.current && userLocation) {
-            mapInstanceRef.current.setView([userLocation.lat, userLocation.lng], 14, { animate: true });
-        }
     };
 
     return (
@@ -114,20 +95,19 @@ export default function NewQuestPage() {
                 />
             </div>
 
-            {!isBriefingActive && !showConfirm && userLocation && (
-                <button onClick={handleRecenter} className="absolute top-24 right-6 z-20 w-12 h-12 bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl flex items-center justify-center text-gray-800 border border-white active:scale-90 transition-all">
-                    <LocateFixed size={20} />
-                </button>
-            )}
-
             {!isBriefingActive && !showConfirm && (
                 <>
-                    <div className="absolute top-8 left-6 right-6 z-20 animate-in fade-in duration-500">
+                    <div className="absolute top-8 left-6 right-6 z-20">
                         <div className="bg-white/40 backdrop-blur-2xl rounded-[2rem] border border-white/40 shadow-xl px-6 py-3">
-                            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("adventure_name_placeholder")} className="w-full bg-transparent border-none outline-none text-gray-800 font-bold placeholder:text-gray-400 text-center" />
+                            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="冒険の名前を入力" className="w-full bg-transparent border-none outline-none text-gray-800 font-bold text-center" />
                         </div>
                     </div>
-                    <div className="mt-auto relative z-10 px-4 mb-4 animate-in slide-in-from-bottom-8 duration-500">
+                    {userLocation && (
+                        <button onClick={() => mapInstanceRef.current?.setView([userLocation.lat, userLocation.lng], 14)} className="absolute top-24 right-6 z-20 w-12 h-12 bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl flex items-center justify-center text-gray-800 border border-white active:scale-90 transition-all">
+                            <LocateFixed size={20} />
+                        </button>
+                    )}
+                    <div className="mt-auto relative z-10 px-4 mb-4">
                         <div className="bg-white/30 backdrop-blur-3xl rounded-[3rem] p-6 shadow-2xl border border-white/40 space-y-5">
                             <div className="flex p-1 bg-black/5 rounded-2xl gap-1">
                                 {rangeModes.map((mode) => (
@@ -136,16 +116,16 @@ export default function NewQuestPage() {
                             </div>
                             <div className="space-y-4 px-1">
                                 <div className="space-y-1">
-                                    <div className="flex justify-between text-sm font-black text-pink-600 uppercase tracking-widest"><span>Radius Range</span><span className="text-gray-800">{formatDistance(radius)}</span></div>
-                                    <input type="range" min={activeMode.min} max={activeMode.max} step={activeMode.step} value={radius} onChange={(e) => handleRadiusChange(parseFloat(e.target.value))} className="w-full h-1.5 accent-gray-400 bg-black/10 rounded-full appearance-none cursor-pointer" />
+                                    <div className="flex justify-between text-sm font-black text-pink-600 uppercase"><span>Radius</span><span className="text-gray-800">{formatDistance(radius)}</span></div>
+                                    <input type="range" min={activeMode.min} max={activeMode.max} step={activeMode.step} value={radius} onChange={(e) => handleRadiusChange(parseFloat(e.target.value))} className="w-full h-1.5 accent-gray-400 bg-black/10 rounded-full appearance-none" />
                                 </div>
                                 <div className="space-y-1">
-                                    <div className="flex justify-between text-sm font-black text-pink-600 uppercase tracking-widest"><span>Items Count</span><span className="text-gray-800">{itemCount}</span></div>
-                                    <input type="range" min="1" max="7" step="1" value={itemCount} onChange={(e) => setItemCount(parseInt(e.target.value))} className="w-full h-1.5 accent-gray-400 bg-black/10 rounded-full appearance-none cursor-pointer" />
+                                    <div className="flex justify-between text-sm font-black text-pink-600 uppercase"><span>Count</span><span className="text-gray-800">{itemCount}</span></div>
+                                    <input type="range" min="1" max="7" step="1" value={itemCount} onChange={(e) => setItemCount(parseInt(e.target.value))} className="w-full h-1.5 accent-gray-400 bg-black/10 rounded-full appearance-none" />
                                 </div>
                             </div>
-                            <button onClick={handleCreate} disabled={isCreating} className="w-full py-4 bg-gradient-to-r from-[#F06292] to-[#FF8A65] text-white rounded-[2rem] font-black text-lg shadow-lg active:scale-95 transition-all border-b-4 border-black/10 flex items-center justify-center gap-2">
-                                {isCreating ? <><Loader2 className="animate-spin" size={20} /> クエスト作成中...</> : "クエストを作成"}
+                            <button onClick={handleCreate} disabled={isCreating} className="w-full py-4 bg-gradient-to-r from-[#F06292] to-[#FF8A65] text-white rounded-[2rem] font-black text-lg shadow-lg flex items-center justify-center gap-2">
+                                {isCreating ? <Loader2 className="animate-spin" /> : "クエストを作成"}
                             </button>
                         </div>
                     </div>
@@ -153,21 +133,17 @@ export default function NewQuestPage() {
             )}
 
             {showConfirm && (
-                <div className="absolute inset-0 z-[2000] flex items-center justify-center p-6 bg-black/20 backdrop-blur-sm animate-in fade-in duration-300 pointer-events-auto">
+                <div className="absolute inset-0 z-[2000] flex items-center justify-center p-6 bg-black/20 backdrop-blur-sm animate-in fade-in duration-300">
                     <div className="bg-white rounded-[3rem] p-8 shadow-2xl w-full max-w-sm text-center space-y-6">
                         <div className="w-16 h-16 bg-pink-50 rounded-full flex items-center justify-center mx-auto">
                             <CheckCircle2 size={32} className="text-pink-500" />
                         </div>
                         <div>
-                            <h3 className="text-xl font-black text-gray-800 uppercase tracking-tight leading-none">Quest Ready</h3>
-                            <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase tracking-widest leading-relaxed">全目的地の解析が完了しました。<br />ブリーフィングを開始しますか？</p>
+                            <h3 className="text-xl font-black text-gray-800 uppercase tracking-tight">Quest Ready</h3>
+                            <p className="text-[10px] font-bold text-gray-400 mt-2 uppercase tracking-widest">ブリーフィングを開始しますか？</p>
                         </div>
-                        <button
-                            onClick={() => { setShowConfirm(false); setIsBriefingActive(true); }}
-                            className="w-full py-4 bg-gray-900 text-white rounded-[2rem] font-black flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-all"
-                        >
-                            <Play size={16} fill="currentColor" />
-                            START BRIEFING
+                        <button onClick={() => { setShowConfirm(false); setIsBriefingActive(true); }} className="w-full py-4 bg-gray-900 text-white rounded-[2rem] font-black flex items-center justify-center gap-2 shadow-xl">
+                            <Play size={16} fill="currentColor" /> START BRIEFING
                         </button>
                     </div>
                 </div>
