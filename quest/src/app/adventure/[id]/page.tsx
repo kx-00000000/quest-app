@@ -71,7 +71,7 @@ export default function QuestActivePage() {
         return () => {
             if (watchId.current) navigator.geolocation.clearWatch(watchId.current);
         };
-    }, [id]);
+    }, [id, router]);
 
     const activeTarget = useMemo(() => {
         const items = plan?.items || [];
@@ -101,7 +101,7 @@ export default function QuestActivePage() {
                 handleAcquireItem(activeTarget);
             }
         }
-    }, [userLoc, activeTarget]);
+    }, [userLoc, activeTarget, isAcquired]);
 
     const handleAcquireItem = (targetItem: any) => {
         if (!plan?.items) return;
@@ -148,26 +148,15 @@ export default function QuestActivePage() {
 
     return (
         <div className="h-screen bg-white flex flex-col relative overflow-hidden text-black font-sans">
-            {/* 1. ヘッダー */}
+            {/* 1. ヘッダー：ドットを削除してスッキリさせました */}
             <header className="p-8 pt-14 flex justify-between items-baseline z-20">
                 <div className="flex flex-col gap-3">
                     <h2 className="text-xl font-bold tracking-tight uppercase truncate max-w-[200px]">{plan.name}</h2>
-                    <div className="flex gap-2.5 items-center h-4">
-                        {items.map((item: any, idx: number) => {
-                            const isCurrent = activeTarget && item.id === activeTarget.id;
-                            return (
-                                <div key={item.id || idx} className="relative flex items-center justify-center">
-                                    {isCurrent && !item.isCollected && <div className="absolute w-4 h-4 border-2 border-gray-200 rounded-full animate-pulse" />}
-                                    {item.isCollected ? <div className="w-1.5 h-1.5 bg-black rounded-full" /> : <div className={`w-1.5 h-1.5 rounded-full ${isCurrent ? 'bg-black scale-125' : 'bg-gray-100'}`} />}
-                                </div>
-                            );
-                        })}
-                    </div>
                 </div>
                 <p className="text-2xl font-bold tabular-nums text-black">{plan.collectedCount}<span className="text-sm text-gray-300 mx-1">/</span>{plan.itemCount}</p>
             </header>
 
-            {/* 2. メインコンテンツ：シンプル化された距離表示 */}
+            {/* 2. メインコンテンツ */}
             <div className="flex-1 flex flex-col items-center justify-center relative z-10 px-6">
                 {!isMissionComplete ? (
                     <>
@@ -180,11 +169,8 @@ export default function QuestActivePage() {
                                 return (
                                     <div className="flex flex-col items-center">
                                         <div className="flex items-baseline justify-center font-bold tracking-tighter tabular-nums text-black">
-                                            {/* 整数部：サイズダウン */}
                                             <span className="text-7xl">{integer}</span>
-                                            {/* 小数部：さらにサイズダウン */}
                                             {decimal && <span className="text-5xl opacity-60">{decimal}</span>}
-                                            {/* 単位 */}
                                             <span className="ml-2 text-2xl font-medium text-black">{unit}</span>
                                         </div>
                                     </div>
@@ -208,17 +194,33 @@ export default function QuestActivePage() {
                 )}
             </div>
 
-            {/* 3. 下部：ナビゲーション */}
+            {/* 3. 下部：ナビゲーション（ここにドットを配置） */}
             {!isMissionComplete && (
                 <div className="p-8 pb-16 z-20 flex flex-col items-center">
-                    <div className="flex items-center gap-8 mb-8">
+                    <div className="flex items-center gap-8 mb-4"> {/* mb-8 から mb-4 にして少し上に上げました */}
                         <button onClick={() => { if (uncollectedItems.length > 1) { const idx = uncollectedItems.findIndex((i: any) => i.id === activeTarget?.id); setManualTargetId(uncollectedItems[(idx - 1 + uncollectedItems.length) % uncollectedItems.length].id); } }} className="p-2 text-gray-300 active:text-black transition-colors"><ChevronLeft size={28} /></button>
-                        <div className="text-center min-w-[140px]">
+
+                        <div className="text-center min-w-[140px] flex flex-col items-center gap-3">
+                            {/* 地名：少し位置を調整 */}
                             <h4 className="text-lg font-bold uppercase tracking-tight text-black">{activeTarget?.locationName || "---"}</h4>
+
+                            {/* ステータスポインタ：地名の下に配置 */}
+                            <div className="flex gap-2.5 items-center h-4">
+                                {items.map((item: any, idx: number) => {
+                                    const isCurrent = activeTarget && item.id === activeTarget.id;
+                                    return (
+                                        <div key={item.id || idx} className="relative flex items-center justify-center">
+                                            {isCurrent && !item.isCollected && <div className="absolute w-4 h-4 border-2 border-gray-200 rounded-full animate-pulse" />}
+                                            {item.isCollected ? <div className="w-1.5 h-1.5 bg-black rounded-full" /> : <div className={`w-1.5 h-1.5 rounded-full ${isCurrent ? 'bg-black scale-125' : 'bg-gray-100'}`} />}
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
+
                         <button onClick={() => { if (uncollectedItems.length > 1) { const idx = uncollectedItems.findIndex((i: any) => i.id === activeTarget?.id); setManualTargetId(uncollectedItems[(idx + 1) % uncollectedItems.length].id); } }} className="p-2 text-gray-300 active:text-black transition-colors"><ChevronRight size={28} /></button>
                     </div>
-                    <button onClick={() => router.push("/plan")} className="text-gray-400 font-bold text-xs uppercase tracking-widest flex items-center gap-2 py-2 px-4 border border-gray-100 rounded-full"><Flag size={14} /> Abort</button>
+                    <button onClick={() => router.push("/plan")} className="text-gray-400 font-bold text-xs uppercase tracking-widest flex items-center gap-2 py-2 px-4 border border-gray-100 rounded-full mt-2"><Flag size={14} /> Abort</button>
                 </div>
             )}
 
