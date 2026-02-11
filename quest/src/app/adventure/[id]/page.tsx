@@ -76,8 +76,7 @@ export default function QuestActivePage() {
         }
         setPlan(currentPlan);
 
-        const hasAgreed = localStorage.getItem("safety_demo_agreed");
-        if (hasAgreed) {
+        if (localStorage.getItem("safety_demo_agreed")) {
             startGPS();
         } else {
             setShowSafetyDemo(true);
@@ -204,21 +203,24 @@ export default function QuestActivePage() {
                     /* --- ミッション達成画面 --- */
                     <div className="text-center w-full max-w-sm space-y-8 animate-in fade-in zoom-in duration-700 relative z-50">
 
-                        {/* クラッカー演出（下から上へ射出） - 最前面に配置 */}
+                        {/* ツイン射出クラッカー */}
                         <div className="absolute inset-0 pointer-events-none overflow-visible z-[100]">
-                            {[...Array(40)].map((_, i) => (
-                                <div key={i} className="confetti" style={{
-                                    /* ランダムな射出角度と色をCSS変数で渡す */
-                                    '--spread': `${Math.random() * 400 - 200}px`,
-                                    '--height': `${Math.random() * -400 - 200}px`,
-                                    left: '50%',
-                                    bottom: '20%',
-                                    backgroundColor: ['#000000', '#FFD700', '#FF69B4', '#00BFFF', '#ADFF2F'][Math.floor(Math.random() * 5)],
-                                    animationDelay: `${Math.random() * 0.2}s`,
-                                    width: `${Math.random() * 10 + 6}px`,
-                                    height: `${Math.random() * 8 + 4}px`,
-                                } as React.CSSProperties} />
-                            ))}
+                            {[...Array(40)].map((_, i) => {
+                                const isLeft = i % 2 === 0;
+                                return (
+                                    <div key={i} className="confetti" style={{
+                                        '--side-multiplier': isLeft ? '1' : '-1',
+                                        '--spread': `${Math.random() * 200 + 100}px`,
+                                        '--height': `${Math.random() * -400 - 200}px`,
+                                        left: isLeft ? '0%' : '100%',
+                                        bottom: '20%',
+                                        backgroundColor: ['#000000', '#FFD700', '#FF69B4', '#00BFFF', '#ADFF2F'][Math.floor(Math.random() * 5)],
+                                        animationDelay: `${Math.random() * 0.3}s`,
+                                        width: `${Math.random() * 10 + 6}px`,
+                                        height: `${Math.random() * 8 + 4}px`,
+                                    } as React.CSSProperties} />
+                                );
+                            })}
                         </div>
 
                         {/* 背景(Congrats) + 動物イラスト */}
@@ -227,8 +229,8 @@ export default function QuestActivePage() {
                             {randomAnimalImg && (
                                 <img
                                     src={randomAnimalImg}
-                                    /* ★さらに下にさげる（70% -> 78%） */
-                                    className="absolute top-[78%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[45%] h-auto animate-bounce"
+                                    /* ★動物画像を1.3倍に拡大 (45% -> 58%) & 静止 */
+                                    className="absolute top-[78%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[58%] h-auto drop-shadow-lg"
                                     alt="Animal"
                                 />
                             )}
@@ -277,13 +279,15 @@ export default function QuestActivePage() {
             {isAcquired && (
                 <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-white/95 backdrop-blur-sm animate-in fade-in duration-300">
                     <div className="relative text-center w-full max-w-[300px]">
+                        {/* 背景画像(ACQUIRED) */}
                         <img src="/images/bg-acquired.png" alt="Acquired Background" className="w-full h-auto" />
-                        {/* ★さらにさげる（70% -> 78%） */}
+
+                        {/* ★アイテム画像を上下に動かす (animate-bounce) */}
                         {randomItemImg && (
                             <img
                                 src={randomItemImg}
                                 alt="Item"
-                                className="absolute top-[78%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[35%] h-auto drop-shadow-2xl animate-in zoom-in duration-500 delay-200"
+                                className="absolute top-[78%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[35%] h-auto drop-shadow-2xl animate-bounce"
                             />
                         )}
                     </div>
@@ -316,32 +320,31 @@ export default function QuestActivePage() {
                 </div>
             )}
 
-            {/* 射出型クラッカーアニメーション */}
+            {/* ツイン射出型クラッカーアニメーション */}
             <style jsx>{`
                 .confetti {
                     position: absolute;
                     opacity: 0;
                     border-radius: 2px;
-                    animation: burst 4s ease-out infinite;
+                    animation: twin-burst 4s ease-out infinite;
                 }
-                @keyframes burst {
+                @keyframes twin-burst {
                     0% {
                         transform: translate(0, 0) scale(0) rotate(0deg);
                         opacity: 1;
                     }
                     15% {
-                        /* 勢いよく上に吹き出す */
-                        transform: translate(calc(var(--spread) * 0.5), var(--height)) scale(1.2) rotate(180deg);
+                        /* 画面端から中央に向かって吹き出す */
+                        transform: translate(calc(var(--spread) * var(--side-multiplier)), var(--height)) scale(1.2) rotate(180deg);
                         opacity: 1;
                     }
                     30% {
-                        /* 頂点から散らばり始める */
-                        transform: translate(var(--spread), calc(var(--height) * 1.2)) scale(1) rotate(360deg);
+                        transform: translate(calc(var(--spread) * var(--side-multiplier) * 1.2), calc(var(--height) * 1.2)) scale(1) rotate(360deg);
                         opacity: 1;
                     }
                     100% {
-                        /* 画面下にひらひら落ちていく */
-                        transform: translate(calc(var(--spread) * 1.5), 100vh) scale(0.8) rotate(720deg);
+                        /* 画面全体に散らばりながら落ちていく */
+                        transform: translate(calc(var(--spread) * var(--side-multiplier) * 1.5), 100vh) scale(0.8) rotate(720deg);
                         opacity: 0;
                     }
                 }
