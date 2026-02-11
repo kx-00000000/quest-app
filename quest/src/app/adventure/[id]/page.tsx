@@ -204,16 +204,20 @@ export default function QuestActivePage() {
                     /* --- ミッション達成画面 --- */
                     <div className="text-center w-full max-w-sm space-y-8 animate-in fade-in zoom-in duration-700 relative z-50">
 
-                        {/* クラッカー演出（下から上へ射出） - Z-indexを画像より上位に配置 */}
+                        {/* クラッカー演出（下から上へ射出） - 最前面に配置 */}
                         <div className="absolute inset-0 pointer-events-none overflow-visible z-[100]">
-                            {[...Array(30)].map((_, i) => (
+                            {[...Array(40)].map((_, i) => (
                                 <div key={i} className="confetti" style={{
-                                    left: `${Math.random() * 100}%`,
+                                    /* ランダムな射出角度と色をCSS変数で渡す */
+                                    '--spread': `${Math.random() * 400 - 200}px`,
+                                    '--height': `${Math.random() * -400 - 200}px`,
+                                    left: '50%',
+                                    bottom: '20%',
                                     backgroundColor: ['#000000', '#FFD700', '#FF69B4', '#00BFFF', '#ADFF2F'][Math.floor(Math.random() * 5)],
-                                    animationDelay: `${Math.random() * 0.5}s`,
-                                    width: `${Math.random() * 12 + 6}px`,
+                                    animationDelay: `${Math.random() * 0.2}s`,
+                                    width: `${Math.random() * 10 + 6}px`,
                                     height: `${Math.random() * 8 + 4}px`,
-                                }} />
+                                } as React.CSSProperties} />
                             ))}
                         </div>
 
@@ -223,8 +227,8 @@ export default function QuestActivePage() {
                             {randomAnimalImg && (
                                 <img
                                     src={randomAnimalImg}
-                                    /* ★さらに下に配置（62% -> 70%） */
-                                    className="absolute top-[70%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[45%] h-auto animate-bounce"
+                                    /* ★さらに下にさげる（70% -> 78%） */
+                                    className="absolute top-[78%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[45%] h-auto animate-bounce"
                                     alt="Animal"
                                 />
                             )}
@@ -273,14 +277,13 @@ export default function QuestActivePage() {
             {isAcquired && (
                 <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-white/95 backdrop-blur-sm animate-in fade-in duration-300">
                     <div className="relative text-center w-full max-w-[300px]">
-                        {/* 背景画像(ACQUIRED) */}
                         <img src="/images/bg-acquired.png" alt="Acquired Background" className="w-full h-auto" />
-                        {/* ★アイテム画像をさらに下に配置（62% -> 70%） */}
+                        {/* ★さらにさげる（70% -> 78%） */}
                         {randomItemImg && (
                             <img
                                 src={randomItemImg}
                                 alt="Item"
-                                className="absolute top-[70%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[35%] h-auto drop-shadow-2xl animate-in zoom-in duration-500 delay-200"
+                                className="absolute top-[78%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[35%] h-auto drop-shadow-2xl animate-in zoom-in duration-500 delay-200"
                             />
                         )}
                     </div>
@@ -313,36 +316,35 @@ export default function QuestActivePage() {
                 </div>
             )}
 
-            {/* 改良版クラッカー（下から吹き上がる動き） */}
+            {/* 射出型クラッカーアニメーション */}
             <style jsx>{`
                 .confetti {
                     position: absolute;
-                    bottom: 20%; /* 画面の下の方から開始 */
-                    left: 50%;
                     opacity: 0;
-                    animation: pop-and-scatter 4s ease-out infinite;
+                    border-radius: 2px;
+                    animation: burst 4s ease-out infinite;
                 }
-                @keyframes pop-and-scatter {
+                @keyframes burst {
                     0% {
                         transform: translate(0, 0) scale(0) rotate(0deg);
                         opacity: 1;
                     }
                     15% {
-                        /* 勢いよく上に射出 */
-                        transform: translate(calc(var(--tw-skew-x) * 1px), -50vh) scale(1) rotate(180deg);
+                        /* 勢いよく上に吹き出す */
+                        transform: translate(calc(var(--spread) * 0.5), var(--height)) scale(1.2) rotate(180deg);
+                        opacity: 1;
+                    }
+                    30% {
+                        /* 頂点から散らばり始める */
+                        transform: translate(var(--spread), calc(var(--height) * 1.2)) scale(1) rotate(360deg);
                         opacity: 1;
                     }
                     100% {
-                        /* 左右に散りながら画面下に落ちていく */
-                        transform: translate(calc(Math.random() * 400px - 200px), 100vh) scale(0.8) rotate(720deg);
+                        /* 画面下にひらひら落ちていく */
+                        transform: translate(calc(var(--spread) * 1.5), 100vh) scale(0.8) rotate(720deg);
                         opacity: 0;
                     }
                 }
-
-                /* 粒ごとの個別の動きをCSS変数で調整（簡易版） */
-                .confetti:nth-child(odd) { animation-duration: 3.5s; }
-                .confetti:nth-child(even) { animation-duration: 4.5s; }
-                .confetti:nth-child(3n) { transform-origin: left bottom; }
             `}</style>
         </div>
     );
