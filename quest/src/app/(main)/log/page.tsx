@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { getPlans } from "@/lib/storage";
 import { calculateDistance } from "@/lib/geo";
-import { MapPin, ChevronDown, ChevronUp, Package, Clock, MessageCircle, Footprints, Timer } from "lucide-react";
+import { MapPin, ChevronDown, ChevronUp, Package, Clock, MessageCircle, Footprints } from "lucide-react";
 import dynamic from "next/dynamic";
 
 const LazyMap = dynamic(() => import("@/components/Map/LazyMap"), {
@@ -11,7 +11,6 @@ const LazyMap = dynamic(() => import("@/components/Map/LazyMap"), {
     loading: () => <div className="h-48 w-full bg-gray-50 animate-pulse rounded-2xl" />
 });
 
-// 距離のフォーマット
 const formatDistance = (km: number): string => {
     if (km < 1) {
         const meters = Math.floor(km * 1000);
@@ -20,7 +19,6 @@ const formatDistance = (km: number): string => {
     return `${km.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`;
 };
 
-// ★時間のフォーマット関数（15min / 2h 10m / 51days 4h 10m）
 const formatDuration = (start: string, end: string): string => {
     const diffMs = new Date(end).getTime() - new Date(start).getTime();
     const diffMins = Math.floor(diffMs / (1000 * 60));
@@ -40,7 +38,7 @@ export default function LogPage() {
         const allPlans = getPlans();
         const logs = allPlans
             .filter(plan => (plan.items || []).some((i: any) => i.isCollected))
-            .map(plan => {
+            .map((plan: any) => { // ★ 型エラーを避けるために plan: any に変更
                 const collectedItems = (plan.items || [])
                     .filter((i: any) => i.isCollected)
                     .sort((a: any, b: any) => new Date(a.collectedAt || 0).getTime() - new Date(b.collectedAt || 0).getTime());
@@ -52,9 +50,9 @@ export default function LogPage() {
                     prevPoint = [item.lat, item.lng];
                 });
 
-                // 冒険の開始・終了時刻の特定
                 const startTime = plan.createdAt;
-                const endTime = plan.finishedAt || collectedItems[collectedItems.length - 1]?.collectedAt || startTime;
+                // ★ 型エラーが出ていた箇所：plan.finishedAt を安全に参照
+                const endTime = plan.finishedAt || (collectedItems.length > 0 ? collectedItems[collectedItems.length - 1].collectedAt : startTime);
 
                 return {
                     ...plan,
@@ -76,7 +74,6 @@ export default function LogPage() {
 
     return (
         <div className="min-h-screen bg-white text-black font-sans pb-32">
-            {/* 1. ヘッダーサマリー（MyPageとの重複検討箇所） */}
             <header className="p-8 pt-16 border-b border-gray-100">
                 <h1 className="text-2xl font-bold tracking-tighter uppercase mb-6">Flight Log</h1>
                 <div className="flex gap-10">
@@ -93,14 +90,12 @@ export default function LogPage() {
                 </div>
             </header>
 
-            {/* 2. ログリスト */}
             <main className="p-4 space-y-4">
                 {completedPlans.length > 0 ? (
                     completedPlans.map((plan) => {
                         const isExpanded = expandedId === plan.id;
                         return (
                             <div key={plan.id} className="bg-white rounded-[2rem] border border-gray-100 overflow-hidden shadow-sm transition-all">
-
                                 <div className="p-6 cursor-pointer flex justify-between items-start" onClick={() => toggleExpand(plan.id)}>
                                     <div className="flex-1 pr-4">
                                         <h3 className="text-lg font-bold text-black uppercase tracking-tight leading-tight">{plan.name}</h3>
@@ -115,7 +110,6 @@ export default function LogPage() {
 
                                 {isExpanded && (
                                     <div className="animate-in fade-in slide-in-from-top-2 duration-500">
-                                        {/* メトリクス：3カラム構成 */}
                                         <div className="grid grid-cols-3 gap-2 px-6 mb-6">
                                             <div className="bg-black text-white rounded-2xl p-4">
                                                 <div className="text-[8px] font-bold opacity-50 uppercase tracking-widest mb-1">Dist</div>
@@ -127,7 +121,7 @@ export default function LogPage() {
                                             </div>
                                             <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 text-black">
                                                 <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-1">Items</div>
-                                                <div className="text-[13px] font-bold tabular-nums truncate">{plan.collectedCount}pts</div>
+                                                <div className="text-[13px] font-bold tabular-nums truncate">{plan.collectedCount} pts</div>
                                             </div>
                                         </div>
 

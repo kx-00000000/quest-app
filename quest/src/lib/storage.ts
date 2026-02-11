@@ -28,6 +28,7 @@ export interface Plan {
     items?: Item[];
     path?: { lat: number; lng: number }[];
     isArchived?: boolean;
+    finishedAt?: string;
 }
 
 const STORAGE_KEY = "quest_plans";
