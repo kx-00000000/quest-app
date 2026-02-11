@@ -9,13 +9,12 @@ import {
     CheckCircle2, Loader2, Flag, ChevronLeft, ChevronRight, Beaker, ShieldAlert, Eye, Lock
 } from "lucide-react";
 
-// --- 距離表示用のパーツ分割ヘルパー ---
+// --- 距離表示用ヘルパー ---
 const getDistanceParts = (meters: number) => {
     if (meters < 1000) {
         return { integer: Math.floor(meters).toLocaleString(), decimal: null, unit: "m" };
     }
     const km = meters / 1000;
-    // 小数点第1位まで固定で取得
     const fixedKm = km.toFixed(1);
     const [intPart, decPart] = fixedKm.split('.');
     return {
@@ -142,7 +141,7 @@ export default function QuestActivePage() {
         setTimeout(() => router.push("/log"), 800);
     };
 
-    if (!plan) return <div className="h-screen bg-white flex items-center justify-center font-black italic text-pink-500 uppercase">Searching Signal...</div>;
+    if (!plan) return <div className="h-screen bg-white flex items-center justify-center font-bold text-gray-900 uppercase">Searching...</div>;
 
     const items = plan?.items || [];
     const uncollectedItems = items.filter((i: any) => !i.isCollected);
@@ -152,106 +151,96 @@ export default function QuestActivePage() {
             {/* 1. ヘッダー */}
             <header className="p-8 pt-14 flex justify-between items-baseline z-20">
                 <div className="flex flex-col gap-3">
-                    <h2 className="text-2xl font-black tracking-tighter uppercase italic truncate max-w-[200px]">{plan.name}</h2>
+                    <h2 className="text-xl font-bold tracking-tight uppercase truncate max-w-[200px]">{plan.name}</h2>
                     <div className="flex gap-2.5 items-center h-4">
                         {items.map((item: any, idx: number) => {
                             const isCurrent = activeTarget && item.id === activeTarget.id;
                             return (
                                 <div key={item.id || idx} className="relative flex items-center justify-center">
-                                    {isCurrent && !item.isCollected && <div className="absolute w-4.5 h-4.5 border-2 border-pink-500/20 rounded-full animate-pulse" />}
-                                    {item.isCollected ? <div className="w-2 h-2 bg-pink-500 rounded-full" /> : <div className={`w-2 h-2 rounded-full transition-all ${isCurrent ? 'bg-pink-500 scale-125' : 'bg-gray-100 border border-gray-200'}`} />}
+                                    {isCurrent && !item.isCollected && <div className="absolute w-4 h-4 border-2 border-gray-200 rounded-full animate-pulse" />}
+                                    {item.isCollected ? <div className="w-1.5 h-1.5 bg-black rounded-full" /> : <div className={`w-1.5 h-1.5 rounded-full ${isCurrent ? 'bg-black scale-125' : 'bg-gray-100'}`} />}
                                 </div>
                             );
                         })}
                     </div>
                 </div>
-                <p className="text-3xl font-black italic tabular-nums text-gray-900">{plan.collectedCount}<span className="text-sm text-gray-200 mx-1">/</span>{plan.itemCount}</p>
+                <p className="text-2xl font-bold tabular-nums text-black">{plan.collectedCount}<span className="text-sm text-gray-300 mx-1">/</span>{plan.itemCount}</p>
             </header>
 
-            {/* 2. メインコンテンツ：距離表示のアップデート */}
+            {/* 2. メインコンテンツ：シンプル化された距離表示 */}
             <div className="flex-1 flex flex-col items-center justify-center relative z-10 px-6">
                 {!isMissionComplete ? (
                     <>
-                        <div className="mb-10">
+                        <div className="mb-12">
                             <Compass targetBearing={targetBearing} />
                         </div>
-                        <div className="w-full">
+                        <div className="text-center">
                             {userLoc ? (() => {
                                 const { integer, decimal, unit } = getDistanceParts(distanceToTarget);
                                 return (
                                     <div className="flex flex-col items-center">
-                                        <div className="flex items-center justify-center gap-1.5 font-black italic tracking-tighter tabular-nums">
-                                            {/* 整数部：黒背景・白文字・-4pt (約91px) */}
-                                            <span className="bg-black text-white px-4 py-2 rounded-xl text-[91px] leading-none shadow-xl">
-                                                {integer}
-                                            </span>
-                                            {/* 小数部：白背景・黒文字・枠線・さらに-2pt (約88px) */}
-                                            {decimal && (
-                                                <span className="bg-white text-black px-2 py-2 border-[4px] border-black rounded-xl text-[88px] leading-none shadow-sm">
-                                                    {decimal}
-                                                </span>
-                                            )}
-                                        </div>
-                                        {/* 単位：-4pt (約91px) */}
-                                        <div className="mt-4">
-                                            <span className="text-black text-[91px] font-black italic leading-none opacity-20">
-                                                {unit}
-                                            </span>
+                                        <div className="flex items-baseline justify-center font-bold tracking-tighter tabular-nums text-black">
+                                            {/* 整数部：サイズダウン */}
+                                            <span className="text-7xl">{integer}</span>
+                                            {/* 小数部：さらにサイズダウン */}
+                                            {decimal && <span className="text-5xl opacity-60">{decimal}</span>}
+                                            {/* 単位 */}
+                                            <span className="ml-2 text-2xl font-medium text-gray-400">{unit}</span>
                                         </div>
                                     </div>
                                 );
                             })() : (
-                                <div className="text-center text-4xl font-black italic opacity-10 animate-pulse">POSITIONING...</div>
+                                <div className="text-xl font-bold text-gray-200 animate-pulse uppercase">Locating...</div>
                             )}
                         </div>
                     </>
                 ) : (
                     <div className="text-center space-y-6 animate-in fade-in duration-1000 w-full px-4">
-                        <CheckCircle2 size={80} className="text-pink-500 mx-auto" />
-                        <h3 className="text-3xl font-black uppercase italic text-black leading-none tracking-tighter">Mission Complete</h3>
-                        <div className="w-full space-y-6">
-                            <textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="今回の冒険はどうでしたか？" className="w-full h-32 bg-gray-50 border border-gray-100 rounded-[1.5rem] p-5 text-sm font-bold resize-none text-black focus:outline-none" />
-                            <button onClick={handleFinishAdventure} disabled={isSaving} className="w-full py-5 bg-pink-500 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-lg active:scale-95 transition-all">
-                                {isSaving ? <Loader2 className="animate-spin" size={16} /> : "Log entry"}
+                        <CheckCircle2 size={64} className="text-black mx-auto" />
+                        <h3 className="text-2xl font-bold uppercase text-black tracking-tight">Mission Complete</h3>
+                        <div className="w-full space-y-4">
+                            <textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="メモを残す" className="w-full h-24 bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm font-medium resize-none text-black focus:outline-none" />
+                            <button onClick={handleFinishAdventure} disabled={isSaving} className="w-full py-4 bg-black text-white rounded-2xl font-bold text-sm uppercase tracking-widest active:scale-95 transition-all">
+                                {isSaving ? <Loader2 className="animate-spin" size={16} /> : "Save Entry"}
                             </button>
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* 3. 下部：ターゲット切替 */}
+            {/* 3. 下部：ナビゲーション */}
             {!isMissionComplete && (
-                <div className="p-8 pb-20 z-20 flex flex-col items-center">
-                    <div className="flex items-center gap-8 mb-10">
-                        <button onClick={() => { if (uncollectedItems.length > 1) { const idx = uncollectedItems.findIndex((i: any) => i.id === activeTarget?.id); setManualTargetId(uncollectedItems[(idx - 1 + uncollectedItems.length) % uncollectedItems.length].id); } }} className="p-3 bg-gray-50 rounded-full text-gray-300 active:text-pink-500 transition-colors"><ChevronLeft size={24} /></button>
-                        <div className="text-center min-w-[160px]">
-                            <h4 className="text-xl font-black uppercase tracking-tight text-black">{activeTarget?.locationName || "---"}</h4>
+                <div className="p-8 pb-16 z-20 flex flex-col items-center">
+                    <div className="flex items-center gap-8 mb-8">
+                        <button onClick={() => { if (uncollectedItems.length > 1) { const idx = uncollectedItems.findIndex((i: any) => i.id === activeTarget?.id); setManualTargetId(uncollectedItems[(idx - 1 + uncollectedItems.length) % uncollectedItems.length].id); } }} className="p-2 text-gray-300 active:text-black transition-colors"><ChevronLeft size={28} /></button>
+                        <div className="text-center min-w-[140px]">
+                            <h4 className="text-lg font-bold uppercase tracking-tight text-black">{activeTarget?.locationName || "---"}</h4>
                         </div>
-                        <button onClick={() => { if (uncollectedItems.length > 1) { const idx = uncollectedItems.findIndex((i: any) => i.id === activeTarget?.id); setManualTargetId(uncollectedItems[(idx + 1) % uncollectedItems.length].id); } }} className="p-3 bg-gray-50 rounded-full text-gray-200 active:text-pink-500 transition-colors"><ChevronRight size={24} /></button>
+                        <button onClick={() => { if (uncollectedItems.length > 1) { const idx = uncollectedItems.findIndex((i: any) => i.id === activeTarget?.id); setManualTargetId(uncollectedItems[(idx + 1) % uncollectedItems.length].id); } }} className="p-2 text-gray-300 active:text-black transition-colors"><ChevronRight size={28} /></button>
                     </div>
-                    <button onClick={() => router.push("/plan")} className="w-full py-4 bg-gray-50 text-gray-400 rounded-2xl font-black text-[10px] uppercase tracking-[0.3em]"><Flag size={14} className="inline mr-2" /> Mission Abort</button>
+                    <button onClick={() => router.push("/plan")} className="text-gray-400 font-bold text-xs uppercase tracking-widest flex items-center gap-2 py-2 px-4 border border-gray-100 rounded-full"><Flag size={14} /> Abort</button>
                 </div>
             )}
 
-            {/* テスト用ツールバー */}
+            {/* デバッグ用ツールバー */}
             {!isMissionComplete && (
-                <div className="fixed bottom-6 left-0 right-0 z-[5000] flex justify-center gap-4 px-8 pointer-events-none">
-                    <div className="bg-white/80 backdrop-blur-md border border-gray-100 p-2 rounded-full shadow-lg flex gap-2 pointer-events-auto">
-                        <button onClick={() => setDistanceToTarget(48)} className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-full text-[9px] font-black uppercase tracking-widest active:bg-pink-500"><Beaker size={12} /> 近接</button>
-                        <button onClick={() => { if (activeTarget) handleAcquireItem(activeTarget); }} className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-full text-[9px] font-black uppercase tracking-widest active:bg-pink-500"><CheckCircle2 size={12} /> 獲得</button>
+                <div className="fixed bottom-4 left-0 right-0 z-[5000] flex justify-center gap-4 px-8 pointer-events-none">
+                    <div className="bg-white/90 backdrop-blur-md border border-gray-100 p-1.5 rounded-full shadow-sm flex gap-2 pointer-events-auto">
+                        <button onClick={() => setDistanceToTarget(48)} className="px-4 py-1.5 bg-gray-100 text-gray-600 rounded-full text-[10px] font-bold uppercase tracking-wider active:bg-black active:text-white transition-colors">Test Close</button>
+                        <button onClick={() => { if (activeTarget) handleAcquireItem(activeTarget); }} className="px-4 py-1.5 bg-black text-white rounded-full text-[10px] font-bold uppercase tracking-wider active:scale-95 transition-all">Force Get</button>
                     </div>
                 </div>
             )}
 
             {/* 獲得ポップアップ */}
             {isAcquired && (
-                <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-white/90 backdrop-blur-md animate-in fade-in duration-300">
+                <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-white/95 backdrop-blur-sm animate-in fade-in duration-300">
                     <div className="text-center space-y-4">
-                        <div className="w-20 h-20 bg-pink-500 rounded-full flex items-center justify-center mx-auto shadow-xl">
-                            <CheckCircle2 size={40} className="text-white" />
+                        <div className="w-16 h-16 bg-black rounded-full flex items-center justify-center mx-auto shadow-lg">
+                            <CheckCircle2 size={32} className="text-white" />
                         </div>
-                        <h3 className="text-4xl font-black italic uppercase tracking-tighter text-black leading-none">獲得しました！</h3>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-2">{acquiredName}</p>
+                        <h3 className="text-2xl font-bold uppercase tracking-tight text-black">Item Acquired</h3>
+                        <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mt-1">{acquiredName}</p>
                     </div>
                 </div>
             )}
@@ -259,16 +248,16 @@ export default function QuestActivePage() {
             {/* Safety Demo */}
             {showSafetyDemo && (
                 <div className="absolute inset-0 z-[6000] bg-white p-10 flex flex-col justify-center animate-in fade-in duration-500">
-                    <div className="mb-12 text-center">
-                        <p className="text-[10px] font-black text-pink-500 uppercase tracking-[0.3em] mb-2">Protocol 01</p>
-                        <h2 className="text-4xl font-black italic uppercase tracking-tighter text-black leading-none">Safety Demo</h2>
+                    <div className="mb-10 text-center">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">Safety Protocol</p>
+                        <h2 className="text-3xl font-bold uppercase tracking-tight text-black">Safety First</h2>
                     </div>
-                    <div className="space-y-10 mb-16">
-                        <div className="flex gap-6 items-start"><Eye className="text-pink-500 shrink-0 mt-1" size={24} /><div className="space-y-1"><h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Attention</h4><p className="text-xs font-bold leading-relaxed text-gray-600">移動中の画面操作は危険です。方位の確認は立ち止まり、周囲の安全を確保してください。</p></div></div>
-                        <div className="flex gap-6 items-start"><Lock className="text-pink-500 shrink-0 mt-1" size={24} /><div className="space-y-1"><h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Respect</h4><p className="text-xs font-bold leading-relaxed text-gray-600">私有地、線路、立ち入り禁止区域への侵入は厳禁です。現地のルールを最優先してください。</p></div></div>
-                        <div className="flex gap-6 items-start"><ShieldAlert className="text-pink-500 shrink-0 mt-1" size={24} /><div className="space-y-1"><h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Disclaimer</h4><p className="text-xs font-bold leading-relaxed text-gray-600">本アプリの使用中に発生したトラブルについて、運営は責任を負いかねます。</p></div></div>
+                    <div className="space-y-8 mb-12">
+                        <div className="flex gap-5 items-start"><Eye className="text-black shrink-0" size={20} /><p className="text-xs font-medium leading-relaxed text-gray-600">移動中の画面操作は危険です。方位の確認は必ず立ち止まって行ってください。</p></div>
+                        <div className="flex gap-5 items-start"><Lock className="text-black shrink-0" size={20} /><p className="text-xs font-medium leading-relaxed text-gray-600">私有地や立ち入り禁止区域への侵入は厳禁です。現地のルールを遵守してください。</p></div>
+                        <div className="flex gap-5 items-start"><ShieldAlert className="text-black shrink-0" size={20} /><p className="text-xs font-medium leading-relaxed text-gray-600">本アプリ使用中のトラブルについて、運営は一切の責任を負いかねます。</p></div>
                     </div>
-                    <button onClick={() => { localStorage.setItem("safety_demo_agreed", "true"); setShowSafetyDemo(false); startGPS(); }} className="w-full py-6 bg-black text-white rounded-[2rem] font-black text-[10px] uppercase tracking-[0.3em] shadow-2xl active:scale-95 transition-all">了解して冒険を開始する</button>
+                    <button onClick={() => { localStorage.setItem("safety_demo_agreed", "true"); setShowSafetyDemo(false); startGPS(); }} className="w-full py-5 bg-black text-white rounded-2xl font-bold text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all">Accept and Start</button>
                 </div>
             )}
         </div>
