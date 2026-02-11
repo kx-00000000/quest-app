@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Nunito } from "next/font/google";
 import "./globals.css";
 import BottomNav from "@/components/BottomNav";
-// ★ スプラッシュスクリーンのインポートを追加
+// スプラッシュスクリーンのインポート
 import SplashScreen from "@/components/SplashScreen";
 
 const nunito = Nunito({
@@ -23,14 +23,21 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
-      <body className={`${nunito.variable} antialiased relative`}>
-        {/* ★ スプラッシュスクリーンを最前面に配置 */}
+      <body className={`${nunito.variable} antialiased relative bg-white`}>
+        {/* スプラッシュスクリーン 
+          z-indexを最大に設定しているため、最前面で描画されます 
+        */}
         <SplashScreen />
 
-        {/* メインコンテンツ */}
-        {children}
+        {/* メインコンテンツエリア */}
+        <main className="min-h-screen">
+          {children}
+        </main>
 
-        {/* ボトムナビゲーション */}
+        {/* ボトムナビゲーション 
+          スプラッシュ画面が表示されている間も背面に存在しますが、
+          スプラッシュ側のz-indexにより隠れます 
+        */}
         <BottomNav />
       </body>
     </html>
