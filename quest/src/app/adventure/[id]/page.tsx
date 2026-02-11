@@ -169,7 +169,7 @@ export default function QuestActivePage() {
             {/* 1. ヘッダー */}
             <header className="p-8 pt-14 flex justify-between items-baseline z-20">
                 <div className="flex flex-col gap-3">
-                    <h2 className="text-2xl font-black tracking-tighter uppercase italic truncate max-w-[200px]">{plan.name}</h2>
+                    <h2 className="text-2xl font-black tracking-tighter uppercase italic truncate max-w-[200px]">{plan.name}</h2><p className="text-red-500 font-black bg-yellow-300 text-[20px] p-2">STILL OLD UI?</p>
                     <div className="flex gap-2.5 items-center h-4">
                         {plan.items.map((item: any, idx: number) => {
                             const isCurrent = activeTarget && item.id === activeTarget.id;
