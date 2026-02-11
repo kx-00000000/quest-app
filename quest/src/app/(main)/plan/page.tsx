@@ -108,7 +108,7 @@ export default function PlanPage() {
                                         userLocation={plan.center}
                                         items={plan.items}
                                         isLogMode={true}
-                                        themeColor="#F06292"
+                                        themeColor="#E6672E"
                                     />
                                     <div className="absolute top-4 left-4 z-10 bg-gray-900/80 backdrop-blur-md px-3 py-1 rounded-full border border-white/20">
                                         <span className="text-[9px] font-black text-white uppercase italic tracking-widest">{plan.radius}km Range</span>

@@ -77,7 +77,7 @@ export default function AdventureView({ id }: { id: string }) {
         <div className="min-h-screen bg-gray-50/50 relative overflow-hidden font-sans">
             {/* 1. 背景地図（固定表示で負荷を最小化） */}
             <div className="absolute inset-0 z-0">
-                <LazyMap items={items} userLocation={null} themeColor="#f06292" center={plan.center} />
+                <LazyMap items={items} userLocation={null} themeColor="#E6672E" center={plan.center} />
                 <div className="absolute inset-0 bg-white/20 backdrop-blur-[2px]" />
             </div>
 
@@ -102,7 +102,7 @@ export default function AdventureView({ id }: { id: string }) {
                         <p className="text-gray-400 text-xs mb-8 font-bold uppercase tracking-widest">Connect to Compass</p>
                         <button
                             onClick={handleStart}
-                            className="w-full bg-gradient-to-r from-[#F06292] to-[#FF8A65] text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all text-sm uppercase tracking-widest border-b-4 border-black/10"
+                            className="w-full bg-gradient-to-r from-[#E6672E] to-[#FF8A65] text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all text-sm uppercase tracking-widest border-b-4 border-black/10"
                         >
                             Start Adventure
                         </button>
@@ -137,7 +137,7 @@ export default function AdventureView({ id }: { id: string }) {
                     <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
                         {items.map((item: any) => (
                             <div key={item.id} className={`w-11 h-11 flex-shrink-0 rounded-xl flex items-center justify-center border transition-all ${item.isCollected ? "bg-pink-50 border-pink-100 text-pink-400" :
-                                    (item.id === currentItem?.id && isTracking ? "bg-white border-pink-300 text-pink-500 shadow-md animate-bounce" : "bg-gray-100/50 border-gray-100 text-gray-200")
+                                (item.id === currentItem?.id && isTracking ? "bg-white border-pink-300 text-pink-500 shadow-md animate-bounce" : "bg-gray-100/50 border-gray-100 text-gray-200")
                                 }`}>
                                 {item.isCollected ? <CheckCircle size={18} /> : <Package size={18} />}
                             </div>

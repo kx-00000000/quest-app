@@ -119,7 +119,7 @@ export default function NewQuestPage() {
                 <LazyMap
                     radiusInKm={radius}
                     userLocation={userLocation}
-                    themeColor="#F06292"
+                    themeColor="#E6672E"
                     items={briefingItems}
                     isBriefingActive={isBriefingActive}
                     isFinalOverview={isFinalOverview}
