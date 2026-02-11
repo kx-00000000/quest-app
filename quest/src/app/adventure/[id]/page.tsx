@@ -156,7 +156,7 @@ export default function QuestActivePage() {
 
     if (!plan) return <div className="h-screen bg-white flex items-center justify-center font-black italic text-pink-500">LOADING...</div>;
 
-    const uncollectedItems = plan.items.filter((i: any) => !i.isCollected);
+    const uncollectedItems = (plan?.items || []).filter((i: any) => !i.isCollected);
     const activeTarget = manualTargetId
         ? uncollectedItems.find((i: any) => i.id === manualTargetId) || uncollectedItems[0]
         : uncollectedItems.length > 0 && userLoc ? uncollectedItems.reduce((p: any, c: any) =>
