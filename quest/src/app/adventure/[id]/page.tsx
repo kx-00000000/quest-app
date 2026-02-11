@@ -9,11 +9,20 @@ import {
     CheckCircle2, Loader2, Flag, ChevronLeft, ChevronRight, Beaker, ShieldAlert, Eye, Lock
 } from "lucide-react";
 
-// --- ヘルパー関数 ---
-const formatDistanceDisplay = (meters: number): string => {
-    if (meters < 1000) return `${Math.floor(meters).toLocaleString()}m`;
+// --- 距離表示用のパーツ分割ヘルパー ---
+const getDistanceParts = (meters: number) => {
+    if (meters < 1000) {
+        return { integer: Math.floor(meters).toLocaleString(), decimal: null, unit: "m" };
+    }
     const km = meters / 1000;
-    return `${km.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}km`;
+    // 小数点第1位まで固定で取得
+    const fixedKm = km.toFixed(1);
+    const [intPart, decPart] = fixedKm.split('.');
+    return {
+        integer: parseInt(intPart).toLocaleString(),
+        decimal: "." + decPart,
+        unit: "km"
+    };
 };
 
 function calculateBearing(startLat: number, startLng: number, destLat: number, destLng: number) {
@@ -44,7 +53,6 @@ export default function QuestActivePage() {
 
     const watchId = useRef<number | null>(null);
 
-    // 1. プランの取得 & 自動開始の判定
     useEffect(() => {
         const allPlans = getPlans();
         const currentPlan = allPlans.find((p: any) => p.id === id);
@@ -54,7 +62,6 @@ export default function QuestActivePage() {
         }
         setPlan(currentPlan);
 
-        // すでに同意済みなら、即座にGPSを開始
         const hasAgreed = localStorage.getItem("safety_demo_agreed");
         if (hasAgreed) {
             startGPS();
@@ -67,7 +74,6 @@ export default function QuestActivePage() {
         };
     }, [id]);
 
-    // 2. 現在のターゲット特定
     const activeTarget = useMemo(() => {
         const items = plan?.items || [];
         const uncollected = items.filter((i: any) => !i.isCollected);
@@ -86,7 +92,6 @@ export default function QuestActivePage() {
         return uncollected[0];
     }, [plan, manualTargetId, userLoc]);
 
-    // 3. 距離と方位の再計算
     useEffect(() => {
         if (userLoc && activeTarget) {
             const distKm = calculateDistance(userLoc.lat, userLoc.lng, activeTarget.lat, activeTarget.lng);
@@ -163,18 +168,41 @@ export default function QuestActivePage() {
                 <p className="text-3xl font-black italic tabular-nums text-gray-900">{plan.collectedCount}<span className="text-sm text-gray-200 mx-1">/</span>{plan.itemCount}</p>
             </header>
 
-            {/* 2. メインコンテンツ */}
+            {/* 2. メインコンテンツ：距離表示のアップデート */}
             <div className="flex-1 flex flex-col items-center justify-center relative z-10 px-6">
                 {!isMissionComplete ? (
                     <>
-                        <div className="mb-12">
+                        <div className="mb-10">
                             <Compass targetBearing={targetBearing} />
                         </div>
-                        <div className="text-center">
-                            <p className="text-8xl font-black tracking-tighter tabular-nums leading-none text-black">
-                                {userLoc ? formatDistanceDisplay(distanceToTarget) : "---"}
-                            </p>
-                            {/* ★ Signal Active 表示を削除しました */}
+                        <div className="w-full">
+                            {userLoc ? (() => {
+                                const { integer, decimal, unit } = getDistanceParts(distanceToTarget);
+                                return (
+                                    <div className="flex flex-col items-center">
+                                        <div className="flex items-center justify-center gap-1.5 font-black italic tracking-tighter tabular-nums">
+                                            {/* 整数部：黒背景・白文字・-4pt (約91px) */}
+                                            <span className="bg-black text-white px-4 py-2 rounded-xl text-[91px] leading-none shadow-xl">
+                                                {integer}
+                                            </span>
+                                            {/* 小数部：白背景・黒文字・枠線・さらに-2pt (約88px) */}
+                                            {decimal && (
+                                                <span className="bg-white text-black px-2 py-2 border-[4px] border-black rounded-xl text-[88px] leading-none shadow-sm">
+                                                    {decimal}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {/* 単位：-4pt (約91px) */}
+                                        <div className="mt-4">
+                                            <span className="text-black text-[91px] font-black italic leading-none opacity-20">
+                                                {unit}
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            })() : (
+                                <div className="text-center text-4xl font-black italic opacity-10 animate-pulse">POSITIONING...</div>
+                            )}
                         </div>
                     </>
                 ) : (
@@ -198,7 +226,6 @@ export default function QuestActivePage() {
                         <button onClick={() => { if (uncollectedItems.length > 1) { const idx = uncollectedItems.findIndex((i: any) => i.id === activeTarget?.id); setManualTargetId(uncollectedItems[(idx - 1 + uncollectedItems.length) % uncollectedItems.length].id); } }} className="p-3 bg-gray-50 rounded-full text-gray-300 active:text-pink-500 transition-colors"><ChevronLeft size={24} /></button>
                         <div className="text-center min-w-[160px]">
                             <h4 className="text-xl font-black uppercase tracking-tight text-black">{activeTarget?.locationName || "---"}</h4>
-                            {/* ★ Auto Tracking / Manual Lock 表示を削除しました */}
                         </div>
                         <button onClick={() => { if (uncollectedItems.length > 1) { const idx = uncollectedItems.findIndex((i: any) => i.id === activeTarget?.id); setManualTargetId(uncollectedItems[(idx + 1) % uncollectedItems.length].id); } }} className="p-3 bg-gray-50 rounded-full text-gray-200 active:text-pink-500 transition-colors"><ChevronRight size={24} /></button>
                     </div>
@@ -216,6 +243,19 @@ export default function QuestActivePage() {
                 </div>
             )}
 
+            {/* 獲得ポップアップ */}
+            {isAcquired && (
+                <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-white/90 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="text-center space-y-4">
+                        <div className="w-20 h-20 bg-pink-500 rounded-full flex items-center justify-center mx-auto shadow-xl">
+                            <CheckCircle2 size={40} className="text-white" />
+                        </div>
+                        <h3 className="text-4xl font-black italic uppercase tracking-tighter text-black leading-none">獲得しました！</h3>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-2">{acquiredName}</p>
+                    </div>
+                </div>
+            )}
+
             {/* Safety Demo */}
             {showSafetyDemo && (
                 <div className="absolute inset-0 z-[6000] bg-white p-10 flex flex-col justify-center animate-in fade-in duration-500">
@@ -224,7 +264,7 @@ export default function QuestActivePage() {
                         <h2 className="text-4xl font-black italic uppercase tracking-tighter text-black leading-none">Safety Demo</h2>
                     </div>
                     <div className="space-y-10 mb-16">
-                        <div className="flex gap-6 items-start"><Eye className="text-pink-500 shrink-0 mt-1" size={24} /><div className="space-y-1"><h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Attention</h4><p className="text-xs font-bold leading-relaxed text-gray-600">移動中の画面操作は危険です。方位の確認は必ず立ち止まり、周囲の安全を確保してください。</p></div></div>
+                        <div className="flex gap-6 items-start"><Eye className="text-pink-500 shrink-0 mt-1" size={24} /><div className="space-y-1"><h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Attention</h4><p className="text-xs font-bold leading-relaxed text-gray-600">移動中の画面操作は危険です。方位の確認は立ち止まり、周囲の安全を確保してください。</p></div></div>
                         <div className="flex gap-6 items-start"><Lock className="text-pink-500 shrink-0 mt-1" size={24} /><div className="space-y-1"><h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Respect</h4><p className="text-xs font-bold leading-relaxed text-gray-600">私有地、線路、立ち入り禁止区域への侵入は厳禁です。現地のルールを最優先してください。</p></div></div>
                         <div className="flex gap-6 items-start"><ShieldAlert className="text-pink-500 shrink-0 mt-1" size={24} /><div className="space-y-1"><h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Disclaimer</h4><p className="text-xs font-bold leading-relaxed text-gray-600">本アプリの使用中に発生したトラブルについて、運営は責任を負いかねます。</p></div></div>
                     </div>
