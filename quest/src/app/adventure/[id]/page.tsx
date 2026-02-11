@@ -56,14 +56,12 @@ export default function QuestActivePage() {
     const [distanceToTarget, setDistanceToTarget] = useState<number>(0);
     const [targetBearing, setTargetBearing] = useState<number>(0);
     const [isAcquired, setIsAcquired] = useState(false);
-    const [acquiredName, setAcquiredName] = useState("");
     const [isMissionComplete, setIsMissionComplete] = useState(false);
     const [comment, setComment] = useState("");
     const [isSaving, setIsSaving] = useState(false);
     const [showSafetyDemo, setShowSafetyDemo] = useState(false);
     const [isTracking, setIsTracking] = useState(false);
 
-    // 演出用ステート
     const [randomItemImg, setRandomItemImg] = useState("");
     const [randomAnimalImg, setRandomAnimalImg] = useState("");
 
@@ -123,9 +121,7 @@ export default function QuestActivePage() {
     const handleAcquireItem = (targetItem: any) => {
         if (!plan?.items) return;
 
-        // アイテム獲得演出用のランダム画像を選択
         setRandomItemImg(ITEM_IMAGES[Math.floor(Math.random() * ITEM_IMAGES.length)]);
-        setAcquiredName(targetItem.locationName || "ポイント");
         setIsAcquired(true);
 
         const updatedItems = plan.items.map((item: any) =>
@@ -139,7 +135,6 @@ export default function QuestActivePage() {
         setManualTargetId(null);
 
         if (newCollectedCount === plan.itemCount) {
-            // ミッション完了演出用のランダム画像を選択
             setRandomAnimalImg(ANIMAL_IMAGES[Math.floor(Math.random() * ANIMAL_IMAGES.length)]);
             setTimeout(() => {
                 setIsAcquired(false);
@@ -208,32 +203,35 @@ export default function QuestActivePage() {
                 ) : (
                     /* --- ミッション達成画面 --- */
                     <div className="text-center w-full max-w-sm space-y-8 animate-in fade-in zoom-in duration-700 relative z-50">
-                        {/* クラッカー演出 */}
+
+                        {/* クラッカー演出（揺れながら落ちる） */}
                         <div className="absolute inset-0 pointer-events-none overflow-visible">
-                            {[...Array(20)].map((_, i) => (
+                            {[...Array(25)].map((_, i) => (
                                 <div key={i} className="confetti" style={{
                                     left: `${Math.random() * 100}%`,
-                                    backgroundColor: ['#000000', '#FFD700', '#FF69B4', '#00BFFF'][Math.floor(Math.random() * 4)],
-                                    animationDelay: `${Math.random() * 2}s`
+                                    backgroundColor: ['#000000', '#FFD700', '#FF69B4', '#00BFFF', '#ADFF2F'][Math.floor(Math.random() * 5)],
+                                    animationDelay: `${Math.random() * 3}s`,
+                                    width: `${Math.random() * 10 + 5}px`,
+                                    height: `${Math.random() * 10 + 5}px`,
                                 }} />
                             ))}
                         </div>
 
                         {/* 背景(Congrats) + 動物イラスト */}
-                        <div className="relative mx-auto w-full max-w-[280px]">
+                        <div className="relative mx-auto w-full max-w-[300px]">
                             <img src="/images/bg-congrats.png" alt="Congrats" className="w-full h-auto" />
                             {randomAnimalImg && (
-                                <img src={randomAnimalImg} className="absolute inset-0 m-auto w-1/2 h-auto animate-bounce" alt="Animal" />
+                                <img
+                                    src={randomAnimalImg}
+                                    /* 動物を背景の文字と重ならないよう下に配置 */
+                                    className="absolute top-[62%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[45%] h-auto animate-bounce"
+                                    alt="Animal"
+                                />
                             )}
                         </div>
 
-                        <div className="space-y-2">
-                            <h3 className="text-2xl font-bold uppercase tracking-tight text-black">Mission Complete</h3>
-                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">お疲れ様でした。素晴らしい冒険でした！</p>
-                        </div>
-
                         {/* コメント欄 */}
-                        <div className="space-y-4 px-4">
+                        <div className="space-y-4 px-4 pt-4">
                             <textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="冒険の記録を残しましょう" className="w-full h-24 bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm font-medium resize-none text-black focus:outline-none" />
                             <button onClick={handleFinishAdventure} disabled={isSaving} className="w-full py-4 bg-black text-white rounded-2xl font-bold text-sm uppercase tracking-widest active:scale-95 transition-all shadow-xl">
                                 {isSaving ? <Loader2 className="animate-spin mx-auto" size={16} /> : "Save Entry"}
@@ -274,21 +272,18 @@ export default function QuestActivePage() {
             {/* --- アイテム獲得ポップアップ --- */}
             {isAcquired && (
                 <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-white/95 backdrop-blur-sm animate-in fade-in duration-300">
-                    <div className="relative text-center w-full max-w-[280px] space-y-4">
+                    <div className="relative text-center w-full max-w-[300px]">
                         {/* 背景画像(ACQUIRED) */}
                         <img src="/images/bg-acquired.png" alt="Acquired Background" className="w-full h-auto" />
-                        {/* ランダムアイテム画像：背景に対して少し下の位置に配置 */}
+                        {/* アイテム画像を背景の文字と重ならないよう下に配置 */}
                         {randomItemImg && (
                             <img
                                 src={randomItemImg}
                                 alt="Item"
-                                className="absolute top-[60%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-1/3 h-auto drop-shadow-2xl animate-in zoom-in duration-500 delay-200"
+                                className="absolute top-[62%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[35%] h-auto drop-shadow-2xl animate-in zoom-in duration-500 delay-200"
                             />
                         )}
-                        <div className="pt-4">
-                            <h3 className="text-xl font-bold uppercase tracking-tight text-black">Item Acquired</h3>
-                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">{acquiredName}</p>
-                        </div>
+                        {/* ★ 文言（Item Acquired等）は背景画像に含まれるためコードからは削除しました */}
                     </div>
                 </div>
             )}
@@ -319,20 +314,31 @@ export default function QuestActivePage() {
                 </div>
             )}
 
-            {/* クラッカー用のインラインCSS */}
+            {/* クラッカー（躍動感のある動き） */}
             <style jsx>{`
                 .confetti {
                     position: absolute;
-                    width: 8px;
-                    height: 8px;
-                    top: -10px;
-                    opacity: 0.6;
+                    top: -20px;
+                    opacity: 0.8;
                     border-radius: 2px;
-                    animation: fall 3s linear infinite;
+                    animation: fall-and-sway 4s linear infinite;
                 }
-                @keyframes fall {
-                    to { 
-                        transform: translateY(100vh) rotate(720deg); 
+                @keyframes fall-and-sway {
+                    0% {
+                        transform: translateY(0) translateX(0) rotate(0deg);
+                        opacity: 1;
+                    }
+                    25% {
+                        transform: translateY(25vh) translateX(20px) rotate(180deg);
+                    }
+                    50% {
+                        transform: translateY(50vh) translateX(-20px) rotate(360deg);
+                    }
+                    75% {
+                        transform: translateY(75vh) translateX(15px) rotate(540deg);
+                    }
+                    100% {
+                        transform: translateY(105vh) translateX(0) rotate(720deg);
                         opacity: 0;
                     }
                 }
