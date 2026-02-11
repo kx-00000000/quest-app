@@ -185,12 +185,12 @@ export default function QuestActivePage() {
                                             {/* 小数部：さらにサイズダウン */}
                                             {decimal && <span className="text-5xl opacity-60">{decimal}</span>}
                                             {/* 単位 */}
-                                            <span className="ml-2 text-2xl font-medium text-gray-400">{unit}</span>
+                                            <span className="ml-2 text-2xl font-medium text-black">{unit}</span>
                                         </div>
                                     </div>
                                 );
                             })() : (
-                                <div className="text-xl font-bold text-gray-200 animate-pulse uppercase">Locating...</div>
+                                <div className="text-xl font-bold text-black animate-pulse uppercase">Locating...</div>
                             )}
                         </div>
                     </>
