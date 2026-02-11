@@ -204,34 +204,34 @@ export default function QuestActivePage() {
                     /* --- ミッション達成画面 --- */
                     <div className="text-center w-full max-w-sm space-y-8 animate-in fade-in zoom-in duration-700 relative z-50">
 
-                        {/* クラッカー演出（揺れながら落ちる） */}
-                        <div className="absolute inset-0 pointer-events-none overflow-visible">
-                            {[...Array(25)].map((_, i) => (
+                        {/* クラッカー演出（下から上へ射出） - Z-indexを画像より上位に配置 */}
+                        <div className="absolute inset-0 pointer-events-none overflow-visible z-[100]">
+                            {[...Array(30)].map((_, i) => (
                                 <div key={i} className="confetti" style={{
                                     left: `${Math.random() * 100}%`,
                                     backgroundColor: ['#000000', '#FFD700', '#FF69B4', '#00BFFF', '#ADFF2F'][Math.floor(Math.random() * 5)],
-                                    animationDelay: `${Math.random() * 3}s`,
-                                    width: `${Math.random() * 10 + 5}px`,
-                                    height: `${Math.random() * 10 + 5}px`,
+                                    animationDelay: `${Math.random() * 0.5}s`,
+                                    width: `${Math.random() * 12 + 6}px`,
+                                    height: `${Math.random() * 8 + 4}px`,
                                 }} />
                             ))}
                         </div>
 
                         {/* 背景(Congrats) + 動物イラスト */}
-                        <div className="relative mx-auto w-full max-w-[300px]">
+                        <div className="relative mx-auto w-full max-w-[300px] z-10">
                             <img src="/images/bg-congrats.png" alt="Congrats" className="w-full h-auto" />
                             {randomAnimalImg && (
                                 <img
                                     src={randomAnimalImg}
-                                    /* 動物を背景の文字と重ならないよう下に配置 */
-                                    className="absolute top-[62%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[45%] h-auto animate-bounce"
+                                    /* ★さらに下に配置（62% -> 70%） */
+                                    className="absolute top-[70%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[45%] h-auto animate-bounce"
                                     alt="Animal"
                                 />
                             )}
                         </div>
 
                         {/* コメント欄 */}
-                        <div className="space-y-4 px-4 pt-4">
+                        <div className="space-y-4 px-4 pt-4 z-20 relative">
                             <textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="冒険の記録を残しましょう" className="w-full h-24 bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm font-medium resize-none text-black focus:outline-none" />
                             <button onClick={handleFinishAdventure} disabled={isSaving} className="w-full py-4 bg-black text-white rounded-2xl font-bold text-sm uppercase tracking-widest active:scale-95 transition-all shadow-xl">
                                 {isSaving ? <Loader2 className="animate-spin mx-auto" size={16} /> : "Save Entry"}
@@ -275,15 +275,14 @@ export default function QuestActivePage() {
                     <div className="relative text-center w-full max-w-[300px]">
                         {/* 背景画像(ACQUIRED) */}
                         <img src="/images/bg-acquired.png" alt="Acquired Background" className="w-full h-auto" />
-                        {/* アイテム画像を背景の文字と重ならないよう下に配置 */}
+                        {/* ★アイテム画像をさらに下に配置（62% -> 70%） */}
                         {randomItemImg && (
                             <img
                                 src={randomItemImg}
                                 alt="Item"
-                                className="absolute top-[62%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[35%] h-auto drop-shadow-2xl animate-in zoom-in duration-500 delay-200"
+                                className="absolute top-[70%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[35%] h-auto drop-shadow-2xl animate-in zoom-in duration-500 delay-200"
                             />
                         )}
-                        {/* ★ 文言（Item Acquired等）は背景画像に含まれるためコードからは削除しました */}
                     </div>
                 </div>
             )}
@@ -314,34 +313,36 @@ export default function QuestActivePage() {
                 </div>
             )}
 
-            {/* クラッカー（躍動感のある動き） */}
+            {/* 改良版クラッカー（下から吹き上がる動き） */}
             <style jsx>{`
                 .confetti {
                     position: absolute;
-                    top: -20px;
-                    opacity: 0.8;
-                    border-radius: 2px;
-                    animation: fall-and-sway 4s linear infinite;
+                    bottom: 20%; /* 画面の下の方から開始 */
+                    left: 50%;
+                    opacity: 0;
+                    animation: pop-and-scatter 4s ease-out infinite;
                 }
-                @keyframes fall-and-sway {
+                @keyframes pop-and-scatter {
                     0% {
-                        transform: translateY(0) translateX(0) rotate(0deg);
+                        transform: translate(0, 0) scale(0) rotate(0deg);
                         opacity: 1;
                     }
-                    25% {
-                        transform: translateY(25vh) translateX(20px) rotate(180deg);
-                    }
-                    50% {
-                        transform: translateY(50vh) translateX(-20px) rotate(360deg);
-                    }
-                    75% {
-                        transform: translateY(75vh) translateX(15px) rotate(540deg);
+                    15% {
+                        /* 勢いよく上に射出 */
+                        transform: translate(calc(var(--tw-skew-x) * 1px), -50vh) scale(1) rotate(180deg);
+                        opacity: 1;
                     }
                     100% {
-                        transform: translateY(105vh) translateX(0) rotate(720deg);
+                        /* 左右に散りながら画面下に落ちていく */
+                        transform: translate(calc(Math.random() * 400px - 200px), 100vh) scale(0.8) rotate(720deg);
                         opacity: 0;
                     }
                 }
+
+                /* 粒ごとの個別の動きをCSS変数で調整（簡易版） */
+                .confetti:nth-child(odd) { animation-duration: 3.5s; }
+                .confetti:nth-child(even) { animation-duration: 4.5s; }
+                .confetti:nth-child(3n) { transform-origin: left bottom; }
             `}</style>
         </div>
     );
