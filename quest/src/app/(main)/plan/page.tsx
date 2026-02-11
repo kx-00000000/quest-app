@@ -135,7 +135,7 @@ export default function PlanPage() {
 
                                     {/* 4. アクションボタン */}
                                     <button
-                                        onClick={() => router.push(`/quest/${plan.id}`)}
+                                        onClick={() => router.push(`/adventure/${plan.id}`)}
                                         className="w-full py-5 bg-gray-900 text-white rounded-[1.5rem] font-black text-xs shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-[0.2em] border-b-4 border-black/20"
                                     >
                                         <Play size={14} fill="currentColor" />
