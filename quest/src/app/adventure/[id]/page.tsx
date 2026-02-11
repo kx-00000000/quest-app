@@ -9,7 +9,7 @@ import {
     CheckCircle2, Loader2, Flag, ChevronLeft, ChevronRight, Beaker, ShieldAlert, Eye, Lock
 } from "lucide-react";
 
-// --- 設定：ランダム表示用の画像リスト（実際のファイル名に合わせて調整してください） ---
+// --- 設定：ランダム表示用の画像リスト ---
 const ITEM_IMAGES = [
     "/images/items/item-1.png",
     "/images/items/item-2.png",
@@ -277,9 +277,13 @@ export default function QuestActivePage() {
                     <div className="relative text-center w-full max-w-[280px] space-y-4">
                         {/* 背景画像(ACQUIRED) */}
                         <img src="/images/bg-acquired.png" alt="Acquired Background" className="w-full h-auto" />
-                        {/* ランダムアイテム画像：中央に配置 */}
+                        {/* ランダムアイテム画像：背景に対して少し下の位置に配置 */}
                         {randomItemImg && (
-                            <img src={randomItemImg} alt="Item" className="absolute inset-0 m-auto w-1/3 h-auto drop-shadow-2xl animate-in zoom-in duration-500 delay-200" />
+                            <img
+                                src={randomItemImg}
+                                alt="Item"
+                                className="absolute top-[60%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-1/3 h-auto drop-shadow-2xl animate-in zoom-in duration-500 delay-200"
+                            />
                         )}
                         <div className="pt-4">
                             <h3 className="text-xl font-bold uppercase tracking-tight text-black">Item Acquired</h3>
