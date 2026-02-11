@@ -3,53 +3,51 @@
 import { useEffect, useState } from "react";
 
 export default function SplashScreen() {
-    // フェードイン・アウトの状態を管理するフラグ（初期値 false で透明から開始）
-    const [isShowing, setIsShowing] = useState(false);
-    // DOMにレンダリングするかどうかを管理するフラグ
+    // 画像（ナマケモノ）のフェードイン管理
+    const [imageShowing, setImageShowing] = useState(false);
+    // スプラッシュ画面全体のフェードアウト管理
+    const [isFadingOut, setIsFadingOut] = useState(false);
+    // DOMから消去する管理
     const [shouldRender, setShouldRender] = useState(true);
 
     useEffect(() => {
-        // マウント直後にフェードインを開始
-        // 少しだけ遅延させることで、ブラウザの描画準備を待ち、より滑らかに開始します
-        const startTimer = setTimeout(() => {
-            setIsShowing(true);
-        }, 100);
+        // 1. 起動直後に画像だけをふわっと出す
+        const imageTimer = setTimeout(() => {
+            setImageShowing(true);
+        }, 300); // 0.3秒後に画像が浮き出る
 
-        // ★変更点2: 表示時間を延長（3500ms = 3.5秒後にフェードアウト開始）
-        const fadeOutTimer = setTimeout(() => {
-            setIsShowing(false); // フェードアウト開始
+        // 2. 3.5秒間しっかり見せる
+        const startFadeOutTimer = setTimeout(() => {
+            setIsFadingOut(true); // 全体を消し始める
 
-            // CSSのアニメーション時間（duration-1000）が終了したらDOMから完全に削除
+            // 3. フェードアウトのアニメーションが終わったら消去
             setTimeout(() => {
                 setShouldRender(false);
             }, 1000);
 
-        }, 3500); // 合計の表示時間
+        }, 3500);
 
         return () => {
-            clearTimeout(startTimer);
-            clearTimeout(fadeOutTimer);
+            clearTimeout(imageTimer);
+            clearTimeout(startFadeOutTimer);
         };
     }, []);
 
-    // 完全に消えたら何も描画しない（背面の操作を阻害しないため）
     if (!shouldRender) return null;
 
     return (
-        // ★変更点1: isShowing フラグで opacity を制御。duration-1000 でゆっくりと変化。
+        /* 背景の白い幕：最初から opacity-100 にしておくことで背景を完全に隠します */
         <div
-            className={`fixed inset-0 z-[9999] flex items-center justify-center bg-white transition-opacity duration-1000 ${isShowing ? 'opacity-100' : 'opacity-0'
+            className={`fixed inset-0 z-[9999] flex items-center justify-center bg-white transition-opacity duration-1000 ${isFadingOut ? 'opacity-0' : 'opacity-100'
                 }`}
         >
-            {/* ★変更点3: 画像コンテナのサイズ制限を緩和し、余白を減らす */}
-            {/* max-w-md を削除し、p-12 を p-4 に変更して画像を大きく表示 */}
             <div className="relative w-full h-full flex flex-col items-center justify-center p-4">
                 <img
                     src="/images/splash.png"
                     alt="Quest Splash"
-                    // 親の opacity transition に任せるため、個別の animate クラスは削除
-                    // 画面からはみ出さない範囲で最大限大きく表示
-                    className="w-full h-auto object-contain max-h-screen"
+                    /* 画像だけをふわっと浮かび上がらせる */
+                    className={`w-full h-auto object-contain max-h-[80vh] transition-all duration-1000 transform ${imageShowing ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+                        }`}
                 />
             </div>
         </div>
