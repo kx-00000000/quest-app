@@ -48,54 +48,55 @@ export default function LazyMap({
 }: LazyMapProps) {
     const map = useMap();
     const [activePlaceName, setActivePlaceName] = useState<string | null>(null);
-    const briefingStarted = useRef(false);
+    const briefingRef = useRef(false);
 
-    // ★ 解決：世界地図にならず、確実にピンの範囲にズームする
+    // ★ 解決：世界地図問題を回避する厳密な範囲計算
     useEffect(() => {
         if (!map || items.length === 0 || isBriefingActive) return;
 
         const applyBounds = () => {
             const bounds = new google.maps.LatLngBounds();
-            let count = 0;
+            let hasValidPoints = false;
+
             items.forEach(item => {
-                if (item.lat && item.lng) {
+                if (item.lat !== 0 && item.lng !== 0) {
                     bounds.extend({ lat: item.lat, lng: item.lng });
-                    count++;
+                    hasValidPoints = true;
                 }
             });
-            if (userLocation?.lat) { bounds.extend(userLocation); count++; }
 
-            if (count > 0) {
+            if (userLocation?.lat) {
+                bounds.extend(userLocation);
+                hasValidPoints = true;
+            }
+
+            if (hasValidPoints) {
                 map.fitBounds(bounds, { top: 60, right: 60, bottom: 60, left: 60 });
             }
         };
 
-        // 即時実行と、地図の安定（idle）後の再実行で確実に範囲を合わせる
-        applyBounds();
-        const listener = google.maps.event.addListenerOnce(map, 'idle', applyBounds);
-        return () => google.maps.event.removeListener(listener);
+        const timer = setTimeout(applyBounds, 500);
+        const idleListener = google.maps.event.addListenerOnce(map, 'idle', applyBounds);
+        return () => {
+            clearTimeout(timer);
+            google.maps.event.removeListener(idleListener);
+        };
     }, [map, items, isLogMode, isFinalOverview, userLocation, isBriefingActive]);
 
-    // ★ 解決：演出を排除したシンプルな地点切り替え
+    // ★ 解決：演出なしのシンプルなスライド
     useEffect(() => {
-        if (!isBriefingActive || !map || items.length === 0 || briefingStarted.current) return;
-        briefingStarted.current = true;
+        if (!isBriefingActive || !map || items.length === 0 || briefingRef.current) return;
+        briefingRef.current = true;
 
         const runBriefing = async () => {
             map.setZoom(15);
             for (const item of items) {
                 map.panTo({ lat: item.lat, lng: item.lng });
-                setActivePlaceName(item.addressName || "WAYPOINT");
-                await new Promise(r => setTimeout(r, 2500)); // 静止時間
+                setActivePlaceName(item.addressName || "Waypoint");
+                await new Promise(r => setTimeout(r, 2500));
             }
-
-            const finalBounds = new google.maps.LatLngBounds();
-            items.forEach(i => finalBounds.extend({ lat: i.lat, lng: i.lng }));
-            map.fitBounds(finalBounds, 80);
-
-            await new Promise(r => setTimeout(r, 1500));
             setActivePlaceName(null);
-            briefingStarted.current = false;
+            briefingRef.current = false;
             if (onBriefingStateChange) onBriefingStateChange(true);
             if (onBriefingComplete) onBriefingComplete();
         };
@@ -111,18 +112,9 @@ export default function LazyMap({
 
     return (
         <div className="w-full h-full relative bg-[#f5f5f5]">
-            <Map
-                defaultZoom={14}
-                center={initialCenter}
-                styles={mapStyle}
-                disableDefaultUI={true}
-                gestureHandling={'greedy'}
-            >
+            <Map defaultZoom={14} center={initialCenter} styles={mapStyle} disableDefaultUI={true} gestureHandling={'greedy'}>
                 {userLocation && <Marker position={userLocation} />}
-                {/* ★ 解決：ブリーフィング中は円を消す */}
-                {userLocation && radiusInKm && !isBriefingActive && (
-                    <MapCircle center={userLocation} radius={radiusInKm} color={themeColor} />
-                )}
+                {userLocation && radiusInKm && !isBriefingActive && <MapCircle center={userLocation} radius={radiusInKm} color={themeColor} />}
                 {items.map((item, idx) => (
                     <Marker key={item.id || idx} position={{ lat: item.lat, lng: item.lng }} label={{ text: (idx + 1).toString(), color: 'white', fontWeight: 'bold' }} />
                 ))}

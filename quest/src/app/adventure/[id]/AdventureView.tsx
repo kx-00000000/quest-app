@@ -18,38 +18,35 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
     useEffect(() => {
         if (typeof window !== "undefined" && "geolocation" in navigator) {
             const geocoder = new google.maps.Geocoder();
-            const watchId = navigator.geolocation.watchPosition(
-                (pos) => {
-                    const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                    setUserLocation(newLoc);
+            const watchId = navigator.geolocation.watchPosition((pos) => {
+                const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                setUserLocation(newLoc);
 
-                    // ★ 解決：座標から地名をリアルタイム取得して表示
-                    if (geocoder) {
-                        geocoder.geocode({ location: newLoc }, (results, status) => {
-                            if (status === "OK" && results?.[0]) {
-                                const city = results[0].address_components.find(c => c.types.includes("locality"))?.long_name ||
-                                    results[0].address_components.find(c => c.types.includes("administrative_area_level_2"))?.long_name || "Active Area";
-                                setCurrentAreaName(city);
-                            }
-                        });
-                    }
-
-                    const updatedItems = (plan.items || []).map((item: any) => {
-                        if (!item.isCollected) {
-                            const dist = calculateDistance(newLoc.lat, newLoc.lng, item.lat, item.lng);
-                            if (dist < 0.05) return { ...item, isCollected: true, collectedAt: new Date().toISOString() };
+                // ★ 解決：座標から地名をリアルタイム取得して表示
+                if (geocoder) {
+                    geocoder.geocode({ location: newLoc }, (results, status) => {
+                        if (status === "OK" && results?.[0]) {
+                            const addr = results[0].address_components;
+                            const city = addr.find(c => c.types.includes("locality"))?.long_name ||
+                                addr.find(c => c.types.includes("administrative_area_level_2"))?.long_name || "Active Area";
+                            setCurrentAreaName(city);
                         }
-                        return item;
                     });
-                    if (JSON.stringify(updatedItems) !== JSON.stringify(plan.items)) {
-                        const newPlan = { ...plan, items: updatedItems };
-                        setPlan(newPlan);
-                        updatePlan(newPlan);
+                }
+
+                const updatedItems = (plan.items || []).map((item: any) => {
+                    if (!item.isCollected) {
+                        const dist = calculateDistance(newLoc.lat, newLoc.lng, item.lat, item.lng);
+                        if (dist < 0.05) return { ...item, isCollected: true, collectedAt: new Date().toISOString() };
                     }
-                },
-                (err) => console.warn(err),
-                { enableHighAccuracy: true }
-            );
+                    return item;
+                });
+                if (JSON.stringify(updatedItems) !== JSON.stringify(plan.items)) {
+                    const newPlan = { ...plan, items: updatedItems };
+                    setPlan(newPlan);
+                    updatePlan(newPlan);
+                }
+            }, null, { enableHighAccuracy: true });
             return () => navigator.geolocation.clearWatch(watchId);
         }
     }, [plan]);

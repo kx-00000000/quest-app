@@ -4,10 +4,14 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { savePlan } from "@/lib/storage";
 import { generateRandomPoint } from "@/lib/geo";
-import { CheckCircle2, Play, Loader2 } from "lucide-react";
+import { Play, Loader2 } from "lucide-react";
 import dynamic from "next/dynamic";
 
 const LazyMap = dynamic<any>(() => import("@/components/Map/LazyMap").then(mod => mod.default), { ssr: false });
+
+const formatDistance = (km: number): string => {
+    return km < 1 ? `${Math.floor(km * 1000)} m` : `${km.toFixed(1)} km`;
+};
 
 export default function NewQuestPage() {
     const router = useRouter();
@@ -41,13 +45,26 @@ export default function NewQuestPage() {
                         const cityName = comp.find(c => c.types.includes("locality"))?.long_name ||
                             comp.find(c => c.types.includes("administrative_area_level_2"))?.long_name || "Active Area";
                         resolve(cityName);
-                    } else resolve("Quest Point");
+                    } else resolve("Quest Area");
                 });
             });
             validItems.push({ id: Math.random().toString(36).substr(2, 9), ...point, isCollected: false, addressName: city });
         }
 
-        const plan = { id: Math.random().toString(36).substr(2, 9), name: name.trim() || "NEW QUEST", radius, items: validItems, center, status: "ready", createdAt: new Date().toISOString() };
+        // ★ 解決：ビルドエラー修正（必要なプロパティをすべて追加）
+        const plan = {
+            id: Math.random().toString(36).substr(2, 9),
+            name: name.trim() || "NEW QUEST",
+            radius,
+            items: validItems,
+            center,
+            status: "ready",
+            createdAt: new Date().toISOString(),
+            itemCount: validItems.length,
+            totalDistance: 0,
+            collectedCount: 0
+        };
+
         savePlan(plan);
         setBriefingItems(validItems);
         setIsCreating(false);
@@ -68,9 +85,9 @@ export default function NewQuestPage() {
                         </div>
                     </div>
                     <div className="mt-auto relative z-10 px-4 mb-4">
-                        <div className="bg-white/80 backdrop-blur-xl rounded-[3rem] p-6 shadow-2xl border border-white space-y-5">
+                        <div className="bg-white/80 backdrop-blur-xl rounded-[3rem] p-6 shadow-2xl space-y-5">
                             <div className="space-y-4 px-1">
-                                <div className="flex justify-between text-[10px] font-black text-[#F37343] uppercase tracking-widest"><span>Radius</span><span>{radius}km</span></div>
+                                <div className="flex justify-between text-[10px] font-black text-[#F37343] uppercase tracking-widest"><span>Radius</span><span>{formatDistance(radius)}</span></div>
                                 <input type="range" min="0.5" max="15" step="0.1" value={radius} onChange={(e) => setRadius(parseFloat(e.target.value))} className="w-full h-3 bg-gray-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-[#F37343] [&::-webkit-slider-thumb]:rounded-full" />
                             </div>
                             <button onClick={handleCreate} disabled={isCreating} className="w-full py-4 bg-gray-900 text-white rounded-[2rem] font-black flex items-center justify-center gap-2 shadow-lg">
