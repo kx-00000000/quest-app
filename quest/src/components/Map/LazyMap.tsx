@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useEffect, useState, useRef } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import { Map, Marker, useMap } from '@vis.gl/react-google-maps';
 
 // --- 🎨 航空計器デザイン：ミニマルな地図スタイル ---
@@ -14,8 +14,7 @@ const mapStyle = [
     { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#e0e0e0" }] }
 ];
 
-// --- ★ Circle コンポーネントの自作 (ビルドエラー解消の鍵) ---
-// ライブラリに Circle がないため、Google Maps API を直接叩いて描画します。
+// --- ★ Circle コンポーネントの自作 ---
 function MapCircle(props: { center: google.maps.LatLngLiteral, radius: number, color: string }) {
     const map = useMap();
     const circleRef = useRef<google.maps.Circle | null>(null);
@@ -23,7 +22,6 @@ function MapCircle(props: { center: google.maps.LatLngLiteral, radius: number, c
     useEffect(() => {
         if (!map) return;
 
-        // 円のインスタンス作成
         circleRef.current = new google.maps.Circle({
             map,
             center: props.center,
@@ -45,6 +43,7 @@ function MapCircle(props: { center: google.maps.LatLngLiteral, radius: number, c
     return null;
 }
 
+// ★ エラー箇所: onBriefingStateChange の型を (state: any) => void に修正
 interface MapProps {
     items: any[];
     center?: { lat: number; lng: number };
@@ -52,11 +51,11 @@ interface MapProps {
     radiusInKm?: number;
     themeColor?: string;
     isLogMode?: boolean;
-    // new/page.tsx から渡される追加プロパティを受け取れるように定義
+    // new/page.tsx から渡される仕様を網羅
     isBriefingActive?: boolean;
     isFinalOverview?: boolean;
     planId?: string | null;
-    onBriefingStateChange?: (state: string) => void;
+    onBriefingStateChange?: (state: any) => void; // ★ string から any に変更して不一致を解消
     onBriefingComplete?: () => void;
 }
 
@@ -69,7 +68,6 @@ export default function LazyMap({
     isLogMode = false
 }: MapProps) {
 
-    // マップの中心を決定
     const mapCenter = useMemo(() => {
         if (userLocation) return userLocation;
         if (center && center.lat !== 0) return center;
@@ -90,12 +88,12 @@ export default function LazyMap({
                 disableDefaultUI={true}
                 gestureHandling={'greedy'}
             >
-                {/* 1. ユーザーの現在地 */}
+                {/* ユーザーの現在地 */}
                 {userLocation && (
                     <Marker position={userLocation} />
                 )}
 
-                {/* 2. 探索範囲の円 (自作コンポーネント) */}
+                {/* 探索範囲のサークル */}
                 {userLocation && radiusInKm && (
                     <MapCircle
                         center={userLocation}
@@ -104,7 +102,7 @@ export default function LazyMap({
                     />
                 )}
 
-                {/* 3. アイテム地点 */}
+                {/* アイテム地点 */}
                 {displayItems.map((item, idx) => (
                     <Marker
                         key={item.id || idx}
