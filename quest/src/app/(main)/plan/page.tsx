@@ -20,7 +20,7 @@ export default function PlanPage() {
 
     const getStatusLabel = (status: string, items: any[]) => {
         if (status === 'completed') return "完了";
-        const collectedCount = items.filter(i => i.isCollected).length;
+        const collectedCount = (items || []).filter(i => i.isCollected).length;
         if (collectedCount > 0) return "冒険中";
         return "準備中";
     };

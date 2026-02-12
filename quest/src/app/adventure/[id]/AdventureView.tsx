@@ -83,7 +83,7 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                             <div className="flex items-center gap-2 justify-end"><div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" /><span className="text-xs font-black uppercase">On Course</span></div>
                         </div>
                     </div>
-                    {nearestItem ? (
+                    {nearestItem && (
                         <div className="grid grid-cols-2 gap-4 border-t border-white/10 pt-6">
                             <div className="flex items-center gap-4">
                                 <Navigation className="text-[#F37343]" size={24} style={{ transform: `rotate(${nearestItem.bearing}deg)` }} />
@@ -94,8 +94,6 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                                 <div><p className="text-[8px] font-bold text-gray-400 uppercase">Heading</p><p className="text-lg font-black tabular-nums">{Math.floor(nearestItem.bearing)}°</p></div>
                             </div>
                         </div>
-                    ) : (
-                        <div className="text-center py-2"><p className="text-xs font-black uppercase text-green-500">All Waypoints Cleared</p></div>
                     )}
                 </div>
             </header>

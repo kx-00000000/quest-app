@@ -49,57 +49,60 @@ export default function LazyMap({
     const map = useMap();
     const [activePlaceName, setActivePlaceName] = useState<string | null>(null);
 
-    // プラン/ログの表示：グレーアウト防止のため idle イベントで実行
+    // ★ グレーアウト防止：有効な中心座標の算出
+    const initialCenter = useMemo(() => {
+        if (userLocation && userLocation.lat !== 0) return userLocation;
+        if (center && center.lat !== 0) return center;
+        if (items.length > 0) return { lat: items[0].lat, lng: items[0].lng };
+        return { lat: 35.6812, lng: 139.7671 }; // 東京駅
+    }, [userLocation, center, items]);
+
+    // 全ピン表示のオートズーム
     useEffect(() => {
         if (!map || items.length === 0 || isBriefingActive) return;
         const bounds = new google.maps.LatLngBounds();
         items.forEach(item => bounds.extend({ lat: item.lat, lng: item.lng }));
         if (userLocation) bounds.extend(userLocation);
-        else if (center && center.lat !== 0) bounds.extend(center);
 
-        const timer = setTimeout(() => {
+        const listener = google.maps.event.addListenerOnce(map, 'idle', () => {
             map.fitBounds(bounds, { top: 60, right: 60, bottom: 60, left: 60 });
-        }, 100);
-        return () => clearTimeout(timer);
-    }, [map, items, isLogMode, isFinalOverview, userLocation, isBriefingActive, center]);
+        });
+        return () => google.maps.event.removeListener(listener);
+    }, [map, items, isLogMode, isFinalOverview, userLocation, isBriefingActive]);
 
-    // ★ 改良版ブリーフィング：Pan -> Move(Zoom Out) -> Focus(Zoom In)
+    // ★ 改良版ブリーフィング順序：1.上昇(ZoomOut) -> 2.移動(Pan) -> 3.下降(ZoomIn)
     useEffect(() => {
         if (!isBriefingActive || !map || items.length === 0) return;
 
         const runBriefing = async () => {
-            // 離陸準備
             map.setOptions({ gestureHandling: 'none' });
-            if (userLocation) map.setCenter(userLocation);
-            map.setZoom(14);
+
+            // 最初：現在地から高度を上げる
+            map.setZoom(13);
             await new Promise(r => setTimeout(r, 1000));
 
             for (const item of items) {
-                // 1. 次の目的地へ移動開始 (Pan) ＋ 離陸(Zoom Out)
-                // 移動中に景色を広く見せるためにズームを下げる
-                map.setZoom(13);
+                // A. 離陸：ズームアウトして視野を広げる
+                map.setZoom(12);
+                await new Promise(r => setTimeout(r, 600));
+
+                // B. 巡航：目的地へ水平移動
                 map.panTo({ lat: item.lat, lng: item.lng });
                 setActivePlaceName(item.addressName || "WAYPOINT");
-
-                // 2. 移動中 (巡航) 1.2秒待機
                 await new Promise(r => setTimeout(r, 1200));
 
-                // 3. 目的地へ着陸 (Focus)
-                // 移動が落ち着いた頃にズームイン
+                // C. 着陸：ターゲットへズームイン
                 map.setZoom(17);
-
-                // 4. 目的地での確認時間
                 await new Promise(r => setTimeout(r, 2000));
             }
 
-            // フィナーレ：全景
-            setActivePlaceName("MISSION LOG VERIFIED");
+            // フィナーレ
             const bounds = new google.maps.LatLngBounds();
             items.forEach(i => bounds.extend({ lat: i.lat, lng: i.lng }));
             if (userLocation) bounds.extend(userLocation);
             map.fitBounds(bounds, 100);
 
-            await new Promise(r => setTimeout(r, 2000));
+            await new Promise(r => setTimeout(r, 1500));
             setActivePlaceName(null);
             if (onBriefingStateChange) onBriefingStateChange(true);
             if (onBriefingComplete) onBriefingComplete();
@@ -109,8 +112,14 @@ export default function LazyMap({
     }, [isBriefingActive, map, items, userLocation, onBriefingStateChange, onBriefingComplete]);
 
     return (
-        <div className="w-full h-full relative">
-            <Map defaultZoom={14} center={null} styles={mapStyle} disableDefaultUI={true} gestureHandling={'greedy'}>
+        <div className="w-full h-full relative bg-gray-100">
+            <Map
+                defaultZoom={14}
+                center={initialCenter}
+                styles={mapStyle}
+                disableDefaultUI={true}
+                gestureHandling={'greedy'}
+            >
                 {userLocation && <Marker position={userLocation} />}
                 {userLocation && radiusInKm && <MapCircle center={userLocation} radius={radiusInKm} color={themeColor} />}
                 {items.map((item, idx) => (
