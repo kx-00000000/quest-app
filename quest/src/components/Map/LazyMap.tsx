@@ -3,7 +3,6 @@
 import React, { useMemo, useEffect, useRef } from 'react';
 import { Map, Marker, useMap } from '@vis.gl/react-google-maps';
 
-// --- 🎨 航空計器デザイン：ミニマルな地図スタイル ---
 const mapStyle = [
     { "elementType": "geometry", "stylers": [{ "color": "#f5f5f5" }] },
     { "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] },
@@ -13,7 +12,6 @@ const mapStyle = [
     { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#e0e0e0" }] }
 ];
 
-// --- 円を描画するコンポーネント ---
 function MapCircle({ center, radius, color }: { center: google.maps.LatLngLiteral, radius: number, color: string }) {
     const map = useMap();
     const circleRef = useRef<google.maps.Circle | null>(null);
@@ -52,7 +50,7 @@ export default function LazyMap({
 }: LazyMapProps) {
     const map = useMap();
 
-    // オートズーム設定
+    // 1. オートズーム (fitBounds)
     useEffect(() => {
         if (!map || items.length === 0 || isBriefingActive) return;
         if (isLogMode || isFinalOverview) {
@@ -63,23 +61,33 @@ export default function LazyMap({
         }
     }, [map, items, isLogMode, isFinalOverview, userLocation, isBriefingActive]);
 
-    // ブリーフィング演出
+    // 2. ★ ブリーフィング演出（滑らかな移動を強化）
     useEffect(() => {
         if (!isBriefingActive || !map || items.length === 0) return;
 
         const runBriefing = async () => {
+            // 地図が完全に準備されるまでわずかに待機
+            await new Promise(r => setTimeout(r, 500));
+
+            // A. 各地点を順番に巡回
             for (const item of items) {
+                // panTo は移動が終わるまで待機しないため、Promiseで待機時間を制御
                 map.panTo({ lat: item.lat, lng: item.lng });
-                map.setZoom(16);
-                await new Promise(r => setTimeout(r, 2000));
+                map.setZoom(15); // あまりズームしすぎない（15〜16）
+
+                await new Promise(r => setTimeout(r, 2500)); // 2.5秒ごとに次の地点へ
             }
 
+            // B. 全体俯瞰へズームアウト
             const bounds = new google.maps.LatLngBounds();
             items.forEach(i => bounds.extend({ lat: i.lat, lng: i.lng }));
             if (userLocation) bounds.extend(userLocation);
+
             map.fitBounds(bounds, 80);
 
-            await new Promise(r => setTimeout(r, 1000));
+            await new Promise(r => setTimeout(r, 1500));
+
+            // 完了通知（Discovery Reportを表示させる）
             if (onBriefingStateChange) onBriefingStateChange(true);
             if (onBriefingComplete) onBriefingComplete();
         };
@@ -102,12 +110,20 @@ export default function LazyMap({
                 disableDefaultUI={true}
                 gestureHandling={'greedy'}
             >
+                {/* 最初から全てのピンを表示 */}
                 {userLocation && <Marker position={userLocation} />}
+
                 {userLocation && radiusInKm && (
                     <MapCircle center={userLocation} radius={radiusInKm * 1000} color={themeColor} />
                 )}
-                {items.filter(i => isLogMode ? i.isCollected : true).map((item, idx) => (
-                    <Marker key={item.id || idx} position={{ lat: item.lat, lng: item.lng }} />
+
+                {/* ピンの表示：isLogMode に関係なく、items があれば表示するように変更 */}
+                {items.map((item, idx) => (
+                    <Marker
+                        key={item.id || idx}
+                        position={{ lat: item.lat, lng: item.lng }}
+                        label={isLogMode ? { text: (idx + 1).toString(), color: 'white', fontWeight: 'bold' } : undefined}
+                    />
                 ))}
             </Map>
             <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_100px_rgba(0,0,0,0.03)]" />
