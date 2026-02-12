@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Navigation, Compass, Target, CheckCircle2, Play, MapPin } from "lucide-react";
+import { Navigation, Compass, MapPin } from "lucide-react";
 import { calculateDistance, calculateBearing } from "@/lib/geo";
 import { updatePlan } from "@/lib/storage";
 import dynamic from "next/dynamic";
@@ -13,21 +13,16 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
     const router = useRouter();
     const [plan, setPlan] = useState(initialPlan);
     const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-    const [currentAreaName, setCurrentAreaName] = useState<string>("Scanning..."); // ★ 追加：地名用ステート
-    const [isComplete, setIsComplete] = useState(false);
-    const [comment, setComment] = useState("");
+    const [currentAreaName, setCurrentAreaName] = useState<string>("Scanning...");
 
-    // 位置情報の監視と地名取得
     useEffect(() => {
         if (typeof window !== "undefined" && "geolocation" in navigator) {
             const geocoder = new google.maps.Geocoder();
-
             const watchId = navigator.geolocation.watchPosition(
                 (pos) => {
                     const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                     setUserLocation(newLoc);
 
-                    // ★ 座標から地名をリアルタイム取得
                     geocoder.geocode({ location: newLoc }, (results, status) => {
                         if (status === "OK" && results?.[0]) {
                             const addr = results[0].address_components;
@@ -48,7 +43,6 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                         const newPlan = { ...plan, items: updatedItems };
                         setPlan(newPlan);
                         updatePlan(newPlan);
-                        if (updatedItems.every((i: any) => i.isCollected)) setIsComplete(true);
                     }
                 },
                 (err) => console.warn(err),
@@ -72,16 +66,14 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
     return (
         <div className="relative h-screen bg-white overflow-hidden flex flex-col">
             <div className="absolute inset-0 z-0">
-                <LazyMap items={plan.items} userLocation={userLocation} themeColor="#E6672E" center={plan.center} />
+                <LazyMap items={plan.items} userLocation={userLocation} themeColor="#F37343" center={plan.center} />
                 <div className="absolute inset-0 bg-white/20 backdrop-blur-[2px]" />
             </div>
-
             <header className="relative z-10 p-6 pt-16">
                 <div className="bg-black/90 backdrop-blur-xl rounded-[2.5rem] p-6 shadow-2xl text-white">
                     <div className="flex justify-between items-start mb-6">
                         <div className="flex-1">
-                            {/* ★ 現在地の地名を表示 */}
-                            <p className="text-[10px] font-black text-pink-500 uppercase tracking-[0.3em] mb-1 flex items-center gap-1">
+                            <p className="text-[10px] font-black text-[#F37343] uppercase tracking-[0.3em] mb-1 flex items-center gap-1">
                                 <MapPin size={10} /> {currentAreaName}
                             </p>
                             <h1 className="text-xl font-black uppercase truncate w-48">{plan.name}</h1>
@@ -94,7 +86,7 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                     {nearestItem ? (
                         <div className="grid grid-cols-2 gap-4 border-t border-white/10 pt-6">
                             <div className="flex items-center gap-4">
-                                <Navigation className="text-pink-500" size={24} style={{ transform: `rotate(${nearestItem.bearing}deg)` }} />
+                                <Navigation className="text-[#F37343]" size={24} style={{ transform: `rotate(${nearestItem.bearing}deg)` }} />
                                 <div><p className="text-[8px] font-bold text-gray-400 uppercase">Distance</p><p className="text-lg font-black tabular-nums">{(nearestItem.distance < 1) ? `${Math.floor(nearestItem.distance * 1000)}m` : `${nearestItem.distance.toFixed(1)}km`}</p></div>
                             </div>
                             <div className="flex items-center gap-4 border-l border-white/5 pl-4">
@@ -107,16 +99,6 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                     )}
                 </div>
             </header>
-
-            {isComplete && (
-                <div className="absolute inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-md">
-                    <div className="bg-white rounded-[3rem] p-8 w-full max-w-sm text-center space-y-8">
-                        <h2 className="text-3xl font-black text-gray-900 uppercase">Mission Complete</h2>
-                        <textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="冒険にコメントを残す..." className="w-full h-32 p-4 bg-gray-50 rounded-3xl text-sm resize-none outline-none" />
-                        <button onClick={() => { updatePlan({ ...plan, finishedAt: new Date().toISOString(), comment, status: "completed" }); router.push("/log"); }} className="w-full py-5 bg-gray-900 text-white rounded-[2rem] font-black uppercase tracking-widest shadow-xl">Log and Archive</button>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

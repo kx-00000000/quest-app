@@ -48,7 +48,6 @@ export default function NewQuestPage() {
         const center = userLocation || { lat: 35.6812, lng: 139.7671 };
         const validItems: any[] = [];
         const geocoder = new google.maps.Geocoder();
-
         let attempts = 0;
         while (validItems.length < itemCount && attempts < 20) {
             attempts++;
@@ -58,14 +57,13 @@ export default function NewQuestPage() {
                     if (status === "OK" && results?.[0]) {
                         const addr = results[0].address_components;
                         const city = addr.find(c => c.types.includes("locality"))?.long_name ||
-                            addr.find(c => c.types.includes("administrative_area_level_2"))?.long_name || "Detected Area";
+                            addr.find(c => c.types.includes("administrative_area_level_2"))?.long_name || "Unknown Area";
                         validItems.push({ id: Math.random().toString(36).substr(2, 9), lat: point.lat, lng: point.lng, isCollected: false, addressName: city });
                     }
                     resolve(null);
                 });
             });
         }
-
         savePlan({ id: Math.random().toString(36).substr(2, 9), name: name.trim() || "NEW QUEST", radius, itemCount: validItems.length, status: "ready", createdAt: new Date().toISOString(), totalDistance: 0, collectedCount: 0, center, items: validItems });
         setBriefingItems(validItems);
         setIsCreating(false);
@@ -82,10 +80,9 @@ export default function NewQuestPage() {
                 <>
                     <div className="absolute top-8 left-6 right-6 z-20">
                         <div className="bg-white/40 backdrop-blur-2xl rounded-[2rem] border border-white/40 shadow-xl px-6 py-3">
-                            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="冒険の名前を入力" className="w-full bg-transparent border-none outline-none text-gray-800 font-black text-center" />
+                            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="QUEST NAME" className="w-full bg-transparent border-none outline-none text-gray-800 font-black text-center" />
                         </div>
                     </div>
-
                     <div className="mt-auto relative z-10 px-4 mb-4">
                         <div className="bg-white/80 backdrop-blur-xl rounded-[3rem] p-6 shadow-2xl border border-white space-y-5">
                             <div className="flex p-1 bg-black/5 rounded-2xl gap-1">
@@ -97,15 +94,15 @@ export default function NewQuestPage() {
                                 <div className="space-y-1">
                                     <div className="flex justify-between text-[10px] font-black text-[#F37343] uppercase tracking-widest"><span>Radius</span><span>{formatDistance(radius)}</span></div>
                                     <input type="range" min={activeMode.min} max={activeMode.max} step={activeMode.step} value={radius} onChange={(e) => setRadius(parseFloat(e.target.value))}
-                                        className="w-full h-2 bg-gray-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-[#F37343] [&::-webkit-slider-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:bg-[#F37343] [&::-moz-range-thumb]:rounded-full" />
+                                        className="w-full h-3 bg-gray-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-[#F37343] [&::-webkit-slider-thumb]:rounded-full [&::-moz-range-thumb]:bg-[#F37343] [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none" />
                                 </div>
                                 <div className="space-y-1">
                                     <div className="flex justify-between text-[10px] font-black text-[#F37343] uppercase tracking-widest"><span>Items Count</span><span>{itemCount}</span></div>
                                     <input type="range" min="1" max="7" step="1" value={itemCount} onChange={(e) => setItemCount(parseInt(e.target.value))}
-                                        className="w-full h-2 bg-gray-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-[#F37343] [&::-webkit-slider-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:bg-[#F37343] [&::-moz-range-thumb]:rounded-full" />
+                                        className="w-full h-3 bg-gray-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-[#F37343] [&::-webkit-slider-thumb]:rounded-full [&::-moz-range-thumb]:bg-[#F37343] [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none" />
                                 </div>
                             </div>
-                            <button onClick={handleCreate} disabled={isCreating} className="w-full py-4 bg-gray-900 text-white rounded-[2rem] font-black flex items-center justify-center gap-2">{isCreating ? <Loader2 className="animate-spin" /> : "クエストを作成"}</button>
+                            <button onClick={handleCreate} disabled={isCreating} className="w-full py-4 bg-gray-900 text-white rounded-[2rem] font-black flex items-center justify-center gap-2">{isCreating ? <Loader2 className="animate-spin" /> : "CREATE QUEST"}</button>
                         </div>
                     </div>
                 </>
@@ -130,7 +127,7 @@ export default function NewQuestPage() {
             )}
 
             {showConfirm && (
-                <div className="absolute inset-0 z-[2000] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm animate-in fade-in">
+                <div className="absolute inset-0 z-[2000] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
                     <div className="bg-white rounded-[3rem] p-8 shadow-2xl w-full max-w-sm text-center space-y-6">
                         <CheckCircle2 size={32} className="text-[#F37343] mx-auto" /><h3 className="text-xl font-black uppercase tracking-tight">Quest Ready</h3>
                         <button onClick={() => { setShowConfirm(false); setIsBriefingActive(true); }} className="w-full py-4 bg-gray-900 text-white rounded-[2rem] font-black flex items-center justify-center gap-2 shadow-xl"><Play size={16} fill="currentColor" /> START BRIEFING</button>

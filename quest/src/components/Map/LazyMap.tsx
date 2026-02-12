@@ -12,29 +12,18 @@ const mapStyle = [
     { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#e0e0e0" }] }
 ];
 
-// --- 探索円を描画するサブコンポーネント ---
 function MapCircle({ center, radius, color }: { center: google.maps.LatLngLiteral, radius: number, color: string }) {
     const map = useMap();
     const circleRef = useRef<google.maps.Circle | null>(null);
-
     useEffect(() => {
         if (!map) return;
         if (circleRef.current) circleRef.current.setMap(null);
-
         circleRef.current = new google.maps.Circle({
-            map,
-            center,
-            radius: radius * 1000, // kmをmに変換
-            fillColor: color,
-            fillOpacity: 0.1,
-            strokeColor: color,
-            strokeOpacity: 0.4,
-            strokeWeight: 1,
+            map, center, radius: radius * 1000,
+            fillColor: color, fillOpacity: 0.1, strokeColor: color, strokeOpacity: 0.4, strokeWeight: 1,
         });
-
         return () => { if (circleRef.current) circleRef.current.setMap(null); };
     }, [map, center, radius, color]);
-
     return null;
 }
 
@@ -60,54 +49,57 @@ export default function LazyMap({
     const map = useMap();
     const [activePlaceName, setActivePlaceName] = useState<string | null>(null);
 
-    // ★ プラン表示・ログ表示のオートズーム (fitBounds)
+    // プラン/ログの表示：グレーアウト防止のため idle イベントで実行
     useEffect(() => {
         if (!map || items.length === 0 || isBriefingActive) return;
-
         const bounds = new google.maps.LatLngBounds();
         items.forEach(item => bounds.extend({ lat: item.lat, lng: item.lng }));
         if (userLocation) bounds.extend(userLocation);
-        else if (center) bounds.extend(center);
+        else if (center && center.lat !== 0) bounds.extend(center);
 
-        // 地図がロードされてから枠に収める
-        const timeout = setTimeout(() => {
+        const timer = setTimeout(() => {
             map.fitBounds(bounds, { top: 60, right: 60, bottom: 60, left: 60 });
-        }, 500);
-        return () => clearTimeout(timeout);
+        }, 100);
+        return () => clearTimeout(timer);
     }, [map, items, isLogMode, isFinalOverview, userLocation, isBriefingActive, center]);
 
-    // ★ 洗練されたブリーフィング演出 (Pan -> Smooth Move -> Focus)
+    // ★ 改良版ブリーフィング：Pan -> Move(Zoom Out) -> Focus(Zoom In)
     useEffect(() => {
         if (!isBriefingActive || !map || items.length === 0) return;
 
         const runBriefing = async () => {
-            // 現在地からスタート
-            map.setZoom(13);
+            // 離陸準備
+            map.setOptions({ gestureHandling: 'none' });
+            if (userLocation) map.setCenter(userLocation);
+            map.setZoom(14);
             await new Promise(r => setTimeout(r, 1000));
 
             for (const item of items) {
-                // 1. 移動開始 (Pan)
+                // 1. 次の目的地へ移動開始 (Pan) ＋ 離陸(Zoom Out)
+                // 移動中に景色を広く見せるためにズームを下げる
+                map.setZoom(13);
                 map.panTo({ lat: item.lat, lng: item.lng });
-                setActivePlaceName(item.addressName || "Waypoint");
+                setActivePlaceName(item.addressName || "WAYPOINT");
 
-                // 2. 移動中に少し引いて「躍動感」を出す
-                await new Promise(r => setTimeout(r, 500));
-                map.setZoom(14);
+                // 2. 移動中 (巡航) 1.2秒待機
+                await new Promise(r => setTimeout(r, 1200));
 
-                // 3. 到着に合わせて急降下ズーム (Focus)
-                await new Promise(r => setTimeout(r, 1000));
+                // 3. 目的地へ着陸 (Focus)
+                // 移動が落ち着いた頃にズームイン
                 map.setZoom(17);
 
+                // 4. 目的地での確認時間
                 await new Promise(r => setTimeout(r, 2000));
             }
 
-            // フィナーレ
+            // フィナーレ：全景
+            setActivePlaceName("MISSION LOG VERIFIED");
             const bounds = new google.maps.LatLngBounds();
             items.forEach(i => bounds.extend({ lat: i.lat, lng: i.lng }));
             if (userLocation) bounds.extend(userLocation);
             map.fitBounds(bounds, 100);
 
-            await new Promise(r => setTimeout(r, 1500));
+            await new Promise(r => setTimeout(r, 2000));
             setActivePlaceName(null);
             if (onBriefingStateChange) onBriefingStateChange(true);
             if (onBriefingComplete) onBriefingComplete();
@@ -116,15 +108,9 @@ export default function LazyMap({
         runBriefing();
     }, [isBriefingActive, map, items, userLocation, onBriefingStateChange, onBriefingComplete]);
 
-    const mapCenter = useMemo(() => {
-        if (isBriefingActive || isLogMode || isFinalOverview) return null;
-        if (userLocation) return userLocation;
-        return center || { lat: 35.6812, lng: 139.7671 };
-    }, [isBriefingActive, isLogMode, isFinalOverview, userLocation, center]);
-
     return (
         <div className="w-full h-full relative">
-            <Map defaultZoom={14} center={mapCenter} styles={mapStyle} disableDefaultUI={true} gestureHandling={'greedy'}>
+            <Map defaultZoom={14} center={null} styles={mapStyle} disableDefaultUI={true} gestureHandling={'greedy'}>
                 {userLocation && <Marker position={userLocation} />}
                 {userLocation && radiusInKm && <MapCircle center={userLocation} radius={radiusInKm} color={themeColor} />}
                 {items.map((item, idx) => (
@@ -132,7 +118,6 @@ export default function LazyMap({
                 ))}
             </Map>
 
-            {/* 地名ポップアップ */}
             {activePlaceName && (
                 <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-700">
                     <div className="bg-black/90 px-6 py-2 rounded-full border border-[#F37343]/30 shadow-2xl">

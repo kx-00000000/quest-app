@@ -14,12 +14,10 @@ export default function PlanPage() {
 
     useEffect(() => {
         const allPlans = getPlans();
-        // アーカイブされていないものを表示
         const activePlans = allPlans.filter(p => !p.isArchived);
         setPlans(activePlans);
     }, []);
 
-    // ステータスを日本語に変換
     const getStatusLabel = (status: string, items: any[]) => {
         if (status === 'completed') return "完了";
         const collectedCount = items.filter(i => i.isCollected).length;
@@ -30,7 +28,7 @@ export default function PlanPage() {
     return (
         <div className="min-h-screen bg-white text-black font-sans pb-32">
             <header className="p-8 pt-16 border-b border-gray-100">
-                <h1 className="text-2xl font-bold tracking-tighter uppercase mb-2">Active Quests</h1>
+                <h1 className="text-2xl font-bold tracking-tighter uppercase mb-2">Quest Status</h1>
                 <p className="text-[9px] font-bold text-gray-400 uppercase tracking-[0.3em]">ミッション管理</p>
             </header>
 
@@ -45,9 +43,7 @@ export default function PlanPage() {
                                         {getStatusLabel(plan.status, plan.items || [])}
                                     </span>
                                 </div>
-                                <button onClick={() => { deletePlan(plan.id); setPlans(plans.filter(p => p.id !== plan.id)); }} className="text-gray-200 hover:text-red-400 transition-colors">
-                                    <Trash2 size={18} />
-                                </button>
+                                <button onClick={() => { deletePlan(plan.id); setPlans(plans.filter(p => p.id !== plan.id)); }} className="text-gray-200 hover:text-red-400"><Trash2 size={18} /></button>
                             </div>
                             <h3 className="text-xl font-black uppercase mb-4 truncate">{plan.name}</h3>
 
@@ -55,14 +51,11 @@ export default function PlanPage() {
                                 <LazyMap items={plan.items} center={plan.center} isLogMode={false} isFinalOverview={true} themeColor="#F37343" />
                             </div>
 
-                            {/* 目的地地名リスト */}
                             <div className="mb-6 space-y-1">
                                 {(plan.items || []).map((item: any, idx: number) => (
                                     <div key={item.id} className="flex items-center gap-2 text-[10px] font-bold text-gray-400">
                                         <span className={item.isCollected ? "text-[#F37343]" : ""}>#{idx + 1}</span>
-                                        <span className={`truncate ${item.isCollected ? "text-gray-900" : ""}`}>
-                                            {item.addressName || "Waypoint"}
-                                        </span>
+                                        <span className={`truncate ${item.isCollected ? "text-gray-900" : ""}`}>{item.addressName || "Waypoint"}</span>
                                     </div>
                                 ))}
                             </div>
@@ -73,8 +66,7 @@ export default function PlanPage() {
                                     <div><p className="text-[8px] font-bold text-gray-400 uppercase">Range</p><p className="font-black text-sm">{plan.radius} km</p></div>
                                 </div>
                                 <button onClick={() => router.push(`/adventure/${plan.id}`)} className="px-6 py-4 bg-gray-900 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest flex items-center gap-2 shadow-lg active:scale-95 transition-all">
-                                    <Play size={12} fill="currentColor" />
-                                    {getStatusLabel(plan.status, plan.items || []) === "準備中" ? "START" : "RESUME"}
+                                    <Play size={12} fill="currentColor" /> {getStatusLabel(plan.status, plan.items || []) === "準備中" ? "START" : "RESUME"}
                                 </button>
                             </div>
                         </div>
