@@ -47,20 +47,20 @@ export default function NewQuestPage() {
         const validItems: any[] = [];
         const geocoder = new google.maps.Geocoder();
 
-        let attempts = 0;
-        while (validItems.length < itemCount && attempts < 20) {
-            attempts++;
+        for (let i = 0; i < itemCount; i++) {
             const point = generateRandomPoint(center, radius);
             await new Promise((resolve) => {
                 geocoder.geocode({ location: point }, (results, status) => {
+                    let city = "Unknown Waypoint";
                     if (status === "OK" && results?.[0]) {
-                        const city = results[0].address_components.find(c => c.types.includes("locality"))?.long_name || "New Area";
-                        validItems.push({ id: Math.random().toString(36).substr(2, 9), lat: point.lat, lng: point.lng, isCollected: false, addressName: city });
+                        city = results[0].address_components.find(c => c.types.includes("locality"))?.long_name || "Detected Area";
                     }
+                    validItems.push({ id: Math.random().toString(36).substr(2, 9), lat: point.lat, lng: point.lng, isCollected: false, addressName: city });
                     resolve(null);
                 });
             });
         }
+
         savePlan({ id: Math.random().toString(36).substr(2, 9), name: name.trim() || "NEW QUEST", radius, itemCount: validItems.length, status: "ready", createdAt: new Date().toISOString(), totalDistance: 0, collectedCount: 0, center, items: validItems });
         setBriefingItems(validItems);
         setIsCreating(false);
@@ -75,7 +75,7 @@ export default function NewQuestPage() {
 
             {!isBriefingActive && !showConfirm && !isFinalOverview && (
                 <>
-                    <div className="absolute top-8 left-6 right-6 z-20 text-center">
+                    <div className="absolute top-8 left-6 right-6 z-20">
                         <div className="bg-white/40 backdrop-blur-2xl rounded-[2rem] border border-white/40 shadow-xl px-6 py-3">
                             <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="QUEST NAME" className="w-full bg-transparent border-none outline-none text-gray-800 font-black text-center" />
                         </div>
@@ -99,15 +99,15 @@ export default function NewQuestPage() {
                                         className="w-full h-3 bg-gray-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-[#F37343] [&::-webkit-slider-thumb]:rounded-full" />
                                 </div>
                             </div>
-                            <button onClick={handleCreate} disabled={isCreating} className="w-full py-4 bg-gray-900 text-white rounded-[2rem] font-black flex items-center justify-center gap-2 shadow-lg">CREATE QUEST</button>
+                            <button onClick={handleCreate} disabled={isCreating} className="w-full py-4 bg-gray-900 text-white rounded-[2rem] font-black flex items-center justify-center gap-2 active:scale-95 shadow-lg">CREATE QUEST</button>
                         </div>
                     </div>
                 </>
             )}
 
             {isFinalOverview && (
-                <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md">
-                    <div className="bg-white rounded-[3rem] p-8 w-full max-w-sm space-y-6 shadow-2xl relative overflow-hidden text-center animate-in zoom-in-95">
+                <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md animate-in zoom-in-95 duration-500">
+                    <div className="bg-white rounded-[3rem] p-8 w-full max-w-sm space-y-6 shadow-2xl relative overflow-hidden text-center">
                         <div className="absolute top-0 left-0 w-full h-1.5 bg-[#F37343]" />
                         <p className="text-[9px] font-black text-[#F37343] uppercase tracking-[0.3em]">Discovery Report</p>
                         <div className="space-y-1.5 py-3 px-5 bg-gray-50 rounded-[2rem] border border-gray-100">
@@ -119,6 +119,15 @@ export default function NewQuestPage() {
                             ))}
                         </div>
                         <button onClick={() => router.push("/plan")} className="w-full py-5 bg-gray-900 text-white rounded-[2rem] font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-2"><Play size={14} fill="currentColor" />Start Adventure</button>
+                    </div>
+                </div>
+            )}
+
+            {showConfirm && (
+                <div className="absolute inset-0 z-[2000] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
+                    <div className="bg-white rounded-[3rem] p-8 shadow-2xl w-full max-w-sm text-center space-y-6">
+                        <CheckCircle2 size={32} className="text-[#F37343] mx-auto" /><h3 className="text-xl font-black uppercase tracking-tight">Quest Ready</h3>
+                        <button onClick={() => { setShowConfirm(false); setIsBriefingActive(true); }} className="w-full py-4 bg-gray-900 text-white rounded-[2rem] font-black flex items-center justify-center gap-2 shadow-xl"><Play size={16} fill="currentColor" /> START BRIEFING</button>
                     </div>
                 </div>
             )}
