@@ -1,232 +1,187 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useTranslation } from "react-i18next";
-import { useRouter } from "next/navigation";
-import { savePlan } from "@/lib/storage";
-import { generateRandomPoint } from "@/lib/geo";
-import LazyMap from "@/components/Map/LazyMap";
-import { CheckCircle2, Play, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { getPlans } from "@/lib/storage";
+import { calculateDistance } from "@/lib/geo";
+import { MapPin, ChevronDown, ChevronUp, Package, Clock, MessageCircle, Footprints } from "lucide-react";
+import dynamic from "next/dynamic";
 
-const rangeModes = [
-    { id: 'neighborhood', label: 'NEIGHBORHOOD', min: 0.5, max: 15, step: 0.1 },
-    { id: 'excursion', label: 'EXCURSION', min: 15, max: 200, step: 1 },
-    { id: 'grand', label: 'GRAND', min: 200, max: 40000, step: 100 }
-];
+// ★ 修正：dynamic インポートに型情報を追加して、ビルドエラーを解消します
+const LazyMap = dynamic<any>(() => import("@/components/Map/LazyMap"), {
+    ssr: false,
+    loading: () => <div className="h-48 w-full bg-gray-50 animate-pulse rounded-2xl" />
+});
 
 const formatDistance = (km: number): string => {
-    const meters = km * 1000;
-    if (meters < 1000) return `${Math.floor(meters).toLocaleString()} m`;
+    if (km < 1) {
+        const meters = Math.floor(km * 1000);
+        return `${meters.toLocaleString()} m`;
+    }
     return `${km.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`;
 };
 
-export default function NewQuestPage() {
-    const router = useRouter();
-    const { t } = useTranslation();
+const formatDuration = (start: string, end: string): string => {
+    const diffMs = new Date(end).getTime() - new Date(start).getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
 
-    // ステート管理
-    const [name, setName] = useState("");
-    const [activeMode, setActiveMode] = useState(rangeModes[0]);
-    const [radius, setRadius] = useState(1);
-    const [itemCount, setItemCount] = useState(3);
-    const [isCreating, setIsCreating] = useState(false);
-    const [showConfirm, setShowConfirm] = useState(false);
-    const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
+    if (diffMins < 60) return `${diffMins} min`;
+    if (diffHours < 24) return `${diffHours}h ${diffMins % 60}m`;
+    return `${diffDays}days ${diffHours % 24}h ${diffMins % 60}m`;
+};
 
-    const [briefingItems, setBriefingItems] = useState<any[]>([]);
-    const [isBriefingActive, setIsBriefingActive] = useState(false);
-    const [isFinalOverview, setIsFinalOverview] = useState(false);
-    const [activePlanId, setActivePlanId] = useState<string | null>(null);
+export default function LogPage() {
+    const [completedPlans, setCompletedPlans] = useState<any[]>([]);
+    const [expandedId, setExpandedId] = useState<string | null>(null);
 
-    // 初期位置取得
     useEffect(() => {
-        if (typeof window !== "undefined" && "geolocation" in navigator) {
-            navigator.geolocation.getCurrentPosition(
-                (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                (err) => console.warn(err)
-            );
-        }
+        const allPlans = getPlans();
+        const logs = allPlans
+            .filter(plan => (plan.items || []).some((i: any) => i.isCollected))
+            .map((plan: any) => {
+                const collectedItems = (plan.items || [])
+                    .filter((i: any) => i.isCollected)
+                    .sort((a: any, b: any) => new Date(a.collectedAt || 0).getTime() - new Date(b.collectedAt || 0).getTime());
+
+                let totalDistance = 0;
+                let prevPoint: [number, number] = plan.center ? [plan.center.lat, plan.center.lng] : [0, 0];
+                collectedItems.forEach((item: any) => {
+                    totalDistance += calculateDistance(prevPoint[0], prevPoint[1], item.lat, item.lng);
+                    prevPoint = [item.lat, item.lng];
+                });
+
+                const startTime = plan.createdAt;
+                const endTime = plan.finishedAt || (collectedItems.length > 0 ? collectedItems[collectedItems.length - 1].collectedAt : startTime);
+
+                return {
+                    ...plan,
+                    collectedItems,
+                    totalDistance,
+                    duration: formatDuration(startTime, endTime),
+                    completionDate: endTime
+                };
+            })
+            .sort((a, b) => new Date(b.completionDate).getTime() - new Date(a.completionDate).getTime());
+
+        setCompletedPlans(logs);
+        if (logs.length > 0) setExpandedId(logs[0].id);
     }, []);
 
-    const handleRadiusChange = (val: number) => {
-        setRadius(val);
-    };
-
-    const handleCreate = async () => {
-        setIsCreating(true);
-        let center = userLocation || { lat: 35.6812, lng: 139.7671 };
-        const validItems: any[] = [];
-        let attempts = 0;
-        const maxAttempts = 100;
-
-        while (validItems.length < itemCount && attempts < maxAttempts) {
-            attempts++;
-            const point = generateRandomPoint(center, radius);
-            try {
-                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${point.lat}&lon=${point.lng}&format=json&zoom=10`);
-                const data = await res.json();
-
-                const hasPlace = data.address && (data.address.country || data.address.city || data.address.state || data.address.suburb);
-                const isWater = data.type === "water" || data.class === "natural" || (data.display_name && data.display_name.toLowerCase().includes("ocean"));
-
-                if (hasPlace && !isWater) {
-                    validItems.push({
-                        id: Math.random().toString(36).substr(2, 9),
-                        lat: point.lat,
-                        lng: point.lng,
-                        isCollected: false,
-                        name: `Item #${validItems.length + 1}`
-                    });
-                }
-            } catch (e) {
-                if (attempts > 80) {
-                    validItems.push({
-                        id: 'fallback-' + attempts,
-                        lat: point.lat,
-                        lng: point.lng,
-                        isCollected: false,
-                        name: `Item #${validItems.length + 1}`
-                    });
-                }
-            }
-        }
-
-        const planId = Math.random().toString(36).substr(2, 9);
-        // ★修正：totalDistance と collectedCount を追加して型の不整合を解消
-        const plan = {
-            id: planId,
-            name: name.trim() || "NEW QUEST",
-            radius,
-            itemCount: validItems.length,
-            status: "ready",
-            createdAt: new Date().toLocaleDateString(),
-            totalDistance: 0,
-            collectedCount: 0,
-            center,
-            items: validItems
-        };
-
-        savePlan(plan);
-        setActivePlanId(planId);
-        setBriefingItems(validItems);
-        setIsCreating(false);
-        setShowConfirm(true);
+    const toggleExpand = (id: string) => {
+        setExpandedId(expandedId === id ? null : id);
     };
 
     return (
-        <div className="flex flex-col h-full min-h-screen pb-20 relative overflow-hidden bg-white">
-            <div className="absolute inset-0 z-0">
-                <LazyMap
-                    radiusInKm={radius}
-                    userLocation={userLocation}
-                    themeColor="#E6672E"
-                    items={briefingItems}
-                    isBriefingActive={isBriefingActive}
-                    isFinalOverview={isFinalOverview}
-                    planId={activePlanId}
-                    onBriefingStateChange={setIsFinalOverview}
-                    onBriefingComplete={() => router.push("/plan")}
-                />
-            </div>
-
-            {!isBriefingActive && !showConfirm && (
-                <>
-                    <div className="absolute top-8 left-6 right-6 z-20 animate-in fade-in duration-500">
-                        <div className="bg-white/40 backdrop-blur-2xl rounded-[2rem] border border-white/40 shadow-xl px-6 py-3">
-                            <input
-                                type="text"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                placeholder="冒険の名前を入力"
-                                className="w-full bg-transparent border-none outline-none text-gray-800 font-black text-center placeholder:text-gray-400"
-                            />
-                        </div>
+        <div className="min-h-screen bg-white text-black font-sans pb-32">
+            <header className="p-8 pt-16 border-b border-gray-100">
+                <h1 className="text-2xl font-bold tracking-tighter uppercase mb-6">Flight Log</h1>
+                <div className="flex gap-10">
+                    <div>
+                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Quests</p>
+                        <p className="text-2xl font-bold tabular-nums">{completedPlans.length}</p>
                     </div>
-
-                    <div className="mt-auto relative z-10 px-4 mb-4 animate-in slide-in-from-bottom-8 duration-500">
-                        <div className="bg-white/80 backdrop-blur-xl rounded-[3rem] p-6 shadow-2xl border border-white space-y-5">
-                            <div className="flex p-1 bg-black/5 rounded-2xl gap-1">
-                                {rangeModes.map((mode) => (
-                                    <button
-                                        key={mode.id}
-                                        onClick={() => { setActiveMode(mode); setRadius(mode.min); }}
-                                        className={`flex-1 py-2 text-[9px] font-black rounded-xl transition-all ${activeMode.id === mode.id ? 'bg-white text-pink-600 shadow-sm' : 'text-gray-500'}`}
-                                    >
-                                        {mode.label}
-                                    </button>
-                                ))}
-                            </div>
-
-                            <div className="space-y-4 px-1">
-                                <div className="space-y-1">
-                                    <div className="flex justify-between text-sm font-black text-pink-600 uppercase tracking-widest">
-                                        <span>Radius</span>
-                                        <span className="text-gray-800">{formatDistance(radius)}</span>
-                                    </div>
-                                    <input
-                                        type="range"
-                                        min={activeMode.min}
-                                        max={activeMode.max}
-                                        step={activeMode.step}
-                                        value={radius}
-                                        onChange={(e) => handleRadiusChange(parseFloat(e.target.value))}
-                                        className="w-full h-1.5 accent-pink-500 bg-black/10 rounded-full appearance-none cursor-pointer"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <div className="flex justify-between text-sm font-black text-pink-600 uppercase tracking-widest">
-                                        <span>Items Count</span>
-                                        <span className="text-gray-800">{itemCount}</span>
-                                    </div>
-                                    <input
-                                        type="range"
-                                        min="1"
-                                        max="7"
-                                        step="1"
-                                        value={itemCount}
-                                        onChange={(e) => setItemCount(parseInt(e.target.value))}
-                                        className="w-full h-1.5 accent-pink-500 bg-black/10 rounded-full appearance-none cursor-pointer"
-                                    />
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={handleCreate}
-                                disabled={isCreating}
-                                className="w-full py-4 bg-gray-900 text-white rounded-[2rem] font-black shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all border-b-4 border-black/20"
-                            >
-                                {isCreating ? (
-                                    <>
-                                        <Loader2 className="animate-spin" size={20} />
-                                        <span>クエスト生成中...</span>
-                                    </>
-                                ) : "クエストを作成"}
-                            </button>
-                        </div>
-                    </div>
-                </>
-            )}
-
-            {showConfirm && (
-                <div className="absolute inset-0 z-[2000] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300 pointer-events-auto">
-                    <div className="bg-white rounded-[3rem] p-8 shadow-2xl w-full max-w-sm text-center space-y-6">
-                        <div className="w-16 h-16 bg-pink-50 rounded-full flex items-center justify-center mx-auto">
-                            <CheckCircle2 size={32} className="text-pink-500" />
-                        </div>
-                        <div>
-                            <h3 className="text-xl font-black text-gray-800 uppercase tracking-tight leading-none">Quest Ready</h3>
-                            <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase tracking-widest leading-relaxed">全目的地の解析が完了しました。<br />ブリーフィングを開始しますか？</p>
-                        </div>
-                        <button
-                            onClick={() => { setShowConfirm(false); setIsBriefingActive(true); }}
-                            className="w-full py-4 bg-gray-900 text-white rounded-[2rem] font-black flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-all"
-                        >
-                            <Play size={16} fill="currentColor" />
-                            START BRIEFING
-                        </button>
+                    <div>
+                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Items</p>
+                        <p className="text-2xl font-bold tabular-nums">
+                            {completedPlans.reduce((acc, curr) => acc + (curr.collectedItems?.length || 0), 0)}
+                        </p>
                     </div>
                 </div>
-            )}
+            </header>
+
+            <main className="p-4 space-y-4">
+                {completedPlans.length > 0 ? (
+                    completedPlans.map((plan) => {
+                        const isExpanded = expandedId === plan.id;
+                        return (
+                            <div key={plan.id} className="bg-white rounded-[2rem] border border-gray-100 overflow-hidden shadow-sm transition-all">
+                                <div className="p-6 cursor-pointer flex justify-between items-start" onClick={() => toggleExpand(plan.id)}>
+                                    <div className="flex-1 pr-4">
+                                        <h3 className="text-lg font-bold text-black uppercase tracking-tight leading-tight">{plan.name}</h3>
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">
+                                            {new Date(plan.completionDate).toLocaleDateString('ja-JP')}
+                                        </p>
+                                    </div>
+                                    <div className="text-gray-300 mt-1">
+                                        {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                                    </div>
+                                </div>
+
+                                {isExpanded && (
+                                    <div className="animate-in fade-in slide-in-from-top-2 duration-500">
+                                        <div className="grid grid-cols-3 gap-2 px-6 mb-6">
+                                            <div className="bg-black text-white rounded-2xl p-4">
+                                                <div className="text-[8px] font-bold opacity-50 uppercase tracking-widest mb-1">Dist</div>
+                                                <div className="text-[13px] font-bold tabular-nums truncate">{formatDistance(plan.totalDistance)}</div>
+                                            </div>
+                                            <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 text-black">
+                                                <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-1">Time</div>
+                                                <div className="text-[13px] font-bold tabular-nums truncate">{plan.duration}</div>
+                                            </div>
+                                            <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 text-black">
+                                                <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-1">Items</div>
+                                                <div className="text-[13px] font-bold tabular-nums truncate">{plan.collectedItems?.length} pts</div>
+                                            </div>
+                                        </div>
+
+                                        {plan.comment && (
+                                            <div className="mx-6 mb-6 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                                                <p className="text-sm font-medium text-gray-700 leading-relaxed italic">"{plan.comment}"</p>
+                                            </div>
+                                        )}
+
+                                        {/* Google Maps 表示エリア */}
+                                        <div className="mx-6 h-52 relative border border-gray-100 rounded-2xl overflow-hidden mb-6">
+                                            <LazyMap
+                                                items={plan.items}
+                                                themeColor="#f06292"
+                                                center={plan.center}
+                                                isLogMode={true}
+                                            />
+                                        </div>
+
+                                        <div className="p-6 pt-0 space-y-6">
+                                            <div className="space-y-6">
+                                                {plan.collectedItems.map((item: any, idx: number) => (
+                                                    <div key={item.id || idx} className="flex gap-4">
+                                                        <div className="flex flex-col items-center">
+                                                            <div className="w-2 h-2 bg-black rounded-full mt-2" />
+                                                            {idx !== plan.collectedItems.length - 1 && (
+                                                                <div className="w-[1px] flex-1 bg-gray-100 my-1" />
+                                                            )}
+                                                        </div>
+                                                        <div className="flex-1 pb-1">
+                                                            <div className="flex justify-between items-start">
+                                                                <h4 className="text-sm font-bold text-black uppercase">{item.locationName || `POINT 0${idx + 1}`}</h4>
+                                                                <span className="text-[10px] font-bold text-gray-400 tabular-nums">
+                                                                    {new Date(item.collectedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-[9px] font-bold text-gray-300 tabular-nums mt-0.5 uppercase">
+                                                                {item.lat.toFixed(4)}°N / {item.lng.toFixed(4)}°E
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-gray-50 p-4 text-center border-t border-gray-100">
+                                            <p className="text-[8px] font-bold text-gray-300 uppercase tracking-[0.3em]">Quest Archive Verified</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })
+                ) : (
+                    <div className="text-center py-24 border border-dashed border-gray-100 rounded-[2rem]">
+                        <Footprints size={48} className="text-gray-100 mx-auto mb-4" />
+                        <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">No Records</p>
+                    </div>
+                )}
+            </main>
         </div>
     );
 }
