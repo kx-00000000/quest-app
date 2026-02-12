@@ -26,7 +26,7 @@ export default function PlanPage() {
     return (
         <div className="min-h-screen bg-white text-black font-sans pb-32">
             <header className="p-8 pt-16 border-b border-gray-100 text-left">
-                <h1 className="text-2xl font-bold tracking-tighter uppercase mb-2">Quest Status</h1>
+                <h1 className="text-2xl font-bold tracking-tighter uppercase mb-2">Quest Control</h1>
                 <p className="text-[9px] font-bold text-gray-400 uppercase tracking-[0.3em]">ミッション管理</p>
             </header>
 
@@ -42,6 +42,7 @@ export default function PlanPage() {
                         </div>
                         <h3 className="text-xl font-black uppercase mb-4 truncate text-left">{plan.name}</h3>
                         <div className="h-48 relative rounded-2xl overflow-hidden border border-gray-100 mb-6 bg-gray-50">
+                            {/* fitBounds を強制するため isFinalOverview={true} を設定 */}
                             <LazyMap items={plan.items} center={plan.center} isLogMode={false} isFinalOverview={true} themeColor="#F37343" />
                         </div>
                         <div className="space-y-1 mb-6">
