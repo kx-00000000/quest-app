@@ -1,141 +1,232 @@
 "use client";
 
-import React, { useMemo, useEffect, useRef } from 'react';
-import { Map, Marker, useMap } from '@vis.gl/react-google-maps';
+import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { useRouter } from "next/navigation";
+import { savePlan } from "@/lib/storage";
+import { generateRandomPoint } from "@/lib/geo";
+import LazyMap from "@/components/Map/LazyMap";
+import { CheckCircle2, Play, Loader2 } from "lucide-react";
 
-const mapStyle = [
-    { "elementType": "geometry", "stylers": [{ "color": "#f5f5f5" }] },
-    { "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] },
-    { "elementType": "labels.text.fill", "stylers": [{ "color": "#9e9e9e" }] },
-    { "featureType": "poi", "stylers": [{ "visibility": "off" }] },
-    { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#ffffff" }] },
-    { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#e0e0e0" }] }
+const rangeModes = [
+    { id: 'neighborhood', label: 'NEIGHBORHOOD', min: 0.5, max: 15, step: 0.1 },
+    { id: 'excursion', label: 'EXCURSION', min: 15, max: 200, step: 1 },
+    { id: 'grand', label: 'GRAND', min: 200, max: 40000, step: 100 }
 ];
 
-function MapCircle({ center, radius, color }: { center: google.maps.LatLngLiteral, radius: number, color: string }) {
-    const map = useMap();
-    const circleRef = useRef<google.maps.Circle | null>(null);
+const formatDistance = (km: number): string => {
+    const meters = km * 1000;
+    if (meters < 1000) return `${Math.floor(meters).toLocaleString()} m`;
+    return `${km.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`;
+};
 
+export default function NewQuestPage() {
+    const router = useRouter();
+    const { t } = useTranslation();
+
+    // ステート管理
+    const [name, setName] = useState("");
+    const [activeMode, setActiveMode] = useState(rangeModes[0]);
+    const [radius, setRadius] = useState(1);
+    const [itemCount, setItemCount] = useState(3);
+    const [isCreating, setIsCreating] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
+    const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
+
+    const [briefingItems, setBriefingItems] = useState<any[]>([]);
+    const [isBriefingActive, setIsBriefingActive] = useState(false);
+    const [isFinalOverview, setIsFinalOverview] = useState(false);
+    const [activePlanId, setActivePlanId] = useState<string | null>(null);
+
+    // 初期位置取得
     useEffect(() => {
-        if (!map) return;
-        circleRef.current = new google.maps.Circle({
-            map, center, radius,
-            fillColor: color, fillOpacity: 0.1,
-            strokeColor: color, strokeOpacity: 0.3, strokeWeight: 2,
-        });
-        return () => { if (circleRef.current) circleRef.current.setMap(null); };
-    }, [map, center, radius, color]);
-    return null;
-}
-
-interface MapProps {
-    items?: any[];
-    center?: { lat: number; lng: number };
-    userLocation?: { lat: number; lng: number } | null;
-    radiusInKm?: number;
-    themeColor?: string;
-    isLogMode?: boolean;
-    isBriefingActive?: boolean;
-    isFinalOverview?: boolean; // ★ 追加
-    planId?: string | null;     // ★ 追加
-    onBriefingStateChange?: (state: any) => void;
-    onBriefingComplete?: () => void;
-}
-
-export default function LazyMap({
-    items = [], center, userLocation, radiusInKm,
-    themeColor = "#000000", isLogMode = false,
-    isBriefingActive = false,
-    isFinalOverview, // ★ 追加
-    planId,          // ★ 追加
-    onBriefingStateChange,
-    onBriefingComplete
-}: MapProps) {
-    const map = useMap();
-    const geocoder = useRef<google.maps.Geocoder | null>(null);
-
-    // オートズーム設定
-    useEffect(() => {
-        if (!map || items.length === 0 || isBriefingActive) return;
-        if (isLogMode || isFinalOverview) {
-            const bounds = new google.maps.LatLngBounds();
-            items.forEach(item => bounds.extend({ lat: item.lat, lng: item.lng }));
-            if (userLocation) bounds.extend(userLocation);
-            map.fitBounds(bounds, { padding: 50 });
+        if (typeof window !== "undefined" && "geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                (err) => console.warn(err)
+            );
         }
-    }, [map, items, isLogMode, isFinalOverview, userLocation, isBriefingActive]);
+    }, []);
 
-    // ブリーフィング演出と地名取得
-    useEffect(() => {
-        if (!isBriefingActive || !map || items.length === 0) return;
-        if (!geocoder.current) geocoder.current = new google.maps.Geocoder();
+    const handleRadiusChange = (val: number) => {
+        setRadius(val);
+    };
 
-        const runBriefing = async () => {
-            // 1. 地名取得と通知
-            if (userLocation && onBriefingStateChange) {
-                geocoder.current?.geocode({ location: userLocation }, (results, status) => {
-                    if (status === "OK" && results?.[0]) {
-                        const city = results[0].address_components.find(c => c.types.includes("locality"))?.long_name ||
-                            results[0].address_components.find(c => c.types.includes("administrative_area_level_2"))?.long_name || "";
-                        // ★ ここで地名を渡していますが、親の setIsFinalOverview が boolean を期待している場合、
-                        // 文字列を渡すと単に「true」として扱われ、地名そのものは表示されません。
-                        onBriefingStateChange(city);
-                    }
-                });
+    const handleCreate = async () => {
+        setIsCreating(true);
+        let center = userLocation || { lat: 35.6812, lng: 139.7671 };
+        const validItems: any[] = [];
+        let attempts = 0;
+        const maxAttempts = 100;
+
+        while (validItems.length < itemCount && attempts < maxAttempts) {
+            attempts++;
+            const point = generateRandomPoint(center, radius);
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${point.lat}&lon=${point.lng}&format=json&zoom=10`);
+                const data = await res.json();
+
+                const hasPlace = data.address && (data.address.country || data.address.city || data.address.state || data.address.suburb);
+                const isWater = data.type === "water" || data.class === "natural" || (data.display_name && data.display_name.toLowerCase().includes("ocean"));
+
+                if (hasPlace && !isWater) {
+                    validItems.push({
+                        id: Math.random().toString(36).substr(2, 9),
+                        lat: point.lat,
+                        lng: point.lng,
+                        isCollected: false,
+                        name: `Item #${validItems.length + 1}`
+                    });
+                }
+            } catch (e) {
+                if (attempts > 80) {
+                    validItems.push({
+                        id: 'fallback-' + attempts,
+                        lat: point.lat,
+                        lng: point.lng,
+                        isCollected: false,
+                        name: `Item #${validItems.length + 1}`
+                    });
+                }
             }
+        }
 
-            // 2. 地点を巡回（現在地と重なる地点はスキップ）
-            for (const item of items) {
-                if (userLocation &&
-                    Math.abs(item.lat - userLocation.lat) < 0.0005 &&
-                    Math.abs(item.lng - userLocation.lng) < 0.0005) continue;
-
-                map.panTo({ lat: item.lat, lng: item.lng });
-                map.setZoom(17);
-                await new Promise(r => setTimeout(r, 2000));
-            }
-
-            // 3. 全体表示
-            const bounds = new google.maps.LatLngBounds();
-            items.forEach(i => bounds.extend({ lat: i.lat, lng: i.lng }));
-            if (userLocation) bounds.extend(userLocation);
-            map.fitBounds(bounds, { padding: 80 });
-
-            await new Promise(r => setTimeout(r, 1500));
-            if (onBriefingComplete) onBriefingComplete();
+        const planId = Math.random().toString(36).substr(2, 9);
+        // ★修正：totalDistance と collectedCount を追加して型の不整合を解消
+        const plan = {
+            id: planId,
+            name: name.trim() || "NEW QUEST",
+            radius,
+            itemCount: validItems.length,
+            status: "ready",
+            createdAt: new Date().toLocaleDateString(),
+            totalDistance: 0,
+            collectedCount: 0,
+            center,
+            items: validItems
         };
 
-        runBriefing();
-    }, [isBriefingActive, map, items, userLocation, onBriefingStateChange, onBriefingComplete]);
-
-    const mapCenter = useMemo(() => {
-        if (userLocation) return userLocation;
-        if (center && center.lat !== 0) return center;
-        return items.length > 0 ? { lat: items[0].lat, lng: items[0].lng } : { lat: 35.6812, lng: 139.7671 };
-    }, [center, userLocation, items]);
+        savePlan(plan);
+        setActivePlanId(planId);
+        setBriefingItems(validItems);
+        setIsCreating(false);
+        setShowConfirm(true);
+    };
 
     return (
-        <div className="w-full h-full relative">
-            <Map
-                defaultZoom={14}
-                center={mapCenter}
-                styles={mapStyle}
-                disableDefaultUI={true}
-                gestureHandling={'greedy'}
-            >
-                {userLocation && <Marker position={userLocation} />}
-                {userLocation && radiusInKm && (
-                    <MapCircle center={userLocation} radius={radiusInKm * 1000} color={themeColor} />
-                )}
-                {items.filter(i => isLogMode ? i.isCollected : true).map((item, idx) => (
-                    <Marker
-                        key={item.id || idx}
-                        position={{ lat: item.lat, lng: item.lng }}
-                        label={isLogMode ? { text: (idx + 1).toString(), color: 'white', fontWeight: 'bold' } : undefined}
-                    />
-                ))}
-            </Map>
-            <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_100px_rgba(0,0,0,0.03)]" />
+        <div className="flex flex-col h-full min-h-screen pb-20 relative overflow-hidden bg-white">
+            <div className="absolute inset-0 z-0">
+                <LazyMap
+                    radiusInKm={radius}
+                    userLocation={userLocation}
+                    themeColor="#E6672E"
+                    items={briefingItems}
+                    isBriefingActive={isBriefingActive}
+                    isFinalOverview={isFinalOverview}
+                    planId={activePlanId}
+                    onBriefingStateChange={setIsFinalOverview}
+                    onBriefingComplete={() => router.push("/plan")}
+                />
+            </div>
+
+            {!isBriefingActive && !showConfirm && (
+                <>
+                    <div className="absolute top-8 left-6 right-6 z-20 animate-in fade-in duration-500">
+                        <div className="bg-white/40 backdrop-blur-2xl rounded-[2rem] border border-white/40 shadow-xl px-6 py-3">
+                            <input
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                placeholder="冒険の名前を入力"
+                                className="w-full bg-transparent border-none outline-none text-gray-800 font-black text-center placeholder:text-gray-400"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="mt-auto relative z-10 px-4 mb-4 animate-in slide-in-from-bottom-8 duration-500">
+                        <div className="bg-white/80 backdrop-blur-xl rounded-[3rem] p-6 shadow-2xl border border-white space-y-5">
+                            <div className="flex p-1 bg-black/5 rounded-2xl gap-1">
+                                {rangeModes.map((mode) => (
+                                    <button
+                                        key={mode.id}
+                                        onClick={() => { setActiveMode(mode); setRadius(mode.min); }}
+                                        className={`flex-1 py-2 text-[9px] font-black rounded-xl transition-all ${activeMode.id === mode.id ? 'bg-white text-pink-600 shadow-sm' : 'text-gray-500'}`}
+                                    >
+                                        {mode.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="space-y-4 px-1">
+                                <div className="space-y-1">
+                                    <div className="flex justify-between text-sm font-black text-pink-600 uppercase tracking-widest">
+                                        <span>Radius</span>
+                                        <span className="text-gray-800">{formatDistance(radius)}</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min={activeMode.min}
+                                        max={activeMode.max}
+                                        step={activeMode.step}
+                                        value={radius}
+                                        onChange={(e) => handleRadiusChange(parseFloat(e.target.value))}
+                                        className="w-full h-1.5 accent-pink-500 bg-black/10 rounded-full appearance-none cursor-pointer"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <div className="flex justify-between text-sm font-black text-pink-600 uppercase tracking-widest">
+                                        <span>Items Count</span>
+                                        <span className="text-gray-800">{itemCount}</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min="1"
+                                        max="7"
+                                        step="1"
+                                        value={itemCount}
+                                        onChange={(e) => setItemCount(parseInt(e.target.value))}
+                                        className="w-full h-1.5 accent-pink-500 bg-black/10 rounded-full appearance-none cursor-pointer"
+                                    />
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={handleCreate}
+                                disabled={isCreating}
+                                className="w-full py-4 bg-gray-900 text-white rounded-[2rem] font-black shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all border-b-4 border-black/20"
+                            >
+                                {isCreating ? (
+                                    <>
+                                        <Loader2 className="animate-spin" size={20} />
+                                        <span>クエスト生成中...</span>
+                                    </>
+                                ) : "クエストを作成"}
+                            </button>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {showConfirm && (
+                <div className="absolute inset-0 z-[2000] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300 pointer-events-auto">
+                    <div className="bg-white rounded-[3rem] p-8 shadow-2xl w-full max-w-sm text-center space-y-6">
+                        <div className="w-16 h-16 bg-pink-50 rounded-full flex items-center justify-center mx-auto">
+                            <CheckCircle2 size={32} className="text-pink-500" />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-black text-gray-800 uppercase tracking-tight leading-none">Quest Ready</h3>
+                            <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase tracking-widest leading-relaxed">全目的地の解析が完了しました。<br />ブリーフィングを開始しますか？</p>
+                        </div>
+                        <button
+                            onClick={() => { setShowConfirm(false); setIsBriefingActive(true); }}
+                            className="w-full py-4 bg-gray-900 text-white rounded-[2rem] font-black flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-all"
+                        >
+                            <Play size={16} fill="currentColor" />
+                            START BRIEFING
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

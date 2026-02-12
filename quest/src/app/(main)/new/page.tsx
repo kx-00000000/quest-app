@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { savePlan } from "@/lib/storage";
 import { generateRandomPoint } from "@/lib/geo";
 import LazyMap from "@/components/Map/LazyMap";
-import { CheckCircle2, Play, Loader2 } from "lucide-react";
+import { CheckCircle2, Play, Loader2, MapPin, Target, Navigation } from "lucide-react";
 
 const rangeModes = [
     { id: 'neighborhood', label: 'NEIGHBORHOOD', min: 0.5, max: 15, step: 0.1 },
@@ -24,7 +24,7 @@ export default function NewQuestPage() {
     const router = useRouter();
     const { t } = useTranslation();
 
-    // ステート管理
+    // 基本ステート
     const [name, setName] = useState("");
     const [activeMode, setActiveMode] = useState(rangeModes[0]);
     const [radius, setRadius] = useState(1);
@@ -33,12 +33,14 @@ export default function NewQuestPage() {
     const [showConfirm, setShowConfirm] = useState(false);
     const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
 
+    // ブリーフィング・演出用ステート
     const [briefingItems, setBriefingItems] = useState<any[]>([]);
     const [isBriefingActive, setIsBriefingActive] = useState(false);
     const [isFinalOverview, setIsFinalOverview] = useState(false);
     const [activePlanId, setActivePlanId] = useState<string | null>(null);
+    const [cityName, setCityName] = useState(""); // ★ 追加：地名保持用
 
-    // 初期位置取得
+    // 現在地取得
     useEffect(() => {
         if (typeof window !== "undefined" && "geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(
@@ -56,6 +58,7 @@ export default function NewQuestPage() {
         setIsCreating(true);
         let center = userLocation || { lat: 35.6812, lng: 139.7671 };
         const validItems: any[] = [];
+        let detectedCity = "";
         let attempts = 0;
         const maxAttempts = 100;
 
@@ -70,6 +73,12 @@ export default function NewQuestPage() {
                 const isWater = data.type === "water" || data.class === "natural" || (data.display_name && data.display_name.toLowerCase().includes("ocean"));
 
                 if (hasPlace && !isWater) {
+                    // ★ 最初の有効な地点から地名を抽出
+                    if (!detectedCity) {
+                        detectedCity = data.address.city || data.address.town || data.address.suburb || data.address.state || "NEW AREA";
+                        setCityName(detectedCity);
+                    }
+
                     validItems.push({
                         id: Math.random().toString(36).substr(2, 9),
                         lat: point.lat,
@@ -92,14 +101,13 @@ export default function NewQuestPage() {
         }
 
         const planId = Math.random().toString(36).substr(2, 9);
-        // ★修正：totalDistance と collectedCount を追加して型の不整合を解消
         const plan = {
             id: planId,
             name: name.trim() || "NEW QUEST",
             radius,
             itemCount: validItems.length,
             status: "ready",
-            createdAt: new Date().toLocaleDateString(),
+            createdAt: new Date().toISOString(),
             totalDistance: 0,
             collectedCount: 0,
             center,
@@ -115,6 +123,7 @@ export default function NewQuestPage() {
 
     return (
         <div className="flex flex-col h-full min-h-screen pb-20 relative overflow-hidden bg-white">
+            {/* バックグラウンドマップ */}
             <div className="absolute inset-0 z-0">
                 <LazyMap
                     radiusInKm={radius}
@@ -124,12 +133,17 @@ export default function NewQuestPage() {
                     isBriefingActive={isBriefingActive}
                     isFinalOverview={isFinalOverview}
                     planId={activePlanId}
+                    // ★ setIsFinalOverview は boolean を期待しているため、LazyMap内ではこれを true にする
                     onBriefingStateChange={setIsFinalOverview}
-                    onBriefingComplete={() => router.push("/plan")}
+                    onBriefingComplete={() => {
+                        setIsBriefingActive(false);
+                        // router.push は Discovery Report 内のボタンで行うためここでは何もしない
+                    }}
                 />
             </div>
 
-            {!isBriefingActive && !showConfirm && (
+            {/* 設定UI（作成前） */}
+            {!isBriefingActive && !showConfirm && !isFinalOverview && (
                 <>
                     <div className="absolute top-8 left-6 right-6 z-20 animate-in fade-in duration-500">
                         <div className="bg-white/40 backdrop-blur-2xl rounded-[2rem] border border-white/40 shadow-xl px-6 py-3">
@@ -207,15 +221,18 @@ export default function NewQuestPage() {
                 </>
             )}
 
+            {/* 生成完了確認 */}
             {showConfirm && (
-                <div className="absolute inset-0 z-[2000] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300 pointer-events-auto">
+                <div className="absolute inset-0 z-[2000] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
                     <div className="bg-white rounded-[3rem] p-8 shadow-2xl w-full max-w-sm text-center space-y-6">
                         <div className="w-16 h-16 bg-pink-50 rounded-full flex items-center justify-center mx-auto">
                             <CheckCircle2 size={32} className="text-pink-500" />
                         </div>
                         <div>
                             <h3 className="text-xl font-black text-gray-800 uppercase tracking-tight leading-none">Quest Ready</h3>
-                            <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase tracking-widest leading-relaxed">全目的地の解析が完了しました。<br />ブリーフィングを開始しますか？</p>
+                            <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase tracking-widest leading-relaxed">
+                                全目的地の解析が完了しました。<br />ブリーフィングを開始しますか？
+                            </p>
                         </div>
                         <button
                             onClick={() => { setShowConfirm(false); setIsBriefingActive(true); }}
@@ -224,6 +241,53 @@ export default function NewQuestPage() {
                             <Play size={16} fill="currentColor" />
                             START BRIEFING
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Discovery Report（ブリーフィング終了後の最終確認画面） */}
+            {isFinalOverview && (
+                <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md animate-in zoom-in-95 duration-500">
+                    <div className="bg-white rounded-[3rem] p-8 w-full max-w-sm text-center space-y-8 relative overflow-hidden shadow-2xl">
+                        {/* デコレーション */}
+                        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-pink-500 via-orange-400 to-pink-500" />
+
+                        <header>
+                            <p className="text-[10px] font-black text-pink-500 uppercase tracking-[0.3em] mb-4">Discovery Report</p>
+                            <h2 className="text-4xl font-black text-gray-900 uppercase tracking-tighter leading-none mb-2">
+                                {cityName || "NEW AREA"}
+                            </h2>
+                            <p className="text-[9px] font-bold text-gray-300 uppercase tracking-widest">Navigation Path Verified</p>
+                        </header>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-gray-50 p-5 rounded-3xl border border-gray-100 flex flex-col items-center">
+                                <Target size={20} className="text-gray-300 mb-2" />
+                                <p className="text-[8px] font-bold text-gray-400 uppercase mb-1">Waypoints</p>
+                                <p className="text-xl font-black text-gray-900">{briefingItems.length}</p>
+                            </div>
+                            <div className="bg-gray-50 p-5 rounded-3xl border border-gray-100 flex flex-col items-center">
+                                <Navigation size={20} className="text-gray-300 mb-2" />
+                                <p className="text-[8px] font-bold text-gray-400 uppercase mb-1">Range</p>
+                                <p className="text-xl font-black text-gray-900">{formatDistance(radius)}</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <button
+                                onClick={() => router.push("/plan")}
+                                className="w-full py-5 bg-gray-900 text-white rounded-[2rem] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3"
+                            >
+                                <Play size={18} fill="currentColor" />
+                                Start Adventure
+                            </button>
+                            <button
+                                onClick={() => { setIsFinalOverview(false); setShowConfirm(true); }}
+                                className="w-full py-3 bg-transparent text-gray-300 font-bold text-[9px] uppercase tracking-widest hover:text-gray-500 transition-colors"
+                            >
+                                Re-run Briefing
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
