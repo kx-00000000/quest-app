@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useMemo } from 'react';
-import { Map, Marker, useMap, Circle } from '@vis.gl/react-google-maps';
+import React, { useMemo, useEffect, useState, useRef } from 'react';
+import { Map, Marker, useMap } from '@vis.gl/react-google-maps';
 
 // --- 🎨 航空計器デザイン：ミニマルな地図スタイル ---
 const mapStyle = [
@@ -14,7 +14,37 @@ const mapStyle = [
     { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#e0e0e0" }] }
 ];
 
-// ★ エラーの核：Props の定義を new/page.tsx の要求に合わせて拡張
+// --- ★ Circle コンポーネントの自作 (ビルドエラー解消の鍵) ---
+// ライブラリに Circle がないため、Google Maps API を直接叩いて描画します。
+function MapCircle(props: { center: google.maps.LatLngLiteral, radius: number, color: string }) {
+    const map = useMap();
+    const circleRef = useRef<google.maps.Circle | null>(null);
+
+    useEffect(() => {
+        if (!map) return;
+
+        // 円のインスタンス作成
+        circleRef.current = new google.maps.Circle({
+            map,
+            center: props.center,
+            radius: props.radius,
+            fillColor: props.color,
+            fillOpacity: 0.1,
+            strokeColor: props.color,
+            strokeOpacity: 0.3,
+            strokeWeight: 2,
+        });
+
+        return () => {
+            if (circleRef.current) {
+                circleRef.current.setMap(null);
+            }
+        };
+    }, [map, props.center, props.radius, props.color]);
+
+    return null;
+}
+
 interface MapProps {
     items: any[];
     center?: { lat: number; lng: number };
@@ -22,6 +52,7 @@ interface MapProps {
     radiusInKm?: number;
     themeColor?: string;
     isLogMode?: boolean;
+    // new/page.tsx から渡される追加プロパティを受け取れるように定義
     isBriefingActive?: boolean;
     isFinalOverview?: boolean;
     planId?: string | null;
@@ -35,11 +66,10 @@ export default function LazyMap({
     userLocation,
     radiusInKm,
     themeColor = "#000000",
-    isLogMode = false,
-    isBriefingActive = false
+    isLogMode = false
 }: MapProps) {
 
-    // 中心点の決定ロジック
+    // マップの中心を決定
     const mapCenter = useMemo(() => {
         if (userLocation) return userLocation;
         if (center && center.lat !== 0) return center;
@@ -47,7 +77,6 @@ export default function LazyMap({
         return { lat: 35.6812, lng: 139.7671 };
     }, [center, userLocation, items]);
 
-    // 表示する地点のフィルタリング
     const displayItems = useMemo(() =>
         items.filter(item => isLogMode ? item.isCollected : true),
         [items, isLogMode]);
@@ -61,29 +90,21 @@ export default function LazyMap({
                 disableDefaultUI={true}
                 gestureHandling={'greedy'}
             >
-                {/* 1. ユーザーの現在地マーカー（青いドットなど） */}
+                {/* 1. ユーザーの現在地 */}
                 {userLocation && (
-                    <Marker
-                        position={userLocation}
-                        title="Current Location"
-                    // 必要に応じてアイコンを航空計器風にカスタム可能です
-                    />
+                    <Marker position={userLocation} />
                 )}
 
-                {/* 2. クエスト探索範囲のサークル（半径表示） */}
+                {/* 2. 探索範囲の円 (自作コンポーネント) */}
                 {userLocation && radiusInKm && (
-                    <Circle
+                    <MapCircle
                         center={userLocation}
-                        radius={radiusInKm * 1000} // km を m に変換
-                        fillColor={themeColor}
-                        fillOpacity={0.1}
-                        strokeColor={themeColor}
-                        strokeOpacity={0.3}
-                        strokeWeight={2}
+                        radius={radiusInKm * 1000}
+                        color={themeColor}
                     />
                 )}
 
-                {/* 3. アイテム地点のマーカー */}
+                {/* 3. アイテム地点 */}
                 {displayItems.map((item, idx) => (
                     <Marker
                         key={item.id || idx}
@@ -92,7 +113,7 @@ export default function LazyMap({
                 ))}
             </Map>
 
-            {/* 画面端のシャドウ（計器のベゼル感を演出） */}
+            {/* 計器の質感を出すベゼルシャドウ */}
             <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_100px_rgba(0,0,0,0.03)]" />
         </div>
     );
