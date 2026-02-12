@@ -1,174 +1,204 @@
 "use client";
 
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { getPlans, savePlan } from "@/lib/storage";
-import { ArrowLeft, Navigation, Sparkles, CheckCircle, Package, Trophy, Zap } from "lucide-react";
-import { calculateBearing, calculateDistance } from "@/lib/geo";
+import {
+    Navigation, Compass, Target, CheckCircle2,
+    MessageCircle, ArrowRight, Shield, AlertTriangle,
+    ChevronUp, ChevronDown, MapPin, X
+} from "lucide-react";
+import { calculateDistance, calculateBearing } from "@/lib/geo";
+import { updatePlan } from "@/lib/storage";
 import dynamic from "next/dynamic";
 
-const LazyMap = dynamic(() => import("@/components/Map/LazyMap"), { ssr: false });
+// --- ★ LazyMap 用の型定義 ---
+interface LazyMapProps {
+    items?: any[];
+    center?: { lat: number; lng: number };
+    userLocation?: { lat: number; lng: number } | null;
+    radiusInKm?: number;
+    themeColor?: string;
+    isLogMode?: boolean;
+    isBriefingActive?: boolean;
+    isFinalOverview?: boolean;
+    planId?: string | null;
+    onBriefingStateChange?: (state: boolean) => void;
+    onBriefingComplete?: () => void;
+}
 
-export default function AdventureView({ id }: { id: string }) {
+// --- ★ dynamic インポートに型を適用 ---
+const LazyMap = dynamic<LazyMapProps>(
+    () => import("@/components/Map/LazyMap").then((mod) => mod.default),
+    {
+        ssr: false,
+        loading: () => <div className="h-full w-full bg-gray-50 animate-pulse flex items-center justify-center text-[10px] font-bold text-gray-300 tracking-widest">CALIBRATING NAV-SYSTEM...</div>
+    }
+);
+
+interface AdventureViewProps {
+    plan: any;
+}
+
+export default function AdventureView({ plan: initialPlan }: AdventureViewProps) {
     const router = useRouter();
-    const [plan, setPlan] = useState<any>(null);
-    const [isTracking, setIsTracking] = useState(false);
-    const [isFound, setIsFound] = useState(false);
+    const [plan, setPlan] = useState(initialPlan);
+    const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+    const [isComplete, setIsComplete] = useState(false);
+    const [comment, setComment] = useState("");
+    const [showSafeNav, setShowSafeNav] = useState(true);
 
-    // 直接操作用Ref（Reactの再レンダリングを介さず爆速更新）
-    const distanceRef = useRef<HTMLDivElement>(null);
-    const compassRef = useRef<HTMLDivElement>(null);
-
+    // 1. 位置情報の常時監視
     useEffect(() => {
-        const found = getPlans().find((p) => p.id === id);
-        if (found) setPlan(found);
-    }, [id]);
-
-    const items = useMemo(() => plan?.items || [], [plan]);
-    const currentItem = useMemo(() => items.find((i: any) => !i.isCollected) || null, [items]);
-
-    const handleStart = async () => {
-        if (typeof window === "undefined") return;
-        const DeviceEvt = (window as any).DeviceOrientationEvent;
-        if (DeviceEvt && typeof DeviceEvt.requestPermission === 'function') {
-            try { await DeviceEvt.requestPermission(); } catch (e) { console.error(e); }
+        if (typeof window !== "undefined" && "geolocation" in navigator) {
+            const watchId = navigator.geolocation.watchPosition(
+                (pos) => {
+                    const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                    setUserLocation(newLoc);
+                    checkCollection(newLoc);
+                },
+                (err) => console.warn(err),
+                { enableHighAccuracy: true }
+            );
+            return () => navigator.geolocation.clearWatch(watchId);
         }
-        setIsTracking(true);
+    }, [plan]);
 
-        let currentHeading = 0;
-        let currentBearing = 0;
-
-        window.addEventListener("deviceorientation", (event: any) => {
-            currentHeading = event.webkitCompassHeading || (event.alpha ? Math.abs(event.alpha - 360) : 0);
-            if (compassRef.current) {
-                compassRef.current.style.transform = `rotate(${currentBearing - currentHeading}deg)`;
+    // 2. アイテム収集判定
+    const checkCollection = (loc: { lat: number; lng: number }) => {
+        let changed = false;
+        const updatedItems = plan.items.map((item: any) => {
+            if (!item.isCollected) {
+                const dist = calculateDistance(loc.lat, loc.lng, item.lat, item.lng);
+                if (dist < 0.05) { // 50m以内に近づいたら収集
+                    changed = true;
+                    return { ...item, isCollected: true, collectedAt: new Date().toISOString() };
+                }
             }
+            return item;
         });
 
-        navigator.geolocation.watchPosition(
-            (pos) => {
-                if (currentItem && distanceRef.current) {
-                    const d = calculateDistance(pos.coords.latitude, pos.coords.longitude, currentItem.lat, currentItem.lng);
-                    currentBearing = calculateBearing(pos.coords.latitude, pos.coords.longitude, currentItem.lat, currentItem.lng);
-                    const meters = Math.floor(d * 1000);
+        if (changed) {
+            const updatedPlan = { ...plan, items: updatedItems };
+            setPlan(updatedPlan);
+            updatePlan(updatedPlan);
 
-                    // 直接書き換え
-                    distanceRef.current.innerText = `${meters.toLocaleString()} m`;
-                }
-            },
-            (err) => console.warn(err),
-            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-        );
+            if (updatedItems.every((i: any) => i.isCollected)) {
+                setIsComplete(true);
+            }
+        }
     };
 
-    const debugAcquire = () => {
-        if (!currentItem) return;
-        const now = new Date().toISOString();
-        const updatedItems = items.map((i: any) => i.id === currentItem.id ? { ...i, isCollected: true, collectedAt: now } : i);
-        const updatedPlan = { ...plan, items: updatedItems, collectedCount: (plan.collectedCount || 0) + 1 };
-        savePlan(updatedPlan as any);
-        setPlan(updatedPlan as any);
-        setIsFound(true);
+    // 3. 最も近い未収集アイテムの計算
+    const nearestItem = useMemo(() => {
+        if (!userLocation) return null;
+        const uncollected = plan.items.filter((i: any) => !i.isCollected);
+        if (uncollected.length === 0) return null;
+
+        return uncollected.map((item: any) => ({
+            ...item,
+            distance: calculateDistance(userLocation.lat, userLocation.lng, item.lat, item.lng),
+            bearing: calculateBearing(userLocation.lat, userLocation.lng, item.lat, item.lng)
+        })).sort((a: any, b: any) => a.distance - b.distance)[0];
+    }, [userLocation, plan.items]);
+
+    const handleFinish = () => {
+        const finalPlan = { ...plan, finishedAt: new Date().toISOString(), comment, status: "completed" };
+        updatePlan(finalPlan);
+        router.push("/log");
     };
 
-    if (!plan) return null;
+    const items = plan.items || [];
 
     return (
-        <div className="min-h-screen bg-gray-50/50 relative overflow-hidden font-sans">
-            {/* 1. 背景地図（固定表示で負荷を最小化） */}
+        <div className="relative h-screen bg-white overflow-hidden flex flex-col">
+            {/* 1. 背景地図（固定表示） */}
             <div className="absolute inset-0 z-0">
-                <LazyMap items={items} userLocation={null} themeColor="#E6672E" center={plan.center} />
+                {/* ★ 修正ポイント：型定義済みの LazyMap に Props を正しく渡す */}
+                <LazyMap
+                    items={items}
+                    userLocation={userLocation}
+                    themeColor="#E6672E"
+                    center={plan.center}
+                />
                 <div className="absolute inset-0 bg-white/20 backdrop-blur-[2px]" />
             </div>
 
-            {/* 2. ヘッダー：Plan/Logと共通の「←」ボタン */}
-            <header className="relative z-10 p-6 pt-12 flex justify-between items-center">
-                <button onClick={() => router.back()} className="w-12 h-12 bg-white/80 backdrop-blur-xl rounded-2xl flex items-center justify-center shadow-lg border border-white/60 active:scale-90 transition-all">
-                    <ArrowLeft className="text-gray-400" size={20} />
-                </button>
-                <div className="bg-white/80 backdrop-blur-xl px-4 py-2 rounded-xl border border-white/60 shadow-sm">
-                    <p className="text-[9px] font-black text-pink-500 uppercase tracking-tighter leading-none mb-0.5">Progress</p>
-                    <p className="text-sm font-black text-gray-800 leading-none">{plan.collectedCount} / {plan.itemCount}</p>
+            {/* 2. 上部：ナビゲーションパネル（航空計器風） */}
+            <header className="relative z-10 p-6 pt-16">
+                <div className="bg-black/90 backdrop-blur-xl rounded-[2.5rem] p-6 shadow-2xl border border-white/10 text-white">
+                    <div className="flex justify-between items-start mb-6">
+                        <div>
+                            <p className="text-[10px] font-black text-pink-500 uppercase tracking-[0.3em] mb-1">Active Mission</p>
+                            <h1 className="text-xl font-black uppercase tracking-tighter truncate w-48">{plan.name}</h1>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Status</p>
+                            <div className="flex items-center gap-2 justify-end">
+                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                                <span className="text-xs font-black uppercase tracking-tighter">On Course</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {nearestItem ? (
+                        <div className="grid grid-cols-2 gap-4 border-t border-white/10 pt-6">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-white/5 rounded-2xl">
+                                    <Navigation className="text-pink-500" size={20} style={{ transform: `rotate(${nearestItem.bearing}deg)` }} />
+                                </div>
+                                <div>
+                                    <p className="text-[8px] font-bold text-gray-500 uppercase mb-0.5">Distance</p>
+                                    <p className="text-lg font-black tabular-nums">
+                                        {(nearestItem.distance < 1) ? `${Math.floor(nearestItem.distance * 1000)}m` : `${nearestItem.distance.toFixed(1)}km`}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-4 border-l border-white/5 pl-4">
+                                <div className="p-3 bg-white/5 rounded-2xl text-gray-400">
+                                    <Compass size={20} />
+                                </div>
+                                <div>
+                                    <p className="text-[8px] font-bold text-gray-500 uppercase mb-0.5">Heading</p>
+                                    <p className="text-lg font-black tabular-nums">{Math.floor(nearestItem.bearing)}°</p>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-center py-2 flex flex-col items-center gap-2">
+                            <CheckCircle2 className="text-green-500" size={32} />
+                            <p className="text-xs font-black uppercase tracking-widest">All Waypoints Cleared</p>
+                        </div>
+                    )}
                 </div>
             </header>
 
-            <main className="flex-1 flex flex-col items-center justify-center relative z-10 px-6 h-[60vh]">
-                {!isTracking ? (
-                    <div className="bg-white/70 backdrop-blur-2xl p-10 rounded-[2.5rem] shadow-2xl border border-white/60 text-center w-full max-w-xs">
-                        <div className="w-20 h-20 bg-pink-50 rounded-[2rem] flex items-center justify-center mx-auto mb-8 text-pink-400">
-                            <Sparkles size={32} />
+            {/* 3. 完了時のオーバーレイ */}
+            {isComplete && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-md animate-in fade-in duration-500">
+                    <div className="bg-white rounded-[3rem] p-8 w-full max-w-sm shadow-2xl text-center space-y-8">
+                        <header>
+                            <div className="w-16 h-16 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <CheckCircle2 className="text-pink-500" size={32} />
+                            </div>
+                            <h2 className="text-3xl font-black text-gray-900 uppercase tracking-tighter">Mission Complete</h2>
+                            <p className="text-[10px] font-bold text-gray-400 mt-2 uppercase tracking-widest">航路の全記録を完了しました</p>
+                        </header>
+
+                        <div className="space-y-2 text-left">
+                            <p className="text-[9px] font-black text-pink-500 uppercase tracking-widest px-2">Mission Log Note</p>
+                            <textarea
+                                value={comment}
+                                onChange={(e) => setComment(e.target.value)}
+                                placeholder="今回の冒険にコメントを残す..."
+                                className="w-full h-32 p-4 bg-gray-50 border-none rounded-3xl text-sm focus:ring-2 focus:ring-pink-500 outline-none transition-all resize-none"
+                            />
                         </div>
-                        <h2 className="text-xl font-black text-gray-800 mb-2">Ready to Start?</h2>
-                        <p className="text-gray-400 text-xs mb-8 font-bold uppercase tracking-widest">Connect to Compass</p>
+
                         <button
-                            onClick={handleStart}
-                            className="w-full bg-gradient-to-r from-[#E6672E] to-[#FF8A65] text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all text-sm uppercase tracking-widest border-b-4 border-black/10"
+                            onClick={handleFinish}
+                            className="w-full py-5 bg-gray-900 text-white rounded-[2rem] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all"
                         >
-                            Start Adventure
-                        </button>
-                    </div>
-                ) : (
-                    <div className="flex flex-col items-center space-y-10 w-full">
-                        {/* 距離計：PlanPageのスタッツボックスを応用 */}
-                        <div className="bg-white/70 backdrop-blur-2xl p-8 rounded-[3rem] shadow-2xl border border-white/60 text-center w-full max-w-sm">
-                            <p className="text-[10px] font-black text-pink-600 uppercase tracking-[0.3em] mb-4">Target Distance</p>
-                            <div ref={distanceRef} className="text-6xl font-black text-gray-800 tracking-tighter">
-                                --- m
-                            </div>
-                        </div>
-
-                        {/* 羅針盤：洗練されたミニマリズム */}
-                        <div className="relative w-64 h-64 flex items-center justify-center">
-                            <div className="absolute inset-0 rounded-full border-2 border-white/40" />
-                            <div className="absolute inset-4 rounded-full border border-pink-100 border-dashed animate-[spin_30s_linear_infinite]" />
-                            <div className="absolute inset-10 rounded-full bg-white/20 backdrop-blur-md border border-white/60 shadow-inner" />
-
-                            <div ref={compassRef} className="relative transition-transform duration-300 ease-out z-10">
-                                <Navigation size={80} fill="currentColor" className="text-pink-500 drop-shadow-xl" />
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </main>
-
-            {/* 3. ボトム：コレクション・トレイ (Logページと統一) */}
-            <footer className="fixed bottom-10 left-6 right-6 z-10">
-                <div className="bg-white/70 backdrop-blur-2xl rounded-[2.5rem] p-5 shadow-2xl border border-white/60">
-                    <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
-                        {items.map((item: any) => (
-                            <div key={item.id} className={`w-11 h-11 flex-shrink-0 rounded-xl flex items-center justify-center border transition-all ${item.isCollected ? "bg-pink-50 border-pink-100 text-pink-400" :
-                                (item.id === currentItem?.id && isTracking ? "bg-white border-pink-300 text-pink-500 shadow-md animate-bounce" : "bg-gray-100/50 border-gray-100 text-gray-200")
-                                }`}>
-                                {item.isCollected ? <CheckCircle size={18} /> : <Package size={18} />}
-                            </div>
-                        ))}
-                    </div>
-                    <div className="mt-4 flex justify-between items-center px-2">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">
-                            {currentItem ? `Next: ${currentItem.name}` : "Complete!"}
-                        </p>
-                        {/* テスト用ボタン：控えめに配置 */}
-                        <button onClick={debugAcquire} className="text-gray-200 hover:text-pink-200 transition-colors">
-                            <Zap size={14} />
-                        </button>
-                    </div>
-                </div>
-            </footer>
-
-            {/* 獲得モーダル：Plan/Logと共通の品格 */}
-            {isFound && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-8 bg-gray-900/10 backdrop-blur-md animate-in fade-in duration-300">
-                    <div className="text-center bg-white p-12 rounded-[3.5rem] shadow-2xl border border-white w-full max-w-xs">
-                        <div className="w-20 h-20 bg-pink-50 rounded-[2rem] flex items-center justify-center mx-auto mb-8 text-pink-400 border border-pink-100">
-                            <Trophy size={36} />
-                        </div>
-                        <h2 className="text-2xl font-black mb-2 text-gray-800">FOUND!</h2>
-                        <p className="text-gray-400 mb-10 text-[10px] font-black tracking-widest uppercase">Target has been secured</p>
-                        <button
-                            onClick={() => { setIsFound(false); if (!currentItem) router.push('/log'); }}
-                            className="w-full py-4 bg-gray-900 text-white font-black rounded-2xl shadow-lg active:scale-95 transition-all uppercase tracking-widest text-xs"
-                        >
-                            {currentItem ? "Next Mission" : "Show Results"}
+                            Log and Archive
                         </button>
                     </div>
                 </div>
