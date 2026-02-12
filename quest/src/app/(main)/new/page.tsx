@@ -5,10 +5,10 @@ import { useTranslation } from "react-i18next";
 import { useRouter } from "next/navigation";
 import { savePlan } from "@/lib/storage";
 import { generateRandomPoint } from "@/lib/geo";
-import { CheckCircle2, Play, Loader2, Target, Navigation } from "lucide-react";
+import { CheckCircle2, Play, Loader2, Target, Navigation, MapPin } from "lucide-react";
 import dynamic from "next/dynamic";
 
-// --- ★ ここで LazyMap が受け取る Props の型を定義します ---
+// --- ★ LazyMap Props 定義 ---
 interface LazyMapProps {
     items?: any[];
     center?: { lat: number; lng: number };
@@ -23,7 +23,6 @@ interface LazyMapProps {
     onBriefingComplete?: () => void;
 }
 
-// --- ★ dynamic インポートに型を適用して、TypeScriptにプロパティを認識させます ---
 const LazyMap = dynamic<LazyMapProps>(
     () => import("@/components/Map/LazyMap").then((mod) => mod.default),
     {
@@ -62,7 +61,7 @@ export default function NewQuestPage() {
     const [isBriefingActive, setIsBriefingActive] = useState(false);
     const [isFinalOverview, setIsFinalOverview] = useState(false);
     const [activePlanId, setActivePlanId] = useState<string | null>(null);
-    const [cityName, setCityName] = useState("");
+    const [discoveredCities, setDiscoveredCities] = useState<string[]>([]); // ★ 追加：複数地名リスト
 
     // 現在地取得
     useEffect(() => {
@@ -74,53 +73,44 @@ export default function NewQuestPage() {
         }
     }, []);
 
-    const handleRadiusChange = (val: number) => {
-        setRadius(val);
-    };
-
     const handleCreate = async () => {
         setIsCreating(true);
-        let center = userLocation || { lat: 35.6812, lng: 139.7671 };
+        const center = userLocation || { lat: 35.6812, lng: 139.7671 };
         const validItems: any[] = [];
-        let detectedCity = "";
+        const citiesSet = new Set<string>();
+
+        // ★ Google Geocoding API インスタンス
+        const geocoder = new google.maps.Geocoder();
+
         let attempts = 0;
-        const maxAttempts = 100;
+        const maxAttempts = 20; // 精度向上のため試行回数を調整
 
         while (validItems.length < itemCount && attempts < maxAttempts) {
             attempts++;
             const point = generateRandomPoint(center, radius);
-            try {
-                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${point.lat}&lon=${point.lng}&format=json&zoom=10`);
-                const data = await res.json();
 
-                const hasPlace = data.address && (data.address.country || data.address.city || data.address.state || data.address.suburb);
-                const isWater = data.type === "water" || data.class === "natural" || (data.display_name && data.display_name.toLowerCase().includes("ocean"));
+            // ★ Google Geocoder による高精度な地名特定
+            await new Promise((resolve) => {
+                geocoder.geocode({ location: point }, (results, status) => {
+                    if (status === "OK" && results?.[0]) {
+                        const addr = results[0].address_components;
+                        // 市町村名（locality）または行政区（sublocality）を取得
+                        const city = addr.find(c => c.types.includes("locality"))?.long_name ||
+                            addr.find(c => c.types.includes("administrative_area_level_2"))?.long_name ||
+                            addr.find(c => c.types.includes("administrative_area_level_1"))?.long_name || "Unknown Area";
 
-                if (hasPlace && !isWater) {
-                    if (!detectedCity) {
-                        detectedCity = data.address.city || data.address.town || data.address.suburb || data.address.state || "NEW AREA";
-                        setCityName(detectedCity);
+                        citiesSet.add(city);
+                        validItems.push({
+                            id: Math.random().toString(36).substr(2, 9),
+                            lat: point.lat,
+                            lng: point.lng,
+                            isCollected: false,
+                            addressName: city // ★ LazyMapのポップアップ用
+                        });
                     }
-
-                    validItems.push({
-                        id: Math.random().toString(36).substr(2, 9),
-                        lat: point.lat,
-                        lng: point.lng,
-                        isCollected: false,
-                        name: `Item #${validItems.length + 1}`
-                    });
-                }
-            } catch (e) {
-                if (attempts > 80) {
-                    validItems.push({
-                        id: 'fallback-' + attempts,
-                        lat: point.lat,
-                        lng: point.lng,
-                        isCollected: false,
-                        name: `Item #${validItems.length + 1}`
-                    });
-                }
-            }
+                    resolve(null);
+                });
+            });
         }
 
         const planId = Math.random().toString(36).substr(2, 9);
@@ -138,6 +128,7 @@ export default function NewQuestPage() {
         };
 
         savePlan(plan);
+        setDiscoveredCities(Array.from(citiesSet)); // 発見した全ての地名を保存
         setActivePlanId(planId);
         setBriefingItems(validItems);
         setIsCreating(false);
@@ -147,7 +138,6 @@ export default function NewQuestPage() {
     return (
         <div className="flex flex-col h-full min-h-screen pb-20 relative overflow-hidden bg-white">
             <div className="absolute inset-0 z-0">
-                {/* ★ 型定義済みの LazyMap を使用 */}
                 <LazyMap
                     radiusInKm={radius}
                     userLocation={userLocation}
@@ -161,6 +151,7 @@ export default function NewQuestPage() {
                 />
             </div>
 
+            {/* クエスト設定パネル（作成前） */}
             {!isBriefingActive && !showConfirm && !isFinalOverview && (
                 <>
                     <div className="absolute top-8 left-6 right-6 z-20 animate-in fade-in duration-500">
@@ -201,7 +192,7 @@ export default function NewQuestPage() {
                                         max={activeMode.max}
                                         step={activeMode.step}
                                         value={radius}
-                                        onChange={(e) => handleRadiusChange(parseFloat(e.target.value))}
+                                        onChange={(e) => setRadius(parseFloat(e.target.value))}
                                         className="w-full h-1.5 accent-pink-500 bg-black/10 rounded-full appearance-none cursor-pointer"
                                     />
                                 </div>
@@ -239,6 +230,7 @@ export default function NewQuestPage() {
                 </>
             )}
 
+            {/* 生成完了確認 */}
             {showConfirm && (
                 <div className="absolute inset-0 z-[2000] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
                     <div className="bg-white rounded-[3rem] p-8 shadow-2xl w-full max-w-sm text-center space-y-6">
@@ -262,6 +254,7 @@ export default function NewQuestPage() {
                 </div>
             )}
 
+            {/* ★ 改良：Discovery Report（全発見地名を表示） */}
             {isFinalOverview && (
                 <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md animate-in zoom-in-95 duration-500">
                     <div className="bg-white rounded-[3rem] p-8 w-full max-w-sm text-center space-y-8 relative overflow-hidden shadow-2xl">
@@ -269,10 +262,19 @@ export default function NewQuestPage() {
 
                         <header>
                             <p className="text-[10px] font-black text-pink-500 uppercase tracking-[0.3em] mb-4">Discovery Report</p>
-                            <h2 className="text-4xl font-black text-gray-900 uppercase tracking-tighter leading-none mb-2">
-                                {cityName || "NEW AREA"}
-                            </h2>
-                            <p className="text-[9px] font-bold text-gray-300 uppercase tracking-widest">Navigation Path Verified</p>
+
+                            {/* 地名リストの表示エリア */}
+                            <div className="max-h-40 overflow-y-auto space-y-2 py-2 px-2 custom-scrollbar">
+                                {discoveredCities.length > 0 ? discoveredCities.map((city, idx) => (
+                                    <h2 key={idx} className="text-3xl font-black text-gray-900 uppercase tracking-tighter leading-none">
+                                        {city}
+                                    </h2>
+                                )) : (
+                                    <h2 className="text-3xl font-black text-gray-900 uppercase tracking-tighter leading-none">NEW AREA</h2>
+                                )}
+                            </div>
+
+                            <p className="text-[9px] font-bold text-gray-300 uppercase tracking-widest mt-4 italic">Navigation Path Verified</p>
                         </header>
 
                         <div className="grid grid-cols-2 gap-3">
