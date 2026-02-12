@@ -45,32 +45,36 @@ export default function LazyMap({
         }
     }, [map, items, isLogMode, isFinalOverview, userLocation, isBriefingActive]);
 
-    // 2. ブリーフィング演出（ panTo で滑らかに移動 ）
+    // 2. 躍動感のあるブリーフィング演出
     useEffect(() => {
         if (!isBriefingActive || !map || items.length === 0) return;
 
         const runBriefing = async () => {
-            // 初期待機
+            // 最初は広域視点から
+            map.setZoom(12);
             await new Promise(r => setTimeout(r, 1000));
 
             for (const item of items) {
-                // 地点へ移動
+                // A. 目的地へ滑らかに移動
                 map.panTo({ lat: item.lat, lng: item.lng });
-                map.setZoom(15);
+                setActivePlaceName(item.addressName || "WAYPOINT DETECTED");
 
-                // 地名ポップアップ表示（アイテム名があれば表示）
-                setActivePlaceName(item.addressName || "Waypoint Detected");
+                // B. 移動の途中でズームインを開始（躍動感の演出）
+                await new Promise(r => setTimeout(r, 800));
+                map.setZoom(16);
 
-                await new Promise(r => setTimeout(r, 2500));
+                // C. 地点での確認待機
+                await new Promise(r => setTimeout(r, 1500));
             }
 
-            setActivePlaceName("Mission Finalizing...");
+            // D. フィナーレ：全体俯瞰へ
+            setActivePlaceName("MISSION LOG VERIFIED");
             const bounds = new google.maps.LatLngBounds();
             items.forEach(i => bounds.extend({ lat: i.lat, lng: i.lng }));
             if (userLocation) bounds.extend(userLocation);
-            map.fitBounds(bounds, 80);
 
-            await new Promise(r => setTimeout(r, 1500));
+            map.fitBounds(bounds, 80);
+            await new Promise(r => setTimeout(r, 2000));
             setActivePlaceName(null);
 
             if (onBriefingStateChange) onBriefingStateChange(true);
@@ -80,9 +84,8 @@ export default function LazyMap({
         runBriefing();
     }, [isBriefingActive, map, items, userLocation, onBriefingStateChange, onBriefingComplete]);
 
-    // ★ 修正：ブリーフィング中は中心を固定しない（移動を妨げない）
     const controlledCenter = useMemo(() => {
-        if (isBriefingActive) return null; // ブリーフィング中は panTo に任せる
+        if (isBriefingActive) return null; // ブリーフィング中は自由移動を許可
         if (userLocation) return userLocation;
         return center || { lat: 35.6812, lng: 139.7671 };
     }, [isBriefingActive, userLocation, center]);
@@ -101,23 +104,21 @@ export default function LazyMap({
                     <Marker
                         key={item.id || idx}
                         position={{ lat: item.lat, lng: item.lng }}
-                        label={isLogMode ? { text: (idx + 1).toString(), color: 'white', fontWeight: 'bold' } : undefined}
+                        label={{ text: (idx + 1).toString(), color: 'white', fontWeight: 'bold' }}
                     />
                 ))}
             </Map>
 
-            {/* 地名ポップアップ：航空機内のアナウンス風 */}
+            {/* 航空アナウンス風ポップアップ */}
             {activePlaceName && (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-24 z-50 animate-in fade-in zoom-in duration-500">
-                    <div className="bg-black/80 backdrop-blur-md px-6 py-2 rounded-full border border-white/20 shadow-2xl">
-                        <p className="text-white text-[10px] font-black uppercase tracking-[0.2em] whitespace-nowrap">
-                            Scanning: <span className="text-pink-400">{activePlaceName}</span>
+                <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-700">
+                    <div className="bg-black/90 px-6 py-2 rounded-full border border-pink-500/30 shadow-[0_0_20px_rgba(236,72,153,0.15)]">
+                        <p className="text-white text-[10px] font-black uppercase tracking-[0.3em] whitespace-nowrap">
+                            <span className="text-pink-500">Scanning:</span> {activePlaceName}
                         </p>
                     </div>
                 </div>
             )}
-
-            <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_100px_rgba(0,0,0,0.03)]" />
         </div>
     );
 }
