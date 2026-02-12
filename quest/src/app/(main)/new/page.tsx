@@ -5,8 +5,32 @@ import { useTranslation } from "react-i18next";
 import { useRouter } from "next/navigation";
 import { savePlan } from "@/lib/storage";
 import { generateRandomPoint } from "@/lib/geo";
-import LazyMap from "@/components/Map/LazyMap";
-import { CheckCircle2, Play, Loader2, MapPin, Target, Navigation } from "lucide-react";
+import { CheckCircle2, Play, Loader2, Target, Navigation } from "lucide-react";
+import dynamic from "next/dynamic";
+
+// --- ★ ここで LazyMap が受け取る Props の型を定義します ---
+interface LazyMapProps {
+    items?: any[];
+    center?: { lat: number; lng: number };
+    userLocation?: { lat: number; lng: number } | null;
+    radiusInKm?: number;
+    themeColor?: string;
+    isLogMode?: boolean;
+    isBriefingActive?: boolean;
+    isFinalOverview?: boolean;
+    planId?: string | null;
+    onBriefingStateChange?: (state: boolean) => void;
+    onBriefingComplete?: () => void;
+}
+
+// --- ★ dynamic インポートに型を適用して、TypeScriptにプロパティを認識させます ---
+const LazyMap = dynamic<LazyMapProps>(
+    () => import("@/components/Map/LazyMap").then((mod) => mod.default),
+    {
+        ssr: false,
+        loading: () => <div className="h-full w-full bg-gray-50 animate-pulse flex items-center justify-center text-[10px] font-bold text-gray-300">INITIALIZING NAVIGATION SYSTEM...</div>
+    }
+);
 
 const rangeModes = [
     { id: 'neighborhood', label: 'NEIGHBORHOOD', min: 0.5, max: 15, step: 0.1 },
@@ -38,7 +62,7 @@ export default function NewQuestPage() {
     const [isBriefingActive, setIsBriefingActive] = useState(false);
     const [isFinalOverview, setIsFinalOverview] = useState(false);
     const [activePlanId, setActivePlanId] = useState<string | null>(null);
-    const [cityName, setCityName] = useState(""); // ★ 追加：地名保持用
+    const [cityName, setCityName] = useState("");
 
     // 現在地取得
     useEffect(() => {
@@ -73,7 +97,6 @@ export default function NewQuestPage() {
                 const isWater = data.type === "water" || data.class === "natural" || (data.display_name && data.display_name.toLowerCase().includes("ocean"));
 
                 if (hasPlace && !isWater) {
-                    // ★ 最初の有効な地点から地名を抽出
                     if (!detectedCity) {
                         detectedCity = data.address.city || data.address.town || data.address.suburb || data.address.state || "NEW AREA";
                         setCityName(detectedCity);
@@ -123,8 +146,8 @@ export default function NewQuestPage() {
 
     return (
         <div className="flex flex-col h-full min-h-screen pb-20 relative overflow-hidden bg-white">
-            {/* バックグラウンドマップ */}
             <div className="absolute inset-0 z-0">
+                {/* ★ 型定義済みの LazyMap を使用 */}
                 <LazyMap
                     radiusInKm={radius}
                     userLocation={userLocation}
@@ -133,16 +156,11 @@ export default function NewQuestPage() {
                     isBriefingActive={isBriefingActive}
                     isFinalOverview={isFinalOverview}
                     planId={activePlanId}
-                    // ★ setIsFinalOverview は boolean を期待しているため、LazyMap内ではこれを true にする
                     onBriefingStateChange={setIsFinalOverview}
-                    onBriefingComplete={() => {
-                        setIsBriefingActive(false);
-                        // router.push は Discovery Report 内のボタンで行うためここでは何もしない
-                    }}
+                    onBriefingComplete={() => setIsBriefingActive(false)}
                 />
             </div>
 
-            {/* 設定UI（作成前） */}
             {!isBriefingActive && !showConfirm && !isFinalOverview && (
                 <>
                     <div className="absolute top-8 left-6 right-6 z-20 animate-in fade-in duration-500">
@@ -221,7 +239,6 @@ export default function NewQuestPage() {
                 </>
             )}
 
-            {/* 生成完了確認 */}
             {showConfirm && (
                 <div className="absolute inset-0 z-[2000] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
                     <div className="bg-white rounded-[3rem] p-8 shadow-2xl w-full max-w-sm text-center space-y-6">
@@ -245,11 +262,9 @@ export default function NewQuestPage() {
                 </div>
             )}
 
-            {/* Discovery Report（ブリーフィング終了後の最終確認画面） */}
             {isFinalOverview && (
                 <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md animate-in zoom-in-95 duration-500">
                     <div className="bg-white rounded-[3rem] p-8 w-full max-w-sm text-center space-y-8 relative overflow-hidden shadow-2xl">
-                        {/* デコレーション */}
                         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-pink-500 via-orange-400 to-pink-500" />
 
                         <header>
