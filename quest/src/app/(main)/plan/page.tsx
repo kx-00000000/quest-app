@@ -6,6 +6,7 @@ import { Trash2, Play, Footprints } from "lucide-react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 
+// ★ 重要：isFinalOverview=true を渡すことで LazyMap の fitBounds (全ピン表示) を発動させます
 const LazyMap = dynamic<any>(() => import("@/components/Map/LazyMap").then(mod => mod.default), { ssr: false });
 
 export default function PlanPage() {
@@ -34,13 +35,12 @@ export default function PlanPage() {
                                     <div className="w-1.5 h-1.5 bg-pink-500 rounded-full animate-pulse" />
                                     <span className="text-[9px] font-black text-pink-600 uppercase tracking-widest">Ready to Fly</span>
                                 </div>
-                                <button onClick={() => { deletePlan(plan.id); setPlans(plans.filter(p => p.id !== plan.id)); }} className="text-gray-200 hover:text-red-400 transition-colors">
-                                    <Trash2 size={18} />
-                                </button>
+                                <button onClick={() => { deletePlan(plan.id); setPlans(plans.filter(p => p.id !== plan.id)); }} className="text-gray-200 hover:text-red-400"><Trash2 size={18} /></button>
                             </div>
                             <h3 className="text-xl font-black uppercase mb-4 truncate">{plan.name}</h3>
                             <div className="h-48 relative rounded-2xl overflow-hidden border border-gray-100 mb-6 bg-gray-50">
-                                <LazyMap items={plan.items} center={plan.center} isLogMode={false} />
+                                {/* ★ 改良：isFinalOverview=true で全ピンが画面に収まるようにする */}
+                                <LazyMap items={plan.items} center={plan.center} isLogMode={false} isFinalOverview={true} />
                                 <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_40px_rgba(0,0,0,0.02)]" />
                             </div>
                             <div className="flex items-center justify-between">

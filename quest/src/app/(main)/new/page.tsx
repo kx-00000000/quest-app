@@ -80,12 +80,14 @@ export default function NewQuestPage() {
 
             {!isBriefingActive && !showConfirm && !isFinalOverview && (
                 <>
+                    {/* 名前入力を上部に分離 */}
                     <div className="absolute top-8 left-6 right-6 z-20">
                         <div className="bg-white/40 backdrop-blur-2xl rounded-[2rem] border border-white/40 shadow-xl px-6 py-3">
                             <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="冒険の名前を入力" className="w-full bg-transparent border-none outline-none text-gray-800 font-black text-center placeholder:text-gray-400" />
                         </div>
                     </div>
 
+                    {/* タブとスライダーのUI */}
                     <div className="mt-auto relative z-10 px-4 mb-4">
                         <div className="bg-white/80 backdrop-blur-xl rounded-[3rem] p-6 shadow-2xl border border-white space-y-5">
                             <div className="flex p-1 bg-black/5 rounded-2xl gap-1">
@@ -96,11 +98,14 @@ export default function NewQuestPage() {
                             <div className="space-y-4 px-1">
                                 <div className="space-y-1">
                                     <div className="flex justify-between text-[10px] font-black text-pink-500 uppercase"><span>Radius</span><span>{formatDistance(radius)}</span></div>
-                                    <input type="range" min={activeMode.min} max={activeMode.max} step={activeMode.step} value={radius} onChange={(e) => setRadius(parseFloat(e.target.value))} className="w-full accent-pink-500" />
+                                    {/* ★ 改良：塗りつぶしなし・枠なしのスライダー */}
+                                    <input type="range" min={activeMode.min} max={activeMode.max} step={activeMode.step} value={radius} onChange={(e) => setRadius(parseFloat(e.target.value))}
+                                        className="w-full h-1 bg-gray-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-pink-500 [&::-webkit-slider-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:bg-pink-500 [&::-moz-range-thumb]:rounded-full" />
                                 </div>
                                 <div className="space-y-1">
                                     <div className="flex justify-between text-[10px] font-black text-pink-500 uppercase"><span>Items Count</span><span>{itemCount}</span></div>
-                                    <input type="range" min="1" max="7" step="1" value={itemCount} onChange={(e) => setItemCount(parseInt(e.target.value))} className="w-full accent-pink-500" />
+                                    <input type="range" min="1" max="7" step="1" value={itemCount} onChange={(e) => setItemCount(parseInt(e.target.value))}
+                                        className="w-full h-1 bg-gray-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-pink-500 [&::-webkit-slider-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:bg-pink-500 [&::-moz-range-thumb]:rounded-full" />
                                 </div>
                             </div>
                             <button onClick={handleCreate} disabled={isCreating} className="w-full py-4 bg-gray-900 text-white rounded-[2rem] font-black flex items-center justify-center gap-2">{isCreating ? <Loader2 className="animate-spin" /> : "クエストを作成"}</button>
@@ -109,6 +114,7 @@ export default function NewQuestPage() {
                 </>
             )}
 
+            {/* Discovery Report */}
             {isFinalOverview && (
                 <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md animate-in zoom-in-95 duration-500">
                     <div className="bg-white rounded-[3rem] p-8 w-full max-w-sm space-y-6 shadow-2xl relative overflow-hidden">
