@@ -48,96 +48,81 @@ export default function LazyMap({
 }: LazyMapProps) {
     const map = useMap();
     const [activePlaceName, setActivePlaceName] = useState<string | null>(null);
-    const briefingStarted = useRef(false);
 
-    // ★ 解決1：現在地スナップ防止
-    // 演出中（ブリーフィングや全表示）は center を null にして、Google Map の自由移動を許可する
-    const controlledCenter = useMemo(() => {
-        if (isBriefingActive || isFinalOverview || isLogMode) return undefined;
-        if (userLocation && userLocation.lat !== 0) return userLocation;
-        if (center && center.lat !== 0) return center;
-        return { lat: 35.6812, lng: 139.7671 };
-    }, [isBriefingActive, isFinalOverview, isLogMode, userLocation, center]);
-
-    // ★ 解決2：プラン画面の全ピン表示
+    // ★ 解決：世界地図になる問題の対策（有効な座標のみで計算）
     useEffect(() => {
         if (!map || items.length === 0 || isBriefingActive) return;
 
         const applyBounds = () => {
             const bounds = new google.maps.LatLngBounds();
-            items.forEach(item => bounds.extend({ lat: item.lat, lng: item.lng }));
-            if (userLocation) bounds.extend(userLocation);
-            map.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 });
+            let count = 0;
+            items.forEach(item => {
+                if (item.lat && item.lng) {
+                    bounds.extend({ lat: item.lat, lng: item.lng });
+                    count++;
+                }
+            });
+            if (userLocation?.lat) { bounds.extend(userLocation); count++; }
+
+            if (count > 0) {
+                map.fitBounds(bounds, { top: 60, right: 60, bottom: 60, left: 60 });
+            }
         };
 
-        // 初回と、地図が落ち着いたタイミングの両方で実行
-        applyBounds();
-        const listener = google.maps.event.addListenerOnce(map, 'idle', applyBounds);
-        return () => google.maps.event.removeListener(listener);
-    }, [map, items, isFinalOverview, isLogMode]);
+        const timer = setTimeout(applyBounds, 800);
+        return () => clearTimeout(timer);
+    }, [map, items, isLogMode, isFinalOverview, userLocation, isBriefingActive]);
 
-    // ★ 解決3：滑らかな演出の復元
+    // ★ 解決：演出を廃止し、地点切り替えのみにする
     useEffect(() => {
-        if (!isBriefingActive || !map || items.length === 0 || briefingStarted.current) return;
-        briefingStarted.current = true;
+        if (!isBriefingActive || !map || items.length === 0) return;
 
         const runBriefing = async () => {
-            map.setOptions({ gestureHandling: 'none' });
+            map.setZoom(15); // 常に一定の高さ
 
             for (const item of items) {
-                // 上昇
-                map.setZoom(12);
-                await new Promise(r => setTimeout(r, 600));
-
-                // 滑空移動
                 map.panTo({ lat: item.lat, lng: item.lng });
-                setActivePlaceName(item.addressName || "WAYPOINT");
-                await new Promise(r => setTimeout(r, 1200));
-
-                // 降下
-                map.setZoom(17);
-                await new Promise(r => setTimeout(r, 2000));
+                setActivePlaceName(item.addressName || "Waypoint");
+                await new Promise(r => setTimeout(r, 2500)); // 静止して見せる時間
             }
 
-            // 全表示に戻す
-            const finalBounds = new google.maps.LatLngBounds();
-            items.forEach(i => finalBounds.extend({ lat: i.lat, lng: i.lng }));
-            map.fitBounds(finalBounds, 80);
-
-            await new Promise(r => setTimeout(r, 1500));
-            setActivePlaceName(null);
-            briefingStarted.current = false;
             if (onBriefingStateChange) onBriefingStateChange(true);
             if (onBriefingComplete) onBriefingComplete();
+            setActivePlaceName(null);
         };
 
         runBriefing();
     }, [isBriefingActive, map, items]);
 
+    const initialCenter = useMemo(() => {
+        if (userLocation?.lat) return userLocation;
+        if (center?.lat) return center;
+        if (items[0]?.lat) return { lat: items[0].lat, lng: items[0].lng };
+        return { lat: 35.6812, lng: 139.7671 };
+    }, [userLocation, center, items]);
+
     return (
         <div className="w-full h-full relative bg-[#f5f5f5]">
             <Map
                 defaultZoom={14}
-                center={controlledCenter}
+                center={initialCenter}
                 styles={mapStyle}
                 disableDefaultUI={true}
                 gestureHandling={'greedy'}
             >
                 {userLocation && <Marker position={userLocation} />}
-                {userLocation && radiusInKm && <MapCircle center={userLocation} radius={radiusInKm} color={themeColor} />}
+                {/* ★ 解決：ブリーフィング中は円を隠す */}
+                {userLocation && radiusInKm && !isBriefingActive && (
+                    <MapCircle center={userLocation} radius={radiusInKm} color={themeColor} />
+                )}
                 {items.map((item, idx) => (
-                    <Marker
-                        key={item.id || idx}
-                        position={{ lat: item.lat, lng: item.lng }}
-                        label={{ text: (idx + 1).toString(), color: 'white', fontWeight: 'bold' }}
-                    />
+                    <Marker key={item.id || idx} position={{ lat: item.lat, lng: item.lng }} label={{ text: (idx + 1).toString(), color: 'white', fontWeight: 'bold' }} />
                 ))}
             </Map>
-
             {activePlaceName && (
-                <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-700">
+                <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50">
                     <div className="bg-black/90 px-6 py-2 rounded-full border border-[#F37343]/30 shadow-2xl">
-                        <p className="text-white text-[10px] font-black uppercase tracking-[0.3em] whitespace-nowrap text-center">
+                        <p className="text-white text-[10px] font-black uppercase tracking-[0.3em]">
                             <span className="text-[#F37343]">Scanning:</span> {activePlaceName}
                         </p>
                     </div>

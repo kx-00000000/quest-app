@@ -26,7 +26,7 @@ export default function PlanPage() {
     return (
         <div className="min-h-screen bg-white text-black font-sans pb-32">
             <header className="p-8 pt-16 border-b border-gray-100 text-left">
-                <h1 className="text-2xl font-bold tracking-tighter uppercase mb-2">Quest Control</h1>
+                <h1 className="text-2xl font-bold tracking-tighter uppercase mb-2 text-gray-900">Quest Control</h1>
                 <p className="text-[9px] font-bold text-gray-400 uppercase tracking-[0.3em]">ミッション管理</p>
             </header>
 
@@ -42,7 +42,6 @@ export default function PlanPage() {
                         </div>
                         <h3 className="text-xl font-black uppercase mb-4 truncate text-left">{plan.name}</h3>
                         <div className="h-48 relative rounded-2xl overflow-hidden border border-gray-100 mb-6 bg-gray-50">
-                            {/* fitBounds を強制するため isFinalOverview={true} を設定 */}
                             <LazyMap items={plan.items} center={plan.center} isLogMode={false} isFinalOverview={true} themeColor="#F37343" />
                         </div>
                         <div className="space-y-1 mb-6">
@@ -55,10 +54,10 @@ export default function PlanPage() {
                         </div>
                         <div className="flex items-center justify-between">
                             <div className="flex gap-6 text-left">
-                                <div><p className="text-[8px] font-bold text-gray-400 uppercase">Waypoints</p><p className="font-black text-sm">{plan.items?.length || 0}</p></div>
-                                <div><p className="text-[8px] font-bold text-gray-400 uppercase">Range</p><p className="font-black text-sm">{plan.radius} km</p></div>
+                                <div><p className="text-[8px] font-bold text-gray-400 uppercase">Waypoints</p><p className="font-black text-sm text-gray-900">{plan.items?.length || 0}</p></div>
+                                <div><p className="text-[8px] font-bold text-gray-400 uppercase">Range</p><p className="font-black text-sm text-gray-900">{plan.radius} km</p></div>
                             </div>
-                            <button onClick={() => router.push(`/adventure/${plan.id}`)} className="px-6 py-4 bg-gray-900 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest flex items-center gap-2 active:scale-95 shadow-lg"><Play size={12} fill="currentColor" />START</button>
+                            <button onClick={() => router.push(`/adventure/${plan.id}`)} className="px-6 py-4 bg-gray-900 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest flex items-center gap-2 shadow-lg active:scale-95 transition-all"><Play size={12} fill="currentColor" />START</button>
                         </div>
                     </div>
                 ))) : (

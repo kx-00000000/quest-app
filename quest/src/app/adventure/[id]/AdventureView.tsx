@@ -13,7 +13,7 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
     const router = useRouter();
     const [plan, setPlan] = useState(initialPlan);
     const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-    const [currentAreaName, setCurrentAreaName] = useState<string>("---");
+    const [currentAreaName, setCurrentAreaName] = useState<string>("Scanning...");
 
     useEffect(() => {
         if (typeof window !== "undefined" && "geolocation" in navigator) {
@@ -23,6 +23,7 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                     const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                     setUserLocation(newLoc);
 
+                    // ★ 解決：座標から地名をリアルタイム同期
                     if (geocoder) {
                         geocoder.geocode({ location: newLoc }, (results, status) => {
                             if (status === "OK" && results?.[0]) {
