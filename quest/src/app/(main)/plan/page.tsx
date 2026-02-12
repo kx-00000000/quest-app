@@ -27,12 +27,13 @@ export default function PlanPage() {
                             <button onClick={() => { deletePlan(plan.id); setPlans(plans.filter(p => p.id !== plan.id)); }} className="text-gray-200"><Trash2 size={18} /></button>
                         </div>
                         <h3 className="text-xl font-black uppercase mb-4 truncate">{plan.name}</h3>
-                        <div className="h-48 relative rounded-2xl overflow-hidden border border-gray-100 mb-6">
-                            <LazyMap items={plan.items} center={plan.center} isFinalOverview={true} themeColor="#F37343" />
+                        <div className="h-48 relative rounded-2xl overflow-hidden border border-gray-100 mb-6 bg-gray-50">
+                            {/* ★ 解決：isFinalOverview={true} を設定 */}
+                            <LazyMap items={plan.items} center={plan.center} isLogMode={false} isFinalOverview={true} themeColor="#F37343" />
                         </div>
                         <div className="flex items-center justify-between">
                             <div className="flex gap-6 text-left"><div><p className="text-[8px] font-bold text-gray-400 uppercase">Waypoints</p><p className="font-black text-sm">{plan.items?.length || 0}</p></div><div><p className="text-[8px] font-bold text-gray-400 uppercase">Range</p><p className="font-black text-sm">{plan.radius} km</p></div></div>
-                            <button onClick={() => router.push(`/adventure/${plan.id}`)} className="px-6 py-4 bg-gray-900 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest flex items-center gap-2 active:scale-95 shadow-lg"><Play size={12} fill="currentColor" />START</button>
+                            <button onClick={() => router.push(`/adventure/${plan.id}`)} className="px-6 py-4 bg-gray-900 text-white rounded-2xl font-black text-[11px] uppercase flex items-center gap-2 shadow-lg"><Play size={12} fill="currentColor" />START</button>
                         </div>
                     </div>
                 ))) : (

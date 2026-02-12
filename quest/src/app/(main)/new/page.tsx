@@ -78,6 +78,7 @@ export default function NewQuestPage() {
                     </div>
                     <div className="mt-auto relative z-10 px-4 mb-4">
                         <div className="bg-white/80 backdrop-blur-xl rounded-[3rem] p-6 shadow-2xl border border-white space-y-5">
+                            {/* ★ 復活：距離別タブ */}
                             <div className="flex p-1 bg-black/5 rounded-2xl gap-1">
                                 {rangeModes.map((mode) => (
                                     <button key={mode.id} onClick={() => { setActiveMode(mode); setRadius(mode.min); }} className={`flex-1 py-2 text-[9px] font-black rounded-xl transition-all ${activeMode.id === mode.id ? 'bg-white text-[#F37343] shadow-sm' : 'text-gray-500'}`}>{mode.label}</button>
@@ -85,15 +86,16 @@ export default function NewQuestPage() {
                             </div>
                             <div className="space-y-4 px-1">
                                 <div className="space-y-1">
-                                    <div className="flex justify-between text-[10px] font-black text-[#F37343] uppercase tracking-widest"><span>Radius</span><span>{radius}km</span></div>
+                                    <div className="flex justify-between text-[10px] font-black text-[#F37343] uppercase"><span>Radius</span><span>{radius}km</span></div>
                                     <input type="range" min={activeMode.min} max={activeMode.max} step={activeMode.step} value={radius} onChange={(e) => setRadius(parseFloat(e.target.value))} className="w-full h-3 bg-gray-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-[#F37343] [&::-webkit-slider-thumb]:rounded-full" />
                                 </div>
+                                {/* ★ 復活：アイテム数スライダー */}
                                 <div className="space-y-1">
-                                    <div className="flex justify-between text-[10px] font-black text-[#F37343] uppercase tracking-widest"><span>Items Count</span><span>{itemCount}</span></div>
+                                    <div className="flex justify-between text-[10px] font-black text-[#F37343] uppercase"><span>Items Count</span><span>{itemCount}</span></div>
                                     <input type="range" min="1" max="7" step="1" value={itemCount} onChange={(e) => setItemCount(parseInt(e.target.value))} className="w-full h-3 bg-gray-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-[#F37343] [&::-webkit-slider-thumb]:rounded-full" />
                                 </div>
                             </div>
-                            <button onClick={handleCreate} disabled={isCreating} className="w-full py-4 bg-gray-900 text-white rounded-[2rem] font-black flex items-center justify-center gap-2 shadow-lg">{isCreating ? <Loader2 className="animate-spin" /> : "CREATE QUEST"}</button>
+                            <button onClick={handleCreate} disabled={isCreating} className="w-full py-4 bg-gray-900 text-white rounded-[2rem] font-black flex items-center justify-center shadow-lg uppercase">{isCreating ? <Loader2 className="animate-spin" /> : "CREATE QUEST"}</button>
                         </div>
                     </div>
                 </>
@@ -101,8 +103,9 @@ export default function NewQuestPage() {
 
             {isFinalOverview && (
                 <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md animate-in zoom-in-95">
-                    <div className="bg-white rounded-[3rem] p-8 w-full max-w-sm space-y-6 shadow-2xl relative text-center">
-                        <div className="absolute top-0 left-0 w-full h-1.5 bg-[#F37343]" /><p className="text-[9px] font-black text-[#F37343] uppercase tracking-[0.3em]">Discovery Report</p>
+                    <div className="bg-white rounded-[3rem] p-8 w-full max-w-sm space-y-6 shadow-2xl relative overflow-hidden text-center">
+                        <div className="absolute top-0 left-0 w-full h-1.5 bg-[#F37343]" />
+                        <p className="text-[9px] font-black text-[#F37343] uppercase tracking-[0.3em]">Discovery Report</p>
                         <div className="space-y-1.5 py-3 px-5 bg-gray-50 rounded-[2rem] border border-gray-100">
                             {briefingItems.map((item, idx) => (<div key={idx} className="flex items-baseline gap-3 text-left"><span className="text-[9px] font-black text-[#F37343]">#{idx + 1}</span><span className="text-[11px] font-black text-gray-900 uppercase truncate flex-1">{item.addressName}</span></div>))}
                         </div>
