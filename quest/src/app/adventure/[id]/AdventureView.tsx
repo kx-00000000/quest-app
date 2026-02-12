@@ -22,13 +22,18 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                 (pos) => {
                     const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                     setUserLocation(newLoc);
-                    geocoder.geocode({ location: newLoc }, (results, status) => {
-                        if (status === "OK" && results?.[0]) {
-                            const addr = results[0].address_components;
-                            const city = addr.find(c => c.types.includes("locality"))?.long_name || "Active Area";
-                            setCurrentAreaName(city);
-                        }
-                    });
+
+                    // ★ 修正：Geocoderが確実に動くように位置取得ごとに実行
+                    if (geocoder) {
+                        geocoder.geocode({ location: newLoc }, (results, status) => {
+                            if (status === "OK" && results?.[0]) {
+                                const addr = results[0].address_components;
+                                const city = addr.find(c => c.types.includes("locality"))?.long_name || "Active Area";
+                                setCurrentAreaName(city);
+                            }
+                        });
+                    }
+
                     const updatedItems = (plan.items || []).map((item: any) => {
                         if (!item.isCollected) {
                             const dist = calculateDistance(newLoc.lat, newLoc.lng, item.lat, item.lng);

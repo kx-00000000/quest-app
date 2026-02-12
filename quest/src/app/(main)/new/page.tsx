@@ -54,7 +54,8 @@ export default function NewQuestPage() {
                 geocoder.geocode({ location: point }, (results, status) => {
                     if (status === "OK" && results?.[0]) {
                         const addr = results[0].address_components;
-                        const city = addr.find(c => c.types.includes("locality"))?.long_name || "Detected Area";
+                        const city = addr.find(c => c.types.includes("locality"))?.long_name ||
+                            addr.find(c => c.types.includes("administrative_area_level_2"))?.long_name || "Active Area";
                         validItems.push({ id: Math.random().toString(36).substr(2, 9), lat: point.lat, lng: point.lng, isCollected: false, addressName: city });
                     }
                     resolve(null);
