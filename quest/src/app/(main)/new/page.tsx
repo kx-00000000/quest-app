@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { savePlan } from "@/lib/storage";
 import { generateRandomPoint } from "@/lib/geo";
-import { CheckCircle2, Play, Loader2, Target, Navigation } from "lucide-react";
+import { CheckCircle2, Play, Loader2 } from "lucide-react";
 import dynamic from "next/dynamic";
 
 const LazyMap = dynamic<any>(() => import("@/components/Map/LazyMap").then(mod => mod.default), { ssr: false });
@@ -16,9 +16,7 @@ const rangeModes = [
 ];
 
 const formatDistance = (km: number): string => {
-    const meters = km * 1000;
-    if (meters < 1000) return `${Math.floor(meters).toLocaleString()} m`;
-    return `${km.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`;
+    return km < 1 ? `${Math.floor(km * 1000)} m` : `${km.toFixed(1)} km`;
 };
 
 export default function NewQuestPage() {
@@ -56,8 +54,7 @@ export default function NewQuestPage() {
                 geocoder.geocode({ location: point }, (results, status) => {
                     if (status === "OK" && results?.[0]) {
                         const addr = results[0].address_components;
-                        const city = addr.find(c => c.types.includes("locality"))?.long_name ||
-                            addr.find(c => c.types.includes("administrative_area_level_2"))?.long_name || "Detected Area";
+                        const city = addr.find(c => c.types.includes("locality"))?.long_name || "Detected Area";
                         validItems.push({ id: Math.random().toString(36).substr(2, 9), lat: point.lat, lng: point.lng, isCollected: false, addressName: city });
                     }
                     resolve(null);
@@ -94,30 +91,30 @@ export default function NewQuestPage() {
                                 <div className="space-y-1">
                                     <div className="flex justify-between text-[10px] font-black text-[#F37343] uppercase tracking-widest"><span>Radius</span><span>{formatDistance(radius)}</span></div>
                                     <input type="range" min={activeMode.min} max={activeMode.max} step={activeMode.step} value={radius} onChange={(e) => setRadius(parseFloat(e.target.value))}
-                                        className="w-full h-2 bg-gray-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-[#F37343] [&::-webkit-slider-thumb]:rounded-full [&::-moz-range-thumb]:bg-[#F37343] [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none" />
+                                        className="w-full h-3 bg-gray-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-[#F37343] [&::-webkit-slider-thumb]:rounded-full" />
                                 </div>
                                 <div className="space-y-1">
                                     <div className="flex justify-between text-[10px] font-black text-[#F37343] uppercase tracking-widest"><span>Items Count</span><span>{itemCount}</span></div>
                                     <input type="range" min="1" max="7" step="1" value={itemCount} onChange={(e) => setItemCount(parseInt(e.target.value))}
-                                        className="w-full h-2 bg-gray-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-[#F37343] [&::-webkit-slider-thumb]:rounded-full [&::-moz-range-thumb]:bg-[#F37343] [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none" />
+                                        className="w-full h-3 bg-gray-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-[#F37343] [&::-webkit-slider-thumb]:rounded-full" />
                                 </div>
                             </div>
-                            <button onClick={handleCreate} disabled={isCreating} className="w-full py-4 bg-gray-900 text-white rounded-[2rem] font-black flex items-center justify-center gap-2">CREATE QUEST</button>
+                            <button onClick={handleCreate} disabled={isCreating} className="w-full py-4 bg-gray-900 text-white rounded-[2rem] font-black flex items-center justify-center gap-2 shadow-lg">CREATE QUEST</button>
                         </div>
                     </div>
                 </>
             )}
 
             {isFinalOverview && (
-                <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md">
-                    <div className="bg-white rounded-[3rem] p-8 w-full max-w-sm space-y-6 shadow-2xl relative overflow-hidden">
-                        <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-[#F37343] to-orange-300" />
-                        <p className="text-[9px] font-black text-[#F37343] uppercase tracking-[0.3em] text-center">Discovery Report</p>
+                <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md animate-in zoom-in-95 duration-500">
+                    <div className="bg-white rounded-[3rem] p-8 w-full max-w-sm space-y-6 shadow-2xl relative overflow-hidden text-center">
+                        <div className="absolute top-0 left-0 w-full h-1.5 bg-[#F37343]" />
+                        <p className="text-[9px] font-black text-[#F37343] uppercase tracking-[0.3em]">Discovery Report</p>
                         <div className="space-y-1.5 py-3 px-5 bg-gray-50 rounded-[2rem] border border-gray-100">
                             {briefingItems.map((item, idx) => (
-                                <div key={idx} className="flex items-baseline gap-3">
-                                    <span className="text-[9px] font-black text-[#F37343] tabular-nums">#{idx + 1}</span>
-                                    <span className="text-[11px] font-black text-gray-900 uppercase truncate text-left flex-1">{item.addressName}</span>
+                                <div key={idx} className="flex items-baseline gap-3 text-left">
+                                    <span className="text-[9px] font-black text-[#F37343]">#{idx + 1}</span>
+                                    <span className="text-[11px] font-black text-gray-900 uppercase truncate flex-1">{item.addressName}</span>
                                 </div>
                             ))}
                         </div>

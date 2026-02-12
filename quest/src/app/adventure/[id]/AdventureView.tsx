@@ -22,17 +22,14 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                 (pos) => {
                     const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                     setUserLocation(newLoc);
-
                     geocoder.geocode({ location: newLoc }, (results, status) => {
                         if (status === "OK" && results?.[0]) {
                             const addr = results[0].address_components;
-                            const city = addr.find(c => c.types.includes("locality"))?.long_name ||
-                                addr.find(c => c.types.includes("administrative_area_level_2"))?.long_name || "Active Area";
+                            const city = addr.find(c => c.types.includes("locality"))?.long_name || "Active Area";
                             setCurrentAreaName(city);
                         }
                     });
-
-                    const updatedItems = plan.items.map((item: any) => {
+                    const updatedItems = (plan.items || []).map((item: any) => {
                         if (!item.isCollected) {
                             const dist = calculateDistance(newLoc.lat, newLoc.lng, item.lat, item.lng);
                             if (dist < 0.05) return { ...item, isCollected: true, collectedAt: new Date().toISOString() };
@@ -54,7 +51,7 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
 
     const nearestItem = useMemo(() => {
         if (!userLocation) return null;
-        const uncollected = plan.items.filter((i: any) => !i.isCollected);
+        const uncollected = (plan.items || []).filter((i: any) => !i.isCollected);
         if (uncollected.length === 0) return null;
         return uncollected.map((item: any) => ({
             ...item,
@@ -72,26 +69,22 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
             <header className="relative z-10 p-6 pt-16">
                 <div className="bg-black/90 backdrop-blur-xl rounded-[2.5rem] p-6 shadow-2xl text-white">
                     <div className="flex justify-between items-start mb-6">
-                        <div className="flex-1">
+                        <div className="flex-1 text-left">
                             <p className="text-[10px] font-black text-[#F37343] uppercase tracking-[0.3em] mb-1 flex items-center gap-1">
                                 <MapPin size={10} /> {currentAreaName}
                             </p>
                             <h1 className="text-xl font-black uppercase truncate w-48">{plan.name}</h1>
                         </div>
-                        <div className="text-right">
-                            <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Status</p>
-                            <div className="flex items-center gap-2 justify-end"><div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" /><span className="text-xs font-black uppercase">On Course</span></div>
-                        </div>
                     </div>
                     {nearestItem && (
                         <div className="grid grid-cols-2 gap-4 border-t border-white/10 pt-6">
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-4 text-left">
                                 <Navigation className="text-[#F37343]" size={24} style={{ transform: `rotate(${nearestItem.bearing}deg)` }} />
-                                <div><p className="text-[8px] font-bold text-gray-400 uppercase">Distance</p><p className="text-lg font-black tabular-nums">{(nearestItem.distance < 1) ? `${Math.floor(nearestItem.distance * 1000)}m` : `${nearestItem.distance.toFixed(1)}km`}</p></div>
+                                <div><p className="text-[8px] font-bold text-gray-400 uppercase">Distance</p><p className="text-lg font-black">{nearestItem.distance < 1 ? `${Math.floor(nearestItem.distance * 1000)}m` : `${nearestItem.distance.toFixed(1)}km`}</p></div>
                             </div>
-                            <div className="flex items-center gap-4 border-l border-white/5 pl-4">
+                            <div className="flex items-center gap-4 border-l border-white/5 pl-4 text-left">
                                 <Compass size={24} className="text-gray-400" />
-                                <div><p className="text-[8px] font-bold text-gray-400 uppercase">Heading</p><p className="text-lg font-black tabular-nums">{Math.floor(nearestItem.bearing)}°</p></div>
+                                <div><p className="text-[8px] font-bold text-gray-400 uppercase">Heading</p><p className="text-lg font-black">{Math.floor(nearestItem.bearing)}°</p></div>
                             </div>
                         </div>
                     )}
