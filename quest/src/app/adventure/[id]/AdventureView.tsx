@@ -23,7 +23,7 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                     const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                     setUserLocation(newLoc);
 
-                    // ★ 解決：座標から地名をリアルタイム同期
+                    // ★ 解決：座標から地名をリアルタイム取得して表示
                     if (geocoder) {
                         geocoder.geocode({ location: newLoc }, (results, status) => {
                             if (status === "OK" && results?.[0]) {

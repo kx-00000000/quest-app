@@ -9,70 +9,58 @@ import dynamic from "next/dynamic";
 
 const LazyMap = dynamic<any>(() => import("@/components/Map/LazyMap").then(mod => mod.default), { ssr: false });
 
-const rangeModes = [
-    { id: 'neighborhood', label: 'NEIGHBORHOOD', min: 0.5, max: 15, step: 0.1 },
-    { id: 'excursion', label: 'EXCURSION', min: 15, max: 200, step: 1 },
-    { id: 'grand', label: 'GRAND', min: 200, max: 40000, step: 100 }
-];
-
-const formatDistance = (km: number): string => {
-    return km < 1 ? `${Math.floor(km * 1000)} m` : `${km.toFixed(1)} km`;
-};
-
 export default function NewQuestPage() {
     const router = useRouter();
     const [name, setName] = useState("");
-    const [activeMode, setActiveMode] = useState(rangeModes[0]);
     const [radius, setRadius] = useState(1);
     const [itemCount, setItemCount] = useState(3);
     const [isCreating, setIsCreating] = useState(false);
-    const [showConfirm, setShowConfirm] = useState(false);
     const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
     const [briefingItems, setBriefingItems] = useState<any[]>([]);
     const [isBriefingActive, setIsBriefingActive] = useState(false);
     const [isFinalOverview, setIsFinalOverview] = useState(false);
 
     useEffect(() => {
-        if (typeof window !== "undefined" && "geolocation" in navigator) {
-            navigator.geolocation.getCurrentPosition(
-                (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                (err) => console.warn(err)
-            );
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition((pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }));
         }
     }, []);
 
     const handleCreate = async () => {
         setIsCreating(true);
         const center = userLocation || { lat: 35.6812, lng: 139.7671 };
-        const validItems: any[] = [];
+        const validItems = [];
         const geocoder = new google.maps.Geocoder();
 
         for (let i = 0; i < itemCount; i++) {
             const point = generateRandomPoint(center, radius);
-            await new Promise((resolve) => {
-                geocoder.geocode({ location: point }, (results, status) => {
-                    let city = "Unknown Waypoint";
-                    if (status === "OK" && results?.[0]) {
-                        city = results[0].address_components.find(c => c.types.includes("locality"))?.long_name || "Active Area";
-                    }
-                    validItems.push({ id: Math.random().toString(36).substr(2, 9), lat: point.lat, lng: point.lng, isCollected: false, addressName: city });
-                    resolve(null);
+            const city = await new Promise<string>((resolve) => {
+                geocoder.geocode({ location: point }, (res, status) => {
+                    if (status === "OK" && res?.[0]) {
+                        const comp = res[0].address_components;
+                        const cityName = comp.find(c => c.types.includes("locality"))?.long_name ||
+                            comp.find(c => c.types.includes("administrative_area_level_2"))?.long_name || "Active Area";
+                        resolve(cityName);
+                    } else resolve("Quest Point");
                 });
             });
+            validItems.push({ id: Math.random().toString(36).substr(2, 9), ...point, isCollected: false, addressName: city });
         }
-        savePlan({ id: Math.random().toString(36).substr(2, 9), name: name.trim() || "NEW QUEST", radius, itemCount: validItems.length, status: "ready", createdAt: new Date().toISOString(), totalDistance: 0, collectedCount: 0, center, items: validItems });
+
+        const plan = { id: Math.random().toString(36).substr(2, 9), name: name.trim() || "NEW QUEST", radius, items: validItems, center, status: "ready", createdAt: new Date().toISOString() };
+        savePlan(plan);
         setBriefingItems(validItems);
         setIsCreating(false);
-        setShowConfirm(true);
+        setIsBriefingActive(true);
     };
 
     return (
         <div className="flex flex-col h-full min-h-screen relative bg-white overflow-hidden">
             <div className="absolute inset-0 z-0">
-                <LazyMap radiusInKm={radius} userLocation={userLocation} themeColor="#F37343" items={briefingItems} isBriefingActive={isBriefingActive} isFinalOverview={isFinalOverview} onBriefingStateChange={setIsFinalOverview} onBriefingComplete={() => setIsBriefingActive(false)} />
+                <LazyMap radiusInKm={radius} userLocation={userLocation} items={briefingItems} isBriefingActive={isBriefingActive} isFinalOverview={isFinalOverview} onBriefingStateChange={setIsFinalOverview} onBriefingComplete={() => setIsBriefingActive(false)} />
             </div>
 
-            {!isBriefingActive && !showConfirm && !isFinalOverview && (
+            {!isBriefingActive && !isFinalOverview && (
                 <>
                     <div className="absolute top-8 left-6 right-6 z-20">
                         <div className="bg-white/40 backdrop-blur-2xl rounded-[2rem] border border-white/40 shadow-xl px-6 py-3">
@@ -81,31 +69,20 @@ export default function NewQuestPage() {
                     </div>
                     <div className="mt-auto relative z-10 px-4 mb-4">
                         <div className="bg-white/80 backdrop-blur-xl rounded-[3rem] p-6 shadow-2xl border border-white space-y-5">
-                            <div className="flex p-1 bg-black/5 rounded-2xl gap-1">
-                                {rangeModes.map((mode) => (
-                                    <button key={mode.id} onClick={() => { setActiveMode(mode); setRadius(mode.min); }} className={`flex-1 py-2 text-[9px] font-black rounded-xl transition-all ${activeMode.id === mode.id ? 'bg-white text-[#F37343] shadow-sm' : 'text-gray-500'}`}>{mode.label}</button>
-                                ))}
-                            </div>
                             <div className="space-y-4 px-1">
-                                <div className="space-y-1">
-                                    <div className="flex justify-between text-[10px] font-black text-[#F37343] uppercase tracking-widest"><span>Radius</span><span>{formatDistance(radius)}</span></div>
-                                    <input type="range" min={activeMode.min} max={activeMode.max} step={activeMode.step} value={radius} onChange={(e) => setRadius(parseFloat(e.target.value))}
-                                        className="w-full h-3 bg-gray-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-[#F37343] [&::-webkit-slider-thumb]:rounded-full" />
-                                </div>
-                                <div className="space-y-1">
-                                    <div className="flex justify-between text-[10px] font-black text-[#F37343] uppercase tracking-widest"><span>Items Count</span><span>{itemCount}</span></div>
-                                    <input type="range" min="1" max="7" step="1" value={itemCount} onChange={(e) => setItemCount(parseInt(e.target.value))}
-                                        className="w-full h-3 bg-gray-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-[#F37343] [&::-webkit-slider-thumb]:rounded-full" />
-                                </div>
+                                <div className="flex justify-between text-[10px] font-black text-[#F37343] uppercase tracking-widest"><span>Radius</span><span>{radius}km</span></div>
+                                <input type="range" min="0.5" max="15" step="0.1" value={radius} onChange={(e) => setRadius(parseFloat(e.target.value))} className="w-full h-3 bg-gray-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-[#F37343] [&::-webkit-slider-thumb]:rounded-full" />
                             </div>
-                            <button onClick={handleCreate} disabled={isCreating} className="w-full py-4 bg-gray-900 text-white rounded-[2rem] font-black flex items-center justify-center gap-2 active:scale-95 shadow-lg">CREATE QUEST</button>
+                            <button onClick={handleCreate} disabled={isCreating} className="w-full py-4 bg-gray-900 text-white rounded-[2rem] font-black flex items-center justify-center gap-2 shadow-lg">
+                                {isCreating ? <Loader2 className="animate-spin" /> : "CREATE QUEST"}
+                            </button>
                         </div>
                     </div>
                 </>
             )}
 
             {isFinalOverview && (
-                <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md animate-in zoom-in-95 duration-500">
+                <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md animate-in zoom-in-95">
                     <div className="bg-white rounded-[3rem] p-8 w-full max-w-sm space-y-6 shadow-2xl relative overflow-hidden text-center">
                         <div className="absolute top-0 left-0 w-full h-1.5 bg-[#F37343]" />
                         <p className="text-[9px] font-black text-[#F37343] uppercase tracking-[0.3em]">Discovery Report</p>

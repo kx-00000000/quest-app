@@ -48,8 +48,9 @@ export default function LazyMap({
 }: LazyMapProps) {
     const map = useMap();
     const [activePlaceName, setActivePlaceName] = useState<string | null>(null);
+    const briefingStarted = useRef(false);
 
-    // ★ 解決：世界地図になる問題の対策（有効な座標のみで計算）
+    // ★ 解決：世界地図にならず、確実にピンの範囲にズームする
     useEffect(() => {
         if (!map || items.length === 0 || isBriefingActive) return;
 
@@ -69,26 +70,34 @@ export default function LazyMap({
             }
         };
 
-        const timer = setTimeout(applyBounds, 800);
-        return () => clearTimeout(timer);
+        // 即時実行と、地図の安定（idle）後の再実行で確実に範囲を合わせる
+        applyBounds();
+        const listener = google.maps.event.addListenerOnce(map, 'idle', applyBounds);
+        return () => google.maps.event.removeListener(listener);
     }, [map, items, isLogMode, isFinalOverview, userLocation, isBriefingActive]);
 
-    // ★ 解決：演出を廃止し、地点切り替えのみにする
+    // ★ 解決：演出を排除したシンプルな地点切り替え
     useEffect(() => {
-        if (!isBriefingActive || !map || items.length === 0) return;
+        if (!isBriefingActive || !map || items.length === 0 || briefingStarted.current) return;
+        briefingStarted.current = true;
 
         const runBriefing = async () => {
-            map.setZoom(15); // 常に一定の高さ
-
+            map.setZoom(15);
             for (const item of items) {
                 map.panTo({ lat: item.lat, lng: item.lng });
-                setActivePlaceName(item.addressName || "Waypoint");
-                await new Promise(r => setTimeout(r, 2500)); // 静止して見せる時間
+                setActivePlaceName(item.addressName || "WAYPOINT");
+                await new Promise(r => setTimeout(r, 2500)); // 静止時間
             }
 
+            const finalBounds = new google.maps.LatLngBounds();
+            items.forEach(i => finalBounds.extend({ lat: i.lat, lng: i.lng }));
+            map.fitBounds(finalBounds, 80);
+
+            await new Promise(r => setTimeout(r, 1500));
+            setActivePlaceName(null);
+            briefingStarted.current = false;
             if (onBriefingStateChange) onBriefingStateChange(true);
             if (onBriefingComplete) onBriefingComplete();
-            setActivePlaceName(null);
         };
 
         runBriefing();
@@ -97,8 +106,7 @@ export default function LazyMap({
     const initialCenter = useMemo(() => {
         if (userLocation?.lat) return userLocation;
         if (center?.lat) return center;
-        if (items[0]?.lat) return { lat: items[0].lat, lng: items[0].lng };
-        return { lat: 35.6812, lng: 139.7671 };
+        return items.length > 0 ? { lat: items[0].lat, lng: items[0].lng } : { lat: 35.6812, lng: 139.7671 };
     }, [userLocation, center, items]);
 
     return (
@@ -111,7 +119,7 @@ export default function LazyMap({
                 gestureHandling={'greedy'}
             >
                 {userLocation && <Marker position={userLocation} />}
-                {/* ★ 解決：ブリーフィング中は円を隠す */}
+                {/* ★ 解決：ブリーフィング中は円を消す */}
                 {userLocation && radiusInKm && !isBriefingActive && (
                     <MapCircle center={userLocation} radius={radiusInKm} color={themeColor} />
                 )}
@@ -122,7 +130,7 @@ export default function LazyMap({
             {activePlaceName && (
                 <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50">
                     <div className="bg-black/90 px-6 py-2 rounded-full border border-[#F37343]/30 shadow-2xl">
-                        <p className="text-white text-[10px] font-black uppercase tracking-[0.3em]">
+                        <p className="text-white text-[10px] font-black uppercase tracking-[0.3em] whitespace-nowrap">
                             <span className="text-[#F37343]">Scanning:</span> {activePlaceName}
                         </p>
                     </div>
