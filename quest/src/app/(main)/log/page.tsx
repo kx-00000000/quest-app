@@ -1,15 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, ComponentType } from "react";
 import { getPlans } from "@/lib/storage";
 import { calculateDistance } from "@/lib/geo";
 import { MapPin, ChevronDown, ChevronUp, Package, Clock, MessageCircle, Footprints } from "lucide-react";
 import dynamic from "next/dynamic";
 
-const LazyMap = dynamic(() => import("@/components/Map/LazyMap"), {
-    ssr: false,
-    loading: () => <div className="h-48 w-full bg-gray-50 animate-pulse rounded-2xl" />
-});
+// --- ★ ここで LazyMap が受け取る Props の型を定義します ---
+interface LazyMapProps {
+    items?: any[];
+    center?: { lat: number; lng: number };
+    userLocation?: { lat: number; lng: number } | null;
+    radiusInKm?: number;
+    themeColor?: string;
+    isLogMode?: boolean;
+    isBriefingActive?: boolean;
+    isFinalOverview?: boolean;
+    planId?: string | null;
+    onBriefingStateChange?: (state: boolean) => void;
+    onBriefingComplete?: () => void;
+}
+
+// --- ★ dynamic インポートに上記の型を適用します ---
+const LazyMap = dynamic<LazyMapProps>(
+    () => import("@/components/Map/LazyMap").then((mod) => mod.default),
+    {
+        ssr: false,
+        loading: () => <div className="h-48 w-full bg-gray-50 animate-pulse rounded-2xl" />
+    }
+);
 
 const formatDistance = (km: number): string => {
     if (km < 1) {
@@ -38,7 +57,7 @@ export default function LogPage() {
         const allPlans = getPlans();
         const logs = allPlans
             .filter(plan => (plan.items || []).some((i: any) => i.isCollected))
-            .map((plan: any) => { // ★ 型エラーを避けるために plan: any に変更
+            .map((plan: any) => {
                 const collectedItems = (plan.items || [])
                     .filter((i: any) => i.isCollected)
                     .sort((a: any, b: any) => new Date(a.collectedAt || 0).getTime() - new Date(b.collectedAt || 0).getTime());
@@ -51,7 +70,6 @@ export default function LogPage() {
                 });
 
                 const startTime = plan.createdAt;
-                // ★ 型エラーが出ていた箇所：plan.finishedAt を安全に参照
                 const endTime = plan.finishedAt || (collectedItems.length > 0 ? collectedItems[collectedItems.length - 1].collectedAt : startTime);
 
                 return {
@@ -84,7 +102,7 @@ export default function LogPage() {
                     <div>
                         <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Items</p>
                         <p className="text-2xl font-bold tabular-nums">
-                            {completedPlans.reduce((acc, curr) => acc + (curr.collectedCount || 0), 0)}
+                            {completedPlans.reduce((acc, curr) => acc + (curr.collectedItems?.length || 0), 0)}
                         </p>
                     </div>
                 </div>
@@ -121,7 +139,7 @@ export default function LogPage() {
                                             </div>
                                             <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 text-black">
                                                 <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-1">Items</div>
-                                                <div className="text-[13px] font-bold tabular-nums truncate">{plan.collectedCount} pts</div>
+                                                <div className="text-[13px] font-bold tabular-nums truncate">{plan.collectedItems?.length} pts</div>
                                             </div>
                                         </div>
 
@@ -132,6 +150,7 @@ export default function LogPage() {
                                         )}
 
                                         <div className="mx-6 h-52 relative border border-gray-100 rounded-2xl overflow-hidden mb-6">
+                                            {/* Google Maps 表示 */}
                                             <LazyMap items={plan.items} themeColor="#f06292" center={plan.center} isLogMode={true} />
                                         </div>
 
