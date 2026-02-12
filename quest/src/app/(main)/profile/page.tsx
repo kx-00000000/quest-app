@@ -41,8 +41,10 @@ export default function ProfilePage() {
             itemCount += collected.length;
 
             collected.forEach((item: any) => {
-                const itemTime = new Date(item.collectedAt).getTime();
-                if (itemTime > latestDate) latestDate = itemTime;
+                if (item.collectedAt) {
+                    const itemTime = new Date(item.collectedAt).getTime();
+                    if (itemTime > latestDate) latestDate = itemTime;
+                }
             });
         });
 
@@ -62,7 +64,7 @@ export default function ProfilePage() {
         setIsEditing(false);
     };
 
-    // ステータス判定（マリオット風のランク分け）
+    // ステータス判定
     const getStatus = (count: number) => {
         if (count >= 50) return { name: "LEGEND VOYAGER", color: "text-purple-600", bg: "bg-purple-50" };
         if (count >= 20) return { name: "ELITE EXPLORER", color: "text-blue-600", bg: "bg-blue-50" };
@@ -75,7 +77,7 @@ export default function ProfilePage() {
     return (
         <div className="min-h-screen bg-gray-50/30 text-black font-sans pb-32">
 
-            {/* 0. ヘッダー：名前と通知 */}
+            {/* ヘッダーセクション */}
             <header className="bg-white p-8 pt-16 border-b border-gray-100 flex items-center justify-between">
                 <div className="flex items-center gap-5">
                     <div className="w-16 h-16 bg-black rounded-full flex items-center justify-center text-white shrink-0 shadow-lg">
@@ -111,9 +113,10 @@ export default function ProfilePage() {
                 </button>
             </header>
 
+            {/* メインコンテンツセクション */}
             <main className="p-6 space-y-6">
 
-                {/* ① 累計ステータス：マリオット風のメインパネル  */}
+                {/* 累計ステータスパネル */}
                 <section className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 overflow-hidden relative">
                     <div className="text-center relative z-10">
                         <div className={`inline-block px-3 py-1 rounded-full text-[9px] font-black tracking-widest mb-4 ${status.bg} ${status.color}`}>
@@ -137,7 +140,7 @@ export default function ProfilePage() {
                     </div>
                 </section>
 
-                {/* クラウドバックアップバナー：デザインを統合 */}
+                {/* バックアップバナー */}
                 {!isLoggedIn && (
                     <div className="p-6 bg-pink-50 rounded-[2rem] border border-pink-100 flex items-center justify-between gap-4">
                         <div className="flex gap-4 items-center">
@@ -158,7 +161,7 @@ export default function ProfilePage() {
                     </div>
                 )}
 
-                {/* ② 設定リスト：マリオットの整理された項目群  */}
+                {/* 設定リスト */}
                 <section className="space-y-2">
                     <p className="px-4 text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-3">System Settings</p>
 
@@ -189,7 +192,7 @@ export default function ProfilePage() {
                 <button className="w-full py-8 flex items-center justify-center gap-2 text-gray-300 font-bold text-[10px] uppercase tracking-[0.3em] active:text-red-400 transition-colors">
                     <LogOut size={14} /> Sign Out / Exit
                 </button>
-            </header>
+            </main>
 
             <p className="mt-4 text-[8px] text-center text-gray-200 font-bold uppercase tracking-[0.4em]">
                 Multi-Language AI Concierge v1.0
