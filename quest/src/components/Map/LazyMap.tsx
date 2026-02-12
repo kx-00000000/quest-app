@@ -48,63 +48,95 @@ export default function LazyMap({
 }: LazyMapProps) {
     const map = useMap();
     const [activePlaceName, setActivePlaceName] = useState<string | null>(null);
+    const briefingRef = useRef(false);
 
-    const mapInitialCenter = useMemo(() => {
+    // ★ 地図が消えるのを防ぐため、centerが空でもデフォルト値を保証
+    const mapCenter = useMemo(() => {
         if (userLocation && userLocation.lat !== 0) return userLocation;
         if (center && center.lat !== 0) return center;
         if (items.length > 0) return { lat: items[0].lat, lng: items[0].lng };
         return { lat: 35.6812, lng: 139.7671 };
     }, [userLocation, center, items]);
 
+    // ★ 全ピンを表示する fitBounds
     useEffect(() => {
         if (!map || items.length === 0 || isBriefingActive) return;
+
         const applyBounds = () => {
             const bounds = new google.maps.LatLngBounds();
             items.forEach(item => bounds.extend({ lat: item.lat, lng: item.lng }));
             if (userLocation) bounds.extend(userLocation);
             map.fitBounds(bounds, { top: 80, right: 60, bottom: 80, left: 60 });
         };
-        const listener = google.maps.event.addListenerOnce(map, 'idle', applyBounds);
-        return () => google.maps.event.removeListener(listener);
+
+        const timer = setTimeout(() => {
+            google.maps.event.addListenerOnce(map, 'idle', applyBounds);
+        }, 500);
+        return () => clearTimeout(timer);
     }, [map, items, isLogMode, isFinalOverview, userLocation, isBriefingActive]);
 
+    // ★ 洗練されたブリーフィング演出：上昇 → 移動 → 降下
     useEffect(() => {
-        if (!isBriefingActive || !map || items.length === 0) return;
+        if (!isBriefingActive || !map || items.length === 0 || briefingRef.current) return;
+        briefingRef.current = true;
+
         const runBriefing = async () => {
             map.setOptions({ gestureHandling: 'none' });
+
             for (const item of items) {
+                // 1. 上昇 (離陸)
                 map.setZoom(12);
-                await new Promise(r => setTimeout(r, 800));
+                await new Promise(r => setTimeout(r, 1000));
+
+                // 2. 移動 (水平飛行)
                 map.panTo({ lat: item.lat, lng: item.lng });
                 setActivePlaceName(item.addressName || "WAYPOINT");
-                await new Promise(r => setTimeout(r, 1200));
+
+                // panToのアニメーション時間を考慮
+                await new Promise(r => setTimeout(r, 1500));
+
+                // 3. 降下 (着陸・フォーカス)
                 map.setZoom(17);
                 await new Promise(r => setTimeout(r, 2000));
             }
+
             const bounds = new google.maps.LatLngBounds();
             items.forEach(i => bounds.extend({ lat: i.lat, lng: i.lng }));
             map.fitBounds(bounds, 100);
-            await new Promise(r => setTimeout(r, 1500));
+
+            await new Promise(r => setTimeout(r, 2000));
             setActivePlaceName(null);
+            briefingRef.current = false;
             if (onBriefingStateChange) onBriefingStateChange(true);
             if (onBriefingComplete) onBriefingComplete();
         };
+
         runBriefing();
-    }, [isBriefingActive, map, items, userLocation, onBriefingStateChange, onBriefingComplete]);
+    }, [isBriefingActive, map, items]);
 
     return (
-        <div className="w-full h-full relative bg-gray-50">
-            <Map defaultZoom={14} center={mapInitialCenter} styles={mapStyle} disableDefaultUI={true} gestureHandling={'greedy'}>
+        <div className="w-full h-full relative bg-[#f5f5f5]">
+            <Map
+                defaultZoom={14}
+                center={mapCenter}
+                styles={mapStyle}
+                disableDefaultUI={true}
+                gestureHandling={'greedy'}
+            >
                 {userLocation && <Marker position={userLocation} />}
                 {userLocation && radiusInKm && <MapCircle center={userLocation} radius={radiusInKm} color={themeColor} />}
                 {items.map((item, idx) => (
-                    <Marker key={item.id || idx} position={{ lat: item.lat, lng: item.lng }} label={{ text: (idx + 1).toString(), color: 'white', fontWeight: 'bold' }} />
+                    <Marker
+                        key={item.id || idx}
+                        position={{ lat: item.lat, lng: item.lng }}
+                        label={{ text: (idx + 1).toString(), color: 'white', fontWeight: 'bold' }}
+                    />
                 ))}
             </Map>
             {activePlaceName && (
                 <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-700">
                     <div className="bg-black/90 px-6 py-2 rounded-full border border-[#F37343]/30 shadow-2xl">
-                        <p className="text-white text-[10px] font-black uppercase tracking-[0.3em] whitespace-nowrap">
+                        <p className="text-white text-[10px] font-black uppercase tracking-[0.3em] whitespace-nowrap text-center">
                             <span className="text-[#F37343]">Scanning:</span> {activePlaceName}
                         </p>
                     </div>

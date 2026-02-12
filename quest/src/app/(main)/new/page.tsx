@@ -46,6 +46,7 @@ export default function NewQuestPage() {
         const center = userLocation || { lat: 35.6812, lng: 139.7671 };
         const validItems: any[] = [];
         const geocoder = new google.maps.Geocoder();
+
         let attempts = 0;
         while (validItems.length < itemCount && attempts < 20) {
             attempts++;
@@ -53,9 +54,7 @@ export default function NewQuestPage() {
             await new Promise((resolve) => {
                 geocoder.geocode({ location: point }, (results, status) => {
                     if (status === "OK" && results?.[0]) {
-                        const addr = results[0].address_components;
-                        const city = addr.find(c => c.types.includes("locality"))?.long_name ||
-                            addr.find(c => c.types.includes("administrative_area_level_2"))?.long_name || "Active Area";
+                        const city = results[0].address_components.find(c => c.types.includes("locality"))?.long_name || "New Area";
                         validItems.push({ id: Math.random().toString(36).substr(2, 9), lat: point.lat, lng: point.lng, isCollected: false, addressName: city });
                     }
                     resolve(null);
@@ -76,7 +75,7 @@ export default function NewQuestPage() {
 
             {!isBriefingActive && !showConfirm && !isFinalOverview && (
                 <>
-                    <div className="absolute top-8 left-6 right-6 z-20">
+                    <div className="absolute top-8 left-6 right-6 z-20 text-center">
                         <div className="bg-white/40 backdrop-blur-2xl rounded-[2rem] border border-white/40 shadow-xl px-6 py-3">
                             <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="QUEST NAME" className="w-full bg-transparent border-none outline-none text-gray-800 font-black text-center" />
                         </div>
@@ -107,8 +106,8 @@ export default function NewQuestPage() {
             )}
 
             {isFinalOverview && (
-                <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md animate-in zoom-in-95 duration-500">
-                    <div className="bg-white rounded-[3rem] p-8 w-full max-w-sm space-y-6 shadow-2xl relative overflow-hidden text-center">
+                <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md">
+                    <div className="bg-white rounded-[3rem] p-8 w-full max-w-sm space-y-6 shadow-2xl relative overflow-hidden text-center animate-in zoom-in-95">
                         <div className="absolute top-0 left-0 w-full h-1.5 bg-[#F37343]" />
                         <p className="text-[9px] font-black text-[#F37343] uppercase tracking-[0.3em]">Discovery Report</p>
                         <div className="space-y-1.5 py-3 px-5 bg-gray-50 rounded-[2rem] border border-gray-100">
@@ -119,7 +118,7 @@ export default function NewQuestPage() {
                                 </div>
                             ))}
                         </div>
-                        <button onClick={() => router.push("/plan")} className="w-full py-5 bg-gray-900 text-white rounded-[2rem] font-black uppercase tracking-widest shadow-xl">Start Adventure</button>
+                        <button onClick={() => router.push("/plan")} className="w-full py-5 bg-gray-900 text-white rounded-[2rem] font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-2"><Play size={14} fill="currentColor" />Start Adventure</button>
                     </div>
                 </div>
             )}

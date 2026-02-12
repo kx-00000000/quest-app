@@ -13,7 +13,7 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
     const router = useRouter();
     const [plan, setPlan] = useState(initialPlan);
     const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-    const [currentAreaName, setCurrentAreaName] = useState<string>("Scanning...");
+    const [currentAreaName, setCurrentAreaName] = useState<string>("Searching...");
 
     useEffect(() => {
         if (typeof window !== "undefined" && "geolocation" in navigator) {
@@ -23,12 +23,12 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                     const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                     setUserLocation(newLoc);
 
-                    // ★ 修正：Geocoderが確実に動くように位置取得ごとに実行
+                    // ★ 座標から地名をリアルタイム同期
                     if (geocoder) {
                         geocoder.geocode({ location: newLoc }, (results, status) => {
                             if (status === "OK" && results?.[0]) {
-                                const addr = results[0].address_components;
-                                const city = addr.find(c => c.types.includes("locality"))?.long_name || "Active Area";
+                                const city = results[0].address_components.find(c => c.types.includes("locality"))?.long_name ||
+                                    results[0].address_components.find(c => c.types.includes("administrative_area_level_2"))?.long_name || "Active Area";
                                 setCurrentAreaName(city);
                             }
                         });
@@ -85,11 +85,11 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                         <div className="grid grid-cols-2 gap-4 border-t border-white/10 pt-6">
                             <div className="flex items-center gap-4 text-left">
                                 <Navigation className="text-[#F37343]" size={24} style={{ transform: `rotate(${nearestItem.bearing}deg)` }} />
-                                <div><p className="text-[8px] font-bold text-gray-400 uppercase">Distance</p><p className="text-lg font-black">{nearestItem.distance < 1 ? `${Math.floor(nearestItem.distance * 1000)}m` : `${nearestItem.distance.toFixed(1)}km`}</p></div>
+                                <div><p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Distance</p><p className="text-lg font-black">{nearestItem.distance < 1 ? `${Math.floor(nearestItem.distance * 1000)}m` : `${nearestItem.distance.toFixed(1)}km`}</p></div>
                             </div>
                             <div className="flex items-center gap-4 border-l border-white/5 pl-4 text-left">
                                 <Compass size={24} className="text-gray-400" />
-                                <div><p className="text-[8px] font-bold text-gray-400 uppercase">Heading</p><p className="text-lg font-black">{Math.floor(nearestItem.bearing)}°</p></div>
+                                <div><p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Heading</p><p className="text-lg font-black">{Math.floor(nearestItem.bearing)}°</p></div>
                             </div>
                         </div>
                     )}
