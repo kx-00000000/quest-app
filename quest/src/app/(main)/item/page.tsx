@@ -1,17 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { Package, Grid, LayoutList, X, MapPin, Calendar, Info } from "lucide-react";
+import { Grid, LayoutList, X, MapPin, Calendar } from "lucide-react";
 
-// --- モックデータ：新仕様に基づいた項目 ---
-const ITEMS = Array.from({ length: 12 }, (_, i) => ({
+// --- モックデータ ---
+const ITEMS = Array.from({ length: 15 }, (_, i) => ({
     id: `item_${i}`,
-    name: i % 2 === 0 ? "ローカル・アンティーク" : "名産の欠片",
-    locationName: "東京都 目黒区 自由が丘周辺",
-    coords: "35.6074° N, 139.6672° E",
-    collectedAt: "2026.02.12 14:30",
-    description: "その土地でしか見つからない特別なアイテム。長い年月を経て、不思議な輝きを放ち続けている。",
-    imagePath: `/images/items/item-${(i % 3) + 1}.png`
+    name: i % 2 === 0 ? "Malibu California" : "Fuji Exploration",
+    locationName: i % 2 === 0 ? "Malibu Beach" : "Mount Fuji Base",
+    coords: i % 2 === 0 ? "34.0259° N, 118.7798° W" : "35.3606° N, 138.7274° E",
+    collectedAt: "2026.02.12",
+    description: "その土地の空気感を閉じ込めた特別なステッカー。旅の記憶が色鮮やかに蘇る。",
+    // テスト用にステッカー例の画像パスを指定（実際の名前に合わせてください）
+    imagePath: i % 2 === 0 ? "/images/items/sticker-ex1.png" : "/images/items/sticker-ex2.png",
+    // ★ 傾きをランダムに持たせるためのプロパティ（-6度から6度）
+    rotation: Math.floor(Math.random() * 12) - 6
 }));
 
 export default function ItemPage() {
@@ -20,59 +23,59 @@ export default function ItemPage() {
 
     return (
         <div className="min-h-screen bg-white font-sans pb-32">
-            {/* 1. ヘッダー（切替スイッチ） */}
-            <div className="flex border-b border-gray-100 bg-white sticky top-0 z-10">
-                <button onClick={() => setViewMode('grid')} className={`flex-1 py-4 flex justify-center items-center border-b-2 transition-all ${viewMode === 'grid' ? 'border-black text-black' : 'border-transparent text-gray-300'}`}>
-                    <Grid size={20} />
-                </button>
-                <button onClick={() => setViewMode('list')} className={`flex-1 py-4 flex justify-center items-center border-b-2 transition-all ${viewMode === 'list' ? 'border-black text-black' : 'border-transparent text-gray-300'}`}>
-                    <LayoutList size={20} />
-                </button>
-            </div>
+            {/* ヘッダー */}
+            <header className="p-8 pt-16 border-b border-gray-100 flex justify-between items-end">
+                <div>
+                    <h1 className="text-2xl font-bold tracking-tighter uppercase text-black">Collection</h1>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Sticker Vault</p>
+                </div>
+                <div className="flex bg-gray-50 rounded-xl p-1">
+                    <button onClick={() => setViewMode('grid')} className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-black' : 'text-gray-300'}`}>
+                        <Grid size={18} />
+                    </button>
+                    <button onClick={() => setViewMode('list')} className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-black' : 'text-gray-300'}`}>
+                        <LayoutList size={18} />
+                    </button>
+                </div>
+            </header>
 
-            {/* 2. メインコンテンツ */}
-            <main className="animate-in fade-in duration-500">
+            {/* メインリスト */}
+            <main className="p-4">
                 {viewMode === 'grid' ? (
-                    /* グリッド表示：画像が主役 */
-                    <div className="grid grid-cols-3 gap-0.5 bg-gray-100">
+                    <div className="grid grid-cols-3 gap-6 pt-4">
                         {ITEMS.map((item) => (
                             <div
                                 key={item.id}
                                 onClick={() => setSelectedItem(item)}
-                                className="aspect-square bg-white flex items-center justify-center p-4 active:opacity-60 transition-opacity cursor-pointer overflow-hidden"
+                                className="aspect-square relative flex items-center justify-center cursor-pointer group"
                             >
-                                <img src={item.imagePath} alt={item.name} className="w-full h-full object-contain" />
+                                {/* ステッカーのベース */}
+                                <div
+                                    className="w-full h-full p-2 transition-transform duration-300 group-hover:scale-110 group-active:scale-95"
+                                    style={{ transform: `rotate(${item.rotation}deg)` }}
+                                >
+                                    <img
+                                        src={item.imagePath}
+                                        alt={item.name}
+                                        /* ★ drop-shadow を適用してステッカーの厚みを表現 */
+                                        className="w-full h-full object-contain drop-shadow-[0_4px_6px_rgba(0,0,0,0.15)] filter"
+                                    />
+                                </div>
                             </div>
                         ))}
                     </div>
                 ) : (
-                    /* リスト表示：すべての情報を縦に並べる */
-                    <div className="p-4 space-y-4">
+                    /* リスト表示（既存の洗練されたリスト） */
+                    <div className="space-y-4">
                         {ITEMS.map((item) => (
-                            <div key={item.id} className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4">
-                                <div className="flex gap-4 items-start">
-                                    <div className="w-20 h-20 bg-gray-50 rounded-2xl flex items-center justify-center shrink-0">
-                                        <img src={item.imagePath} alt={item.name} className="w-14 h-14 object-contain" />
-                                    </div>
-                                    <div className="flex-1 min-w-0 text-black">
-                                        <h3 className="font-bold text-lg leading-tight mb-1 truncate">{item.name}</h3>
-                                        <div className="space-y-1">
-                                            <p className="flex items-center gap-1.5 text-[10px] font-medium text-gray-400">
-                                                <MapPin size={10} /> {item.locationName}
-                                            </p>
-                                            <p className="text-[10px] font-mono text-gray-300 ml-3.5">
-                                                {item.coords}
-                                            </p>
-                                        </div>
-                                    </div>
+                            <div key={item.id} className="bg-white p-6 rounded-[2.5rem] border border-gray-100 flex gap-6 items-center shadow-sm">
+                                <div className="w-20 h-20 shrink-0" style={{ transform: `rotate(${item.rotation}deg)` }}>
+                                    <img src={item.imagePath} alt={item.name} className="w-full h-full object-contain drop-shadow-md" />
                                 </div>
-                                <div className="space-y-2 border-t border-gray-50 pt-3 text-black">
-                                    <p className="text-[11px] leading-relaxed font-medium">
-                                        {item.description}
-                                    </p>
-                                    <p className="text-[9px] font-bold text-gray-200 uppercase tracking-widest flex items-center gap-1">
-                                        <Calendar size={10} /> {item.collectedAt}
-                                    </p>
+                                <div className="flex-1">
+                                    <h3 className="font-bold text-black uppercase">{item.name}</h3>
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{item.locationName}</p>
+                                    <p className="text-[10px] font-mono text-gray-300 mt-1">{item.coords}</p>
                                 </div>
                             </div>
                         ))}
@@ -80,33 +83,40 @@ export default function ItemPage() {
                 )}
             </main>
 
-            {/* 3. 詳細ポップアップ (Grid表示からの遷移用) */}
+            {/* 詳細ポップアップ（ここもステッカーが主役） */}
             {selectedItem && (
-                <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/20 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-                    <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 pb-12 relative animate-in slide-in-from-bottom duration-500">
-                        <button onClick={() => setSelectedItem(null)} className="absolute top-6 right-6 p-2 bg-gray-50 rounded-full text-gray-400 active:scale-90 transition-transform">
-                            <X size={20} />
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/10 backdrop-blur-md p-6 animate-in fade-in">
+                    <div className="bg-white w-full max-w-sm rounded-[3rem] p-8 relative shadow-2xl animate-in zoom-in-95 duration-300">
+                        <button onClick={() => setSelectedItem(null)} className="absolute top-6 right-6 p-2 text-gray-300 hover:text-black transition-colors">
+                            <X size={24} />
                         </button>
 
-                        <div className="flex flex-col items-center text-center space-y-6 text-black">
-                            <div className="w-32 h-32 bg-gray-50 rounded-3xl flex items-center justify-center">
-                                <img src={selectedItem.imagePath} alt={selectedItem.name} className="w-24 h-24 object-contain" />
+                        <div className="flex flex-col items-center text-center">
+                            <div className="w-48 h-48 mb-8" style={{ transform: `rotate(${selectedItem.rotation}deg)` }}>
+                                <img
+                                    src={selectedItem.imagePath}
+                                    alt={selectedItem.name}
+                                    className="w-full h-full object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.2)]"
+                                />
                             </div>
 
-                            <div className="space-y-1">
-                                <h2 className="text-2xl font-bold tracking-tight">{selectedItem.name}</h2>
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center justify-center gap-1">
-                                    <MapPin size={12} /> {selectedItem.locationName}
+                            <h2 className="text-2xl font-bold text-black uppercase mb-2 tracking-tighter">{selectedItem.name}</h2>
+                            <div className="flex items-center gap-2 text-gray-400 mb-6 font-bold uppercase text-[10px] tracking-widest">
+                                <MapPin size={12} /> {selectedItem.locationName}
+                            </div>
+
+                            <div className="w-full bg-gray-50 rounded-3xl p-6 text-left space-y-4">
+                                <p className="text-sm font-medium text-gray-600 leading-relaxed italic">
+                                    "{selectedItem.description}"
                                 </p>
-                                <p className="text-[10px] font-mono text-gray-300">{selectedItem.coords}</p>
-                            </div>
-
-                            <p className="text-sm font-medium leading-relaxed px-4 text-gray-600">
-                                {selectedItem.description}
-                            </p>
-
-                            <div className="pt-4 border-t border-gray-50 w-full">
-                                <p className="text-[10px] font-bold text-gray-200 uppercase tracking-tighter italic">Collected on {selectedItem.collectedAt}</p>
+                                <div className="pt-4 border-t border-gray-100 flex justify-between items-end">
+                                    <div className="font-mono text-[9px] text-gray-300 leading-tight">
+                                        GPS_REF: {selectedItem.coords}
+                                    </div>
+                                    <div className="flex items-center gap-1 text-[9px] font-black text-gray-200 uppercase tracking-tighter">
+                                        <Calendar size={10} /> {selectedItem.collectedAt}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
