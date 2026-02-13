@@ -51,7 +51,6 @@ export default function LazyMap({
     const [activeIndex, setActiveIndex] = useState<number>(-1);
     const briefingStarted = useRef(false);
 
-    // 演出中や全表示中は外部からの強制的なcenter吸着を解除
     const controlledCenter = useMemo(() => {
         if (isBriefingActive || isFinalOverview || isLogMode) return undefined;
         if (userLocation && userLocation.lat !== 0) return userLocation;
@@ -59,7 +58,7 @@ export default function LazyMap({
         return { lat: 35.6812, lng: 139.7671 };
     }, [isBriefingActive, isFinalOverview, isLogMode, userLocation, center]);
 
-    // ★ 解決：縮尺の自動調整ロジック
+    // ★ 世界地図化を物理的に防ぐ fitBounds ロジック
     useEffect(() => {
         if (!map || items.length === 0 || isBriefingActive) return;
 
@@ -80,9 +79,8 @@ export default function LazyMap({
             clearTimeout(timer);
             google.maps.event.removeListener(listener);
         };
-    }, [map, items, isBriefingActive, isFinalOverview, isLogMode]);
+    }, [map, items, isBriefingActive, isFinalOverview]);
 
-    // ブリーフィング演出
     useEffect(() => {
         if (!isBriefingActive || !map || items.length === 0 || briefingStarted.current) return;
         briefingStarted.current = true;
@@ -97,15 +95,13 @@ export default function LazyMap({
                 await new Promise(r => setTimeout(r, 2500));
             }
 
-            // フィナーレ：全地点俯瞰
             const finalBounds = new google.maps.LatLngBounds();
             items.forEach((p: any) => finalBounds.extend(p));
-            if (userLocation) finalBounds.extend(userLocation);
             map.fitBounds(finalBounds, 80);
 
             setActivePlaceName(null);
             setActiveIndex(-1);
-            await new Promise(r => setTimeout(r, 5000)); // 5秒の余韻
+            await new Promise(r => setTimeout(r, 5000)); // 5秒の俯瞰
 
             briefingStarted.current = false;
             if (onBriefingStateChange) onBriefingStateChange(true);
@@ -113,7 +109,7 @@ export default function LazyMap({
         };
 
         runBriefing();
-    }, [isBriefingActive, map, items, userLocation, onBriefingStateChange, onBriefingComplete]);
+    }, [isBriefingActive, map, items]);
 
     return (
         <div className="w-full h-full relative bg-[#f5f5f5]">
@@ -129,8 +125,8 @@ export default function LazyMap({
 
             {activePlaceName && (
                 <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-3 w-full px-10 animate-in fade-in slide-in-from-top-4 duration-700">
-                    <div className="bg-black/90 px-8 py-3 rounded-full border border-[#F37343]/30 shadow-2xl">
-                        <p className="text-white text-xs font-black uppercase tracking-[0.4em] text-center">{activePlaceName}</p>
+                    <div className="bg-black/90 px-8 py-3 rounded-full border border-[#F37343]/30 shadow-2xl text-center">
+                        <p className="text-white text-xs font-black uppercase tracking-[0.4em]">{activePlaceName}</p>
                     </div>
                     <div className="flex gap-1.5 w-full max-w-[200px] h-1.5 px-2">
                         {items.map((_, idx) => (

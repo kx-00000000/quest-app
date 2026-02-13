@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getPlans, deletePlan } from "@/getlib/storage"; // ★ 環境に合わせて lib/storage へ修正してください
+import { getPlans, deletePlan } from "@/lib/storage"; // ★ タイポ修正済み
 import { Trash2, Play, Footprints } from "lucide-react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -13,13 +13,12 @@ export default function PlanPage() {
     const [plans, setPlans] = useState<any[]>([]);
 
     useEffect(() => {
-        // storage.ts の関数 getPlans を使用
-        const allPlans = (typeof window !== 'undefined') ? require("@/lib/storage").getPlans() : [];
-        setPlans(allPlans.filter((p: any) => !p.isArchived));
+        const allPlans = getPlans().filter(p => !p.isArchived);
+        setPlans(allPlans);
     }, []);
 
     const handleDelete = (id: string) => {
-        require("@/lib/storage").deletePlan(id);
+        deletePlan(id);
         setPlans(plans.filter(p => p.id !== id));
     };
 
@@ -42,7 +41,7 @@ export default function PlanPage() {
                         </div>
                         <h3 className="text-xl font-black uppercase mb-4 truncate text-left">{plan.name}</h3>
                         <div className="h-48 relative rounded-2xl overflow-hidden border border-gray-100 mb-6 bg-gray-50">
-                            {/* ★ isFinalOverview=true を渡して fitBounds をトリガー */}
+                            {/* isFinalOverview={true} を渡し、LazyMap側で fitBounds を発動させる */}
                             <LazyMap items={plan.items} center={plan.center} isFinalOverview={true} themeColor="#F37343" />
                         </div>
                         <div className="flex items-center justify-between">
