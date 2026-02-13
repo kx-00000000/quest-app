@@ -178,14 +178,13 @@ export default function NewQuestPage() {
                 </>
             )}
 
-            {/* ★ 修正：コンパクトになった Discovery Report */}
             {isFinalOverview && (
                 <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-black/40 backdrop-blur-[2px] animate-in fade-in duration-700">
                     <div className="bg-white/95 backdrop-blur-xl rounded-[2.5rem] p-8 w-full max-w-sm space-y-6 shadow-2xl relative overflow-hidden text-center border border-white/50">
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#F37343] to-orange-300" />
 
+                        {/* ★ 修正：Discovery Report / Mission Complete の文言を削除 */}
                         <div className="space-y-1">
-                            <p className="text-[10px] font-black text-[#F37343] uppercase tracking-[0.4em]">Mission Complete</p>
                             <h2 className="text-xl font-black text-gray-900 uppercase truncate">{name || "NEW QUEST"}</h2>
                         </div>
 
