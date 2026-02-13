@@ -199,7 +199,7 @@ export default function NewQuestPage() {
                                 {isCreating ? (
                                     <div className="flex items-center gap-2">
                                         <Loader2 className="animate-spin" size={18} />
-                                        <span>Analyzing Landmass...</span>
+                                        <span></span>
                                     </div>
                                 ) : isBriefingReady ? (
                                     <><Play size={16} fill="currentColor" /> START BRIEFING</>
