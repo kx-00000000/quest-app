@@ -51,6 +51,7 @@ export default function LazyMap({
     const [activeIndex, setActiveIndex] = useState<number>(-1);
     const briefingStarted = useRef(false);
 
+    // ブリーフィング中や全表示中は外部からのcenter指定を無視してカメラの自由を確保
     const mapCenter = useMemo(() => {
         if (isBriefingActive || isFinalOverview || isLogMode) return undefined;
         if (userLocation && userLocation.lat !== 0) return userLocation;
@@ -58,22 +59,45 @@ export default function LazyMap({
         return { lat: 35.6812, lng: 139.7671 };
     }, [isBriefingActive, isFinalOverview, isLogMode, userLocation, center]);
 
+    // ★ 解決：プランページ等でピンの範囲に自動ズームする
     useEffect(() => {
         if (!map || items.length === 0 || isBriefingActive) return;
+
         const applyBounds = () => {
             const bounds = new google.maps.LatLngBounds();
-            let hasPoints = false;
-            items.forEach(p => { if (p.lat) { bounds.extend(p); hasPoints = true; } });
-            if (userLocation?.lat) { bounds.extend(userLocation); hasPoints = true; }
-            if (hasPoints) {
-                map.fitBounds(bounds, { top: 60, right: 60, bottom: 60, left: 60 });
+            let hasValidPoints = false;
+
+            items.forEach(item => {
+                if (item.lat !== 0 && item.lng !== 0) {
+                    bounds.extend({ lat: item.lat, lng: item.lng });
+                    hasValidPoints = true;
+                }
+            });
+
+            // 現在地も範囲に含める（必要に応じて）
+            if (userLocation?.lat) {
+                bounds.extend(userLocation);
+                hasValidPoints = true;
+            }
+
+            if (hasValidPoints) {
+                // paddingを広めにとって、カード内でもピンが端に隠れないように調整
+                map.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
             }
         };
-        const timer = setTimeout(applyBounds, 500);
-        const listener = google.maps.event.addListenerOnce(map, 'idle', applyBounds);
-        return () => { clearTimeout(timer); google.maps.event.removeListener(listener); };
-    }, [map, items, isLogMode, isFinalOverview, isBriefingActive, userLocation]);
 
+        // 地図の準備完了（idle）を待ってから実行することで世界地図化を確実に防ぐ
+        const listener = google.maps.event.addListenerOnce(map, 'idle', applyBounds);
+        // 保険として少し遅れて実行
+        const timer = setTimeout(applyBounds, 600);
+
+        return () => {
+            google.maps.event.removeListener(listener);
+            clearTimeout(timer);
+        };
+    }, [map, items, isLogMode, isFinalOverview, userLocation, isBriefingActive]);
+
+    // ブリーフィング演出
     useEffect(() => {
         if (!isBriefingActive || !map || items.length === 0 || briefingStarted.current) return;
         briefingStarted.current = true;
@@ -88,7 +112,7 @@ export default function LazyMap({
                 await new Promise(r => setTimeout(r, 2500));
             }
 
-            // ★ 追加：全地点を表示するためのズームアウト演出
+            // 全地点を表示するためのズームアウト
             const bounds = new google.maps.LatLngBounds();
             items.forEach(i => bounds.extend({ lat: i.lat, lng: i.lng }));
             if (userLocation) bounds.extend(userLocation);
@@ -97,8 +121,8 @@ export default function LazyMap({
             setActivePlaceName(null);
             setActiveIndex(-1);
 
-            // 全表示を見せるための「溜め」
-            await new Promise(r => setTimeout(r, 2500));
+            // 全表示を眺める時間を 5秒 に延長
+            await new Promise(r => setTimeout(r, 5000));
 
             briefingStarted.current = false;
             if (onBriefingStateChange) onBriefingStateChange(true);
@@ -110,14 +134,23 @@ export default function LazyMap({
 
     return (
         <div className="w-full h-full relative bg-[#f5f5f5]">
-            <Map defaultZoom={14} center={mapCenter} styles={mapStyle} disableDefaultUI={true} gestureHandling={'greedy'}>
+            <Map
+                defaultZoom={14}
+                center={mapCenter}
+                styles={mapStyle}
+                disableDefaultUI={true}
+                gestureHandling={'greedy'}
+            >
                 {userLocation && <Marker position={userLocation} />}
-                {userLocation && radiusInKm && !isBriefingActive && <MapCircle center={userLocation} radius={radiusInKm} color={themeColor} />}
+                {userLocation && radiusInKm && !isBriefingActive && (
+                    <MapCircle center={userLocation} radius={radiusInKm} color={themeColor} />
+                )}
                 {items.map((item, idx) => (
                     <Marker key={item.id || idx} position={{ lat: item.lat, lng: item.lng }} label={{ text: (idx + 1).toString(), color: 'white', fontWeight: 'bold' }} />
                 ))}
             </Map>
 
+            {/* ブリーフィングUI：Scanningの削除とステータスバーの追加 */}
             {activePlaceName && (
                 <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-3 w-full px-10 animate-in fade-in slide-in-from-top-4 duration-700">
                     <div className="bg-black/90 px-8 py-3 rounded-full border border-[#F37343]/30 shadow-2xl">
