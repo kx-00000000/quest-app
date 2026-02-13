@@ -20,14 +20,22 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                 const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                 setUserLocation(newLoc);
 
-                // ★ 解決：座標から地名をリアルタイム取得して表示
-                geocoder.geocode({ location: newLoc }, (results, status) => {
-                    if (status === "OK" && results?.[0]) {
-                        const city = results[0].address_components.find(c => c.types.includes("locality"))?.long_name ||
-                            results[0].address_components.find(c => c.types.includes("administrative_area_level_2"))?.long_name || "Active Area";
-                        setCurrentAreaName(city);
-                    }
-                });
+                // ★ 修正：詳細な地名フォーマットの取得
+                if (geocoder) {
+                    geocoder.geocode({ location: newLoc }, (results, status) => {
+                        if (status === "OK" && results?.[0]) {
+                            const comp = results[0].address_components;
+
+                            const pref = comp.find(c => c.types.includes("administrative_area_level_1"))?.long_name || "";
+                            const locality = comp.find(c => c.types.includes("locality"))?.long_name ||
+                                comp.find(c => c.types.includes("sublocality_level_1"))?.long_name || "";
+                            const country = comp.find(c => c.types.includes("country"))?.long_name || "";
+
+                            const formatted = `${pref} ${locality}, ${country}`.trim();
+                            setCurrentAreaName(formatted || "Active Area");
+                        }
+                    });
+                }
 
                 const updatedItems = (plan.items || []).map((item: any) => {
                     if (!item.isCollected && calculateDistance(newLoc.lat, newLoc.lng, item.lat, item.lng) < 0.05) {
@@ -72,7 +80,7 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                         <div className="grid grid-cols-2 gap-4 border-t border-white/10 pt-4">
                             <div className="flex items-center gap-3">
                                 <Navigation className="text-[#F37343]" size={20} style={{ transform: `rotate(${nearestItem.bearing}deg)` }} />
-                                <div><p className="text-[8px] text-gray-400 uppercase tracking-widest">Distance</p><p className="text-lg font-black">{nearestItem.distance < 1 ? `${Math.floor(nearestItem.distance * 1000)}m` : `${nearestItem.distance.toFixed(1)}km`}</p></div>
+                                <div><p className="text-[8px] text-gray-500 uppercase tracking-widest">Distance</p><p className="text-lg font-black">{nearestItem.distance < 1 ? `${Math.floor(nearestItem.distance * 1000)}m` : `${nearestItem.distance.toFixed(1)}km`}</p></div>
                             </div>
                         </div>
                     )}

@@ -62,9 +62,18 @@ export default function NewQuestPage() {
                 geocoder.geocode({ location: point }, (res, status) => {
                     if (status === "OK" && res?.[0]) {
                         const comp = res[0].address_components;
-                        const cityName = comp.find(c => c.types.includes("locality"))?.long_name ||
-                            comp.find(c => c.types.includes("administrative_area_level_2"))?.long_name || "Active Area";
-                        resolve(cityName);
+
+                        // 都道府県
+                        const pref = comp.find(c => c.types.includes("administrative_area_level_1"))?.long_name || "";
+                        // 市区町村
+                        const locality = comp.find(c => c.types.includes("locality"))?.long_name ||
+                            comp.find(c => c.types.includes("sublocality_level_1"))?.long_name || "";
+                        // 国
+                        const country = comp.find(c => c.types.includes("country"))?.long_name || "";
+
+                        // フォーマット: 都道府県 市区町村, 国
+                        const formatted = `${pref} ${locality}, ${country}`.trim();
+                        resolve(formatted || "Quest Point");
                     } else resolve("Quest Area");
                 });
             });
@@ -183,7 +192,6 @@ export default function NewQuestPage() {
                     <div className="bg-white/95 backdrop-blur-xl rounded-[2.5rem] p-8 w-full max-w-sm space-y-6 shadow-2xl relative overflow-hidden text-center border border-white/50">
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#F37343] to-orange-300" />
 
-                        {/* ★ 修正：Discovery Report / Mission Complete の文言を削除 */}
                         <div className="space-y-1">
                             <h2 className="text-xl font-black text-gray-900 uppercase truncate">{name || "NEW QUEST"}</h2>
                         </div>
