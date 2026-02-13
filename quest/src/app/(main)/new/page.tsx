@@ -15,6 +15,10 @@ const rangeModes = [
     { id: 'grand', label: 'GRAND', min: 200, max: 40000, step: 100 }
 ];
 
+const formatDistance = (km: number): string => {
+    return km < 1 ? `${Math.floor(km * 1000)} m` : `${km.toFixed(1)} km`;
+};
+
 export default function NewQuestPage() {
     const router = useRouter();
     const [name, setName] = useState("");
@@ -22,24 +26,24 @@ export default function NewQuestPage() {
     const [radius, setRadius] = useState(1);
     const [itemCount, setItemCount] = useState(3);
     const [isCreating, setIsCreating] = useState(false);
-    const [isBriefingReady, setIsBriefingReady] = useState(false); // ★ 追加: 準備完了フラグ
+    const [isBriefingReady, setIsBriefingReady] = useState(false); // ★ 追加：準備完了フラグ
     const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
     const [briefingItems, setBriefingItems] = useState<any[]>([]);
     const [isBriefingActive, setIsBriefingActive] = useState(false);
     const [isFinalOverview, setIsFinalOverview] = useState(false);
 
     useEffect(() => {
-        if ("geolocation" in navigator) {
-            navigator.geolocation.getCurrentPosition((pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }));
+        if (typeof window !== "undefined" && "geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                (err) => console.warn(err)
+            );
         }
     }, []);
 
-    // 設定が変更されたら「準備完了」状態を解除する（再作成を促す）
-    const handleParamChange = (type: string, value: any) => {
-        if (type === 'name') setName(value);
-        if (type === 'radius') setRadius(value);
-        if (type === 'itemCount') setItemCount(value);
-        setIsBriefingReady(false);
+    // 設定が変更されたら「準備完了」状態をリセットする
+    const resetReadyStatus = () => {
+        if (isBriefingReady) setIsBriefingReady(false);
     };
 
     const handleAction = async () => {
@@ -91,7 +95,16 @@ export default function NewQuestPage() {
     return (
         <div className="flex flex-col h-full min-h-screen relative bg-white overflow-hidden">
             <div className="absolute inset-0 z-0">
-                <LazyMap radiusInKm={radius} userLocation={userLocation} items={briefingItems} isBriefingActive={isBriefingActive} isFinalOverview={isFinalOverview} onBriefingStateChange={setIsFinalOverview} onBriefingComplete={() => setIsBriefingActive(false)} />
+                <LazyMap
+                    radiusInKm={radius}
+                    userLocation={userLocation}
+                    // ★ 修正：ブリーフィングが実際に始まるまではピンの配列を「空」で渡す
+                    items={(isBriefingActive || isFinalOverview) ? briefingItems : []}
+                    isBriefingActive={isBriefingActive}
+                    isFinalOverview={isFinalOverview}
+                    onBriefingStateChange={setIsFinalOverview}
+                    onBriefingComplete={() => setIsBriefingActive(false)}
+                />
             </div>
 
             {!isBriefingActive && !isFinalOverview && (
@@ -101,7 +114,7 @@ export default function NewQuestPage() {
                             <input
                                 type="text"
                                 value={name}
-                                onChange={(e) => handleParamChange('name', e.target.value)}
+                                onChange={(e) => { setName(e.target.value); resetReadyStatus(); }}
                                 placeholder="QUEST NAME"
                                 className="w-full bg-transparent border-none outline-none text-gray-800 font-black text-center"
                             />
@@ -113,7 +126,7 @@ export default function NewQuestPage() {
                                 {rangeModes.map((mode) => (
                                     <button
                                         key={mode.id}
-                                        onClick={() => { setActiveMode(mode); handleParamChange('radius', mode.min); }}
+                                        onClick={() => { setActiveMode(mode); setRadius(mode.min); resetReadyStatus(); }}
                                         className={`flex-1 py-2 text-[9px] font-black rounded-xl transition-all ${activeMode.id === mode.id ? 'bg-white text-[#F37343] shadow-sm' : 'text-gray-500'}`}
                                     >
                                         {mode.label}
@@ -124,13 +137,13 @@ export default function NewQuestPage() {
                                 <div className="space-y-1">
                                     <div className="flex justify-between text-[10px] font-black text-[#F37343] uppercase tracking-widest">
                                         <span>Radius</span>
-                                        <span>{radius}km</span>
+                                        <span>{formatDistance(radius)}</span>
                                     </div>
                                     <input
                                         type="range"
                                         min={activeMode.min} max={activeMode.max} step={activeMode.step}
                                         value={radius}
-                                        onChange={(e) => handleParamChange('radius', parseFloat(e.target.value))}
+                                        onChange={(e) => { setRadius(parseFloat(e.target.value)); resetReadyStatus(); }}
                                         className="w-full h-3 bg-gray-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-[#F37343] [&::-webkit-slider-thumb]:rounded-full"
                                     />
                                 </div>
@@ -143,18 +156,18 @@ export default function NewQuestPage() {
                                         type="range"
                                         min="1" max="7" step="1"
                                         value={itemCount}
-                                        onChange={(e) => handleParamChange('itemCount', parseInt(e.target.value))}
+                                        onChange={(e) => { setItemCount(parseInt(e.target.value)); resetReadyStatus(); }}
                                         className="w-full h-3 bg-gray-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-[#F37343] [&::-webkit-slider-thumb]:rounded-full"
                                     />
                                 </div>
                             </div>
 
-                            {/* ★ ボタンの切り替えロジック */}
+                            {/* ★ アクションボタン：状態に応じてスタイルとテキストを切り替え */}
                             <button
                                 onClick={handleAction}
                                 disabled={isCreating}
-                                className={`w-full py-4 rounded-[2rem] font-black flex items-center justify-center gap-2 transition-all duration-300 shadow-lg uppercase active:scale-95 ${isBriefingReady
-                                        ? "bg-gradient-to-r from-[#F37343] to-orange-400 text-white"
+                                className={`w-full py-4 rounded-[2rem] font-black flex items-center justify-center gap-2 transition-all duration-500 shadow-lg uppercase active:scale-95 ${isBriefingReady
+                                        ? "bg-gradient-to-r from-[#F37343] to-orange-400 text-white shadow-[0_10px_25px_rgba(243,115,67,0.4)]"
                                         : "bg-gray-900 text-white"
                                     }`}
                             >
