@@ -26,7 +26,7 @@ export default function NewQuestPage() {
     const [radius, setRadius] = useState(1);
     const [itemCount, setItemCount] = useState(3);
     const [isCreating, setIsCreating] = useState(false);
-    const [isBriefingReady, setIsBriefingReady] = useState(false);
+    const [isBriefingReady, setIsBriefingReady] = useState(false); // ★ 追加：準備完了フラグ
     const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
     const [briefingItems, setBriefingItems] = useState<any[]>([]);
     const [isBriefingActive, setIsBriefingActive] = useState(false);
@@ -41,43 +41,65 @@ export default function NewQuestPage() {
         }
     }, []);
 
+    // 設定が変更されたら「準備完了」状態をリセットする
     const resetReadyStatus = () => {
         if (isBriefingReady) setIsBriefingReady(false);
     };
 
     const handleAction = async () => {
+        // ★ すでに準備ができていれば、ブリーフィングを開始する
         if (isBriefingReady) {
             setIsBriefingActive(true);
             return;
         }
 
+        // ★ 準備ができていない場合は、データを作成する
         setIsCreating(true);
         const center = userLocation || { lat: 35.6812, lng: 139.7671 };
         const validItems = [];
         const geocoder = new google.maps.Geocoder();
 
-        for (let i = 0; i < itemCount; i++) {
+        // 指定された地点数に達するまで陸地を探し続ける
+        while (validItems.length < itemCount) {
             const point = generateRandomPoint(center, radius);
-            const city = await new Promise<string>((resolve) => {
+
+            const result = await new Promise<{ cityName: string, lat: number, lng: number } | null>((resolve) => {
                 geocoder.geocode({ location: point }, (res, status) => {
                     if (status === "OK" && res?.[0]) {
                         const comp = res[0].address_components;
 
-                        // 都道府県
-                        const pref = comp.find(c => c.types.includes("administrative_area_level_1"))?.long_name || "";
-                        // 市区町村
+                        // ★ 判定条件：都道府県と国が両方存在すれば「住所のある陸地」とみなす
+                        const pref = comp.find(c => c.types.includes("administrative_area_level_1"))?.long_name;
+                        const country = comp.find(c => c.types.includes("country"))?.long_name;
                         const locality = comp.find(c => c.types.includes("locality"))?.long_name ||
                             comp.find(c => c.types.includes("sublocality_level_1"))?.long_name || "";
-                        // 国
-                        const country = comp.find(c => c.types.includes("country"))?.long_name || "";
 
-                        // フォーマット: 都道府県 市区町村, 国
-                        const formatted = `${pref} ${locality}, ${country}`.trim();
-                        resolve(formatted || "Quest Point");
-                    } else resolve("Quest Area");
+                        if (pref && country) {
+                            const formatted = `${pref} ${locality}, ${country}`.trim();
+                            resolve({
+                                cityName: formatted,
+                                lat: point.lat,
+                                lng: point.lng
+                            });
+                            return;
+                        }
+                    }
+                    // 海上や住所が不十分な場合は null を返して再試行
+                    resolve(null);
                 });
             });
-            validItems.push({ id: Math.random().toString(36).substr(2, 9), ...point, isCollected: false, addressName: city });
+
+            if (result) {
+                validItems.push({
+                    id: Math.random().toString(36).substr(2, 9),
+                    lat: result.lat,
+                    lng: result.lng,
+                    isCollected: false,
+                    addressName: result.cityName
+                });
+            }
+            // APIへの連続負荷を避けるための微小な待機
+            await new Promise(r => setTimeout(r, 50));
         }
 
         savePlan({
@@ -95,7 +117,7 @@ export default function NewQuestPage() {
 
         setBriefingItems(validItems);
         setIsCreating(false);
-        setIsBriefingReady(true);
+        setIsBriefingReady(true); // ★ 準備完了状態にする
     };
 
     return (
@@ -175,7 +197,10 @@ export default function NewQuestPage() {
                                     }`}
                             >
                                 {isCreating ? (
-                                    <Loader2 className="animate-spin" />
+                                    <div className="flex items-center gap-2">
+                                        <Loader2 className="animate-spin" size={18} />
+                                        <span>Analyzing Landmass...</span>
+                                    </div>
                                 ) : isBriefingReady ? (
                                     <><Play size={16} fill="currentColor" /> START BRIEFING</>
                                 ) : (
@@ -191,11 +216,9 @@ export default function NewQuestPage() {
                 <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-black/40 backdrop-blur-[2px] animate-in fade-in duration-700">
                     <div className="bg-white/95 backdrop-blur-xl rounded-[2.5rem] p-8 w-full max-w-sm space-y-6 shadow-2xl relative overflow-hidden text-center border border-white/50">
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#F37343] to-orange-300" />
-
                         <div className="space-y-1">
                             <h2 className="text-xl font-black text-gray-900 uppercase truncate">{name || "NEW QUEST"}</h2>
                         </div>
-
                         <div className="space-y-2 py-4 px-2">
                             {briefingItems.map((item, idx) => (
                                 <div key={idx} className="flex items-center gap-3 text-left">
@@ -208,7 +231,6 @@ export default function NewQuestPage() {
                                 </div>
                             ))}
                         </div>
-
                         <button
                             onClick={() => router.push("/plan")}
                             className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-transform"
