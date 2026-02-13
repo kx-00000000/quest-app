@@ -26,7 +26,7 @@ export default function NewQuestPage() {
     const [radius, setRadius] = useState(1);
     const [itemCount, setItemCount] = useState(3);
     const [isCreating, setIsCreating] = useState(false);
-    const [isBriefingReady, setIsBriefingReady] = useState(false); // ★ 追加：準備完了フラグ
+    const [isBriefingReady, setIsBriefingReady] = useState(false);
     const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
     const [briefingItems, setBriefingItems] = useState<any[]>([]);
     const [isBriefingActive, setIsBriefingActive] = useState(false);
@@ -41,19 +41,16 @@ export default function NewQuestPage() {
         }
     }, []);
 
-    // 設定が変更されたら「準備完了」状態をリセットする
     const resetReadyStatus = () => {
         if (isBriefingReady) setIsBriefingReady(false);
     };
 
     const handleAction = async () => {
-        // ★ すでに準備ができていれば、ブリーフィングを開始する
         if (isBriefingReady) {
             setIsBriefingActive(true);
             return;
         }
 
-        // ★ 準備ができていない場合は、データを作成する
         setIsCreating(true);
         const center = userLocation || { lat: 35.6812, lng: 139.7671 };
         const validItems = [];
@@ -89,7 +86,7 @@ export default function NewQuestPage() {
 
         setBriefingItems(validItems);
         setIsCreating(false);
-        setIsBriefingReady(true); // ★ 準備完了状態にする
+        setIsBriefingReady(true);
     };
 
     return (
@@ -98,7 +95,6 @@ export default function NewQuestPage() {
                 <LazyMap
                     radiusInKm={radius}
                     userLocation={userLocation}
-                    // ★ 修正：ブリーフィングが実際に始まるまではピンの配列を「空」で渡す
                     items={(isBriefingActive || isFinalOverview) ? briefingItems : []}
                     isBriefingActive={isBriefingActive}
                     isFinalOverview={isFinalOverview}
@@ -116,7 +112,7 @@ export default function NewQuestPage() {
                                 value={name}
                                 onChange={(e) => { setName(e.target.value); resetReadyStatus(); }}
                                 placeholder="QUEST NAME"
-                                className="w-full bg-transparent border-none outline-none text-gray-800 font-black text-center"
+                                className="w-full bg-transparent border-none outline-none text-gray-800 font-black text-center placeholder:text-gray-400"
                             />
                         </div>
                     </div>
@@ -161,14 +157,12 @@ export default function NewQuestPage() {
                                     />
                                 </div>
                             </div>
-
-                            {/* ★ アクションボタン：状態に応じてスタイルとテキストを切り替え */}
                             <button
                                 onClick={handleAction}
                                 disabled={isCreating}
                                 className={`w-full py-4 rounded-[2rem] font-black flex items-center justify-center gap-2 transition-all duration-500 shadow-lg uppercase active:scale-95 ${isBriefingReady
-                                        ? "bg-gradient-to-r from-[#F37343] to-orange-400 text-white shadow-[0_10px_25px_rgba(243,115,67,0.4)]"
-                                        : "bg-gray-900 text-white"
+                                    ? "bg-gradient-to-r from-[#F37343] to-orange-400 text-white shadow-[0_10px_25px_rgba(243,115,67,0.4)]"
+                                    : "bg-gray-900 text-white"
                                     }`}
                             >
                                 {isCreating ? (
@@ -184,21 +178,36 @@ export default function NewQuestPage() {
                 </>
             )}
 
+            {/* ★ 修正：コンパクトになった Discovery Report */}
             {isFinalOverview && (
-                <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md animate-in zoom-in-95">
-                    <div className="bg-white rounded-[3rem] p-8 w-full max-w-sm space-y-6 shadow-2xl relative overflow-hidden text-center">
-                        <div className="absolute top-0 left-0 w-full h-1.5 bg-[#F37343]" />
-                        <p className="text-[9px] font-black text-[#F37343] uppercase tracking-[0.3em]">Discovery Report</p>
-                        <div className="space-y-1.5 py-3 px-5 bg-gray-50 rounded-[2rem] border border-gray-100">
+                <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-black/40 backdrop-blur-[2px] animate-in fade-in duration-700">
+                    <div className="bg-white/95 backdrop-blur-xl rounded-[2.5rem] p-8 w-full max-w-sm space-y-6 shadow-2xl relative overflow-hidden text-center border border-white/50">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#F37343] to-orange-300" />
+
+                        <div className="space-y-1">
+                            <p className="text-[10px] font-black text-[#F37343] uppercase tracking-[0.4em]">Mission Complete</p>
+                            <h2 className="text-xl font-black text-gray-900 uppercase truncate">{name || "NEW QUEST"}</h2>
+                        </div>
+
+                        <div className="space-y-2 py-4 px-2">
                             {briefingItems.map((item, idx) => (
-                                <div key={idx} className="flex items-baseline gap-3 text-left">
-                                    <span className="text-[9px] font-black text-[#F37343]">#{idx + 1}</span>
-                                    <span className="text-[11px] font-black text-gray-900 uppercase truncate flex-1">{item.addressName}</span>
+                                <div key={idx} className="flex items-center gap-3 text-left">
+                                    <span className="flex-none w-5 h-5 bg-[#F37343] text-white text-[10px] font-black flex items-center justify-center rounded-full shadow-sm">
+                                        {idx + 1}
+                                    </span>
+                                    <span className="text-[12px] font-bold text-gray-700 uppercase truncate flex-1 tracking-tight">
+                                        {item.addressName}
+                                    </span>
                                 </div>
                             ))}
                         </div>
-                        <button onClick={() => router.push("/plan")} className="w-full py-5 bg-gray-900 text-white rounded-[2rem] font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-2">
-                            <Play size={14} fill="currentColor" />Start Adventure
+
+                        <button
+                            onClick={() => router.push("/plan")}
+                            className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-transform"
+                        >
+                            <Play size={14} fill="currentColor" />
+                            <span>Confirm Quest</span>
                         </button>
                     </div>
                 </div>

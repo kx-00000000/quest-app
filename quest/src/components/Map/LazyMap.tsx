@@ -48,7 +48,7 @@ export default function LazyMap({
 }: LazyMapProps) {
     const map = useMap();
     const [activePlaceName, setActivePlaceName] = useState<string | null>(null);
-    const [activeIndex, setActiveIndex] = useState<number>(-1); // ★ 追加：現在の進行度
+    const [activeIndex, setActiveIndex] = useState<number>(-1);
     const briefingStarted = useRef(false);
 
     const mapCenter = useMemo(() => {
@@ -80,23 +80,33 @@ export default function LazyMap({
 
         const runBriefing = async () => {
             map.setZoom(15);
-            // items プロパティには page.tsx から briefingItems が渡されています
             for (let i = 0; i < items.length; i++) {
                 const item = items[i];
-                setActiveIndex(i); // ★ バーの点灯位置を更新
+                setActiveIndex(i);
                 map.panTo({ lat: item.lat, lng: item.lng });
                 setActivePlaceName(item.addressName || "WAYPOINT");
                 await new Promise(r => setTimeout(r, 2500));
             }
+
+            // ★ 追加：全地点を表示するためのズームアウト演出
+            const bounds = new google.maps.LatLngBounds();
+            items.forEach(i => bounds.extend({ lat: i.lat, lng: i.lng }));
+            if (userLocation) bounds.extend(userLocation);
+            map.fitBounds(bounds, { top: 100, right: 80, bottom: 100, left: 80 });
+
             setActivePlaceName(null);
             setActiveIndex(-1);
+
+            // 全表示を見せるための「溜め」
+            await new Promise(r => setTimeout(r, 2500));
+
             briefingStarted.current = false;
             if (onBriefingStateChange) onBriefingStateChange(true);
             if (onBriefingComplete) onBriefingComplete();
         };
 
         runBriefing();
-    }, [isBriefingActive, map, items, onBriefingStateChange, onBriefingComplete]);
+    }, [isBriefingActive, map, items, userLocation, onBriefingStateChange, onBriefingComplete]);
 
     return (
         <div className="w-full h-full relative bg-[#f5f5f5]">
@@ -108,25 +118,16 @@ export default function LazyMap({
                 ))}
             </Map>
 
-            {/* ★ ブリーフィング中のUIオーバーレイ */}
             {activePlaceName && (
                 <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-3 w-full px-10 animate-in fade-in slide-in-from-top-4 duration-700">
-                    {/* 地名ラベル */}
                     <div className="bg-black/90 px-8 py-3 rounded-full border border-[#F37343]/30 shadow-2xl">
-                        <p className="text-white text-xs font-black uppercase tracking-[0.4em] text-center">
-                            {activePlaceName}
-                        </p>
+                        <p className="text-white text-xs font-black uppercase tracking-[0.4em] text-center">{activePlaceName}</p>
                     </div>
-
-                    {/* ★ ステータスバー（セグメント式プログレスバー） */}
                     <div className="flex gap-1.5 w-full max-w-[200px] h-1.5 px-2">
                         {items.map((_, idx) => (
                             <div
                                 key={idx}
-                                className={`flex-1 rounded-full transition-all duration-700 ${idx <= activeIndex
-                                        ? "bg-[#F37343] shadow-[0_0_12px_rgba(243,115,67,0.6)]"
-                                        : "bg-black/20 backdrop-blur-sm"
-                                    }`}
+                                className={`flex-1 rounded-full transition-all duration-700 ${idx <= activeIndex ? "bg-[#F37343] shadow-[0_0_12px_rgba(243,115,67,0.6)]" : "bg-black/20 backdrop-blur-sm"}`}
                             />
                         ))}
                     </div>
