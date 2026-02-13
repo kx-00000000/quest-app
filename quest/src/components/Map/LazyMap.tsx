@@ -12,79 +12,123 @@ const mapStyle = [
     { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#e0e0e0" }] }
 ];
 
+function MapCircle({ center, radius, color }: { center: google.maps.LatLngLiteral, radius: number, color: string }) {
+    const map = useMap();
+    const circleRef = useRef<google.maps.Circle | null>(null);
+    useEffect(() => {
+        if (!map) return;
+        if (circleRef.current) circleRef.current.setMap(null);
+        circleRef.current = new google.maps.Circle({
+            map, center, radius: radius * 1000,
+            fillColor: color, fillOpacity: 0.1, strokeColor: color, strokeOpacity: 0.4, strokeWeight: 1,
+        });
+        return () => { if (circleRef.current) circleRef.current.setMap(null); };
+    }, [map, center, radius, color]);
+    return null;
+}
+
+interface LazyMapProps {
+    items?: any[];
+    center?: { lat: number; lng: number };
+    userLocation?: { lat: number; lng: number } | null;
+    radiusInKm?: number;
+    themeColor?: string;
+    isLogMode?: boolean;
+    isBriefingActive?: boolean;
+    isFinalOverview?: boolean;
+    onBriefingStateChange?: (state: boolean) => void;
+    onBriefingComplete?: () => void;
+}
+
 export default function LazyMap({
     items = [], center, userLocation, radiusInKm,
     themeColor = "#F37343", isLogMode = false,
     isBriefingActive = false, isFinalOverview = false,
     onBriefingStateChange, onBriefingComplete
-}: any) {
+}: LazyMapProps) {
     const map = useMap();
     const [activePlaceName, setActivePlaceName] = useState<string | null>(null);
-    const briefingRef = useRef(false);
+    const [activeIndex, setActiveIndex] = useState<number>(-1); // ★ 追加：現在の進行度
+    const briefingStarted = useRef(false);
 
-    // ★ 解決：現在地スナップを物理的に遮断
-    // ブリーフィング中や全体表示中は、center プロパティに「何も渡さない」ことで勝手に戻るのを防ぎます
     const mapCenter = useMemo(() => {
         if (isBriefingActive || isFinalOverview || isLogMode) return undefined;
-        if (userLocation?.lat) return userLocation;
-        if (center?.lat) return center;
+        if (userLocation && userLocation.lat !== 0) return userLocation;
+        if (center && center.lat !== 0) return center;
         return { lat: 35.6812, lng: 139.7671 };
     }, [isBriefingActive, isFinalOverview, isLogMode, userLocation, center]);
 
-    // ★ 解決：全ピン表示の縮尺を強制適用
     useEffect(() => {
         if (!map || items.length === 0 || isBriefingActive) return;
-
         const applyBounds = () => {
             const bounds = new google.maps.LatLngBounds();
-            let count = 0;
-            items.forEach((p: any) => { if (p.lat) { bounds.extend(p); count++; } });
-            if (userLocation?.lat) { bounds.extend(userLocation); count++; }
-
-            if (count > 0) {
-                map.fitBounds(bounds, { top: 70, right: 70, bottom: 70, left: 70 });
+            let hasPoints = false;
+            items.forEach(p => { if (p.lat) { bounds.extend(p); hasPoints = true; } });
+            if (userLocation?.lat) { bounds.extend(userLocation); hasPoints = true; }
+            if (hasPoints) {
+                map.fitBounds(bounds, { top: 60, right: 60, bottom: 60, left: 60 });
             }
         };
+        const timer = setTimeout(applyBounds, 500);
+        const listener = google.maps.event.addListenerOnce(map, 'idle', applyBounds);
+        return () => { clearTimeout(timer); google.maps.event.removeListener(listener); };
+    }, [map, items, isLogMode, isFinalOverview, isBriefingActive, userLocation]);
 
-        const timer = setTimeout(() => {
-            google.maps.event.addListenerOnce(map, 'idle', applyBounds);
-            applyBounds(); // 即時実行
-        }, 300);
-        return () => clearTimeout(timer);
-    }, [map, items, isBriefingActive]);
-
-    // ★ 解決：演出なし・地点切り替えのみのブリーフィング
     useEffect(() => {
-        if (!isBriefingActive || !map || items.length === 0 || briefingRef.current) return;
-        briefingRef.current = true;
+        if (!isBriefingActive || !map || items.length === 0 || briefingStarted.current) return;
+        briefingStarted.current = true;
 
-        const startBriefing = async () => {
+        const runBriefing = async () => {
             map.setZoom(15);
-            for (const item of items) {
+            // items プロパティには page.tsx から briefingItems が渡されています
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                setActiveIndex(i); // ★ バーの点灯位置を更新
                 map.panTo({ lat: item.lat, lng: item.lng });
                 setActivePlaceName(item.addressName || "WAYPOINT");
                 await new Promise(r => setTimeout(r, 2500));
             }
             setActivePlaceName(null);
-            briefingRef.current = false;
+            setActiveIndex(-1);
+            briefingStarted.current = false;
             if (onBriefingStateChange) onBriefingStateChange(true);
             if (onBriefingComplete) onBriefingComplete();
         };
-        startBriefing();
-    }, [isBriefingActive, map, items]);
+
+        runBriefing();
+    }, [isBriefingActive, map, items, onBriefingStateChange, onBriefingComplete]);
 
     return (
         <div className="w-full h-full relative bg-[#f5f5f5]">
             <Map defaultZoom={14} center={mapCenter} styles={mapStyle} disableDefaultUI={true} gestureHandling={'greedy'}>
                 {userLocation && <Marker position={userLocation} />}
-                {items.map((item: any, idx: number) => (
-                    <Marker key={idx} position={{ lat: item.lat, lng: item.lng }} label={{ text: (idx + 1).toString(), color: 'white', fontWeight: 'bold' }} />
+                {userLocation && radiusInKm && !isBriefingActive && <MapCircle center={userLocation} radius={radiusInKm} color={themeColor} />}
+                {items.map((item, idx) => (
+                    <Marker key={item.id || idx} position={{ lat: item.lat, lng: item.lng }} label={{ text: (idx + 1).toString(), color: 'white', fontWeight: 'bold' }} />
                 ))}
             </Map>
+
+            {/* ★ ブリーフィング中のUIオーバーレイ */}
             {activePlaceName && (
-                <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50">
-                    <div className="bg-black/90 px-6 py-2 rounded-full border border-[#F37343]/30 shadow-2xl">
-                        <p className="text-white text-[10px] font-black uppercase tracking-[0.3em]"><span className="text-[#F37343]">Scanning:</span> {activePlaceName}</p>
+                <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-3 w-full px-10 animate-in fade-in slide-in-from-top-4 duration-700">
+                    {/* 地名ラベル */}
+                    <div className="bg-black/90 px-8 py-3 rounded-full border border-[#F37343]/30 shadow-2xl">
+                        <p className="text-white text-xs font-black uppercase tracking-[0.4em] text-center">
+                            {activePlaceName}
+                        </p>
+                    </div>
+
+                    {/* ★ ステータスバー（セグメント式プログレスバー） */}
+                    <div className="flex gap-1.5 w-full max-w-[200px] h-1.5 px-2">
+                        {items.map((_, idx) => (
+                            <div
+                                key={idx}
+                                className={`flex-1 rounded-full transition-all duration-700 ${idx <= activeIndex
+                                        ? "bg-[#F37343] shadow-[0_0_12px_rgba(243,115,67,0.6)]"
+                                        : "bg-black/20 backdrop-blur-sm"
+                                    }`}
+                            />
+                        ))}
                     </div>
                 </div>
             )}
