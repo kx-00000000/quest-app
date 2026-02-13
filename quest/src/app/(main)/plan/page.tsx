@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getPlans, deletePlan } from "@/lib/storage";
+import { getPlans, deletePlan } from "@/getlib/storage"; // ★ 環境に合わせて lib/storage へ修正してください
 import { Trash2, Play, Footprints } from "lucide-react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -13,9 +13,15 @@ export default function PlanPage() {
     const [plans, setPlans] = useState<any[]>([]);
 
     useEffect(() => {
-        const allPlans = getPlans().filter(p => !p.isArchived);
-        setPlans(allPlans);
+        // storage.ts の関数 getPlans を使用
+        const allPlans = (typeof window !== 'undefined') ? require("@/lib/storage").getPlans() : [];
+        setPlans(allPlans.filter((p: any) => !p.isArchived));
     }, []);
+
+    const handleDelete = (id: string) => {
+        require("@/lib/storage").deletePlan(id);
+        setPlans(plans.filter(p => p.id !== id));
+    };
 
     return (
         <div className="min-h-screen bg-white text-black font-sans pb-32">
@@ -32,11 +38,11 @@ export default function PlanPage() {
                                 <div className="w-1.5 h-1.5 bg-[#F37343] rounded-full animate-pulse" />
                                 <span className="text-[9px] font-black text-[#F37343] uppercase tracking-widest">Active</span>
                             </div>
-                            <button onClick={() => { deletePlan(plan.id); setPlans(plans.filter(p => p.id !== plan.id)); }} className="text-gray-200 hover:text-red-400"><Trash2 size={18} /></button>
+                            <button onClick={() => handleDelete(plan.id)} className="text-gray-200 hover:text-red-400"><Trash2 size={18} /></button>
                         </div>
                         <h3 className="text-xl font-black uppercase mb-4 truncate text-left">{plan.name}</h3>
                         <div className="h-48 relative rounded-2xl overflow-hidden border border-gray-100 mb-6 bg-gray-50">
-                            {/* isFinalOverview={true} を渡すことで LazyMap 内の fitBounds を確実に発動させる */}
+                            {/* ★ isFinalOverview=true を渡して fitBounds をトリガー */}
                             <LazyMap items={plan.items} center={plan.center} isFinalOverview={true} themeColor="#F37343" />
                         </div>
                         <div className="flex items-center justify-between">
