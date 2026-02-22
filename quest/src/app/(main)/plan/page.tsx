@@ -33,7 +33,7 @@ export default function PlanPage() {
 
             <main className="p-4 space-y-6">
                 {plans.length > 0 ? (plans.map((plan) => (
-                    <div key={plan.id} className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm p-6 relative shadow-lg">
+                    <div key={plan.id} className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm p-6 relative">
                         <div className="flex justify-between items-start mb-4">
                             <div className="flex items-center gap-2 bg-[#F37343]/5 px-3 py-1 rounded-full">
                                 <div className="w-1.5 h-1.5 bg-[#F37343] rounded-full animate-pulse" />
@@ -41,10 +41,15 @@ export default function PlanPage() {
                             </div>
                             <button onClick={() => handleDelete(plan.id)} className="text-gray-200 hover:text-red-400 transition-colors"><Trash2 size={18} /></button>
                         </div>
-                        <h3 className="text-xl font-black uppercase mb-4 truncate text-left tracking-tight">{plan.name}</h3>
+                        <h3 className="text-xl font-black uppercase mb-4 truncate text-left">{plan.name}</h3>
                         <div className="h-48 relative rounded-2xl overflow-hidden border border-gray-100 mb-6 bg-gray-50">
-                            {/* isFinalOverview={true} を渡し、LazyMap側で fitBounds を発動させる */}
-                            <LazyMap items={plan.items} center={plan.center} isFinalOverview={true} themeColor="#F37343" />
+                            {/* プランの中心点とアイテムを渡し、LazyMap側で fitBounds を発動させる */}
+                            <LazyMap
+                                items={plan.items}
+                                center={plan.center || { lat: 35.6812, lng: 139.7671 }}
+                                isFinalOverview={true}
+                                themeColor="#F37343"
+                            />
                         </div>
                         <div className="flex items-center justify-between">
                             <div className="flex gap-6 text-left">
