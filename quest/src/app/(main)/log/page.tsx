@@ -30,7 +30,6 @@ const formatDistance = (km: number): string => {
     return `${km.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`;
 };
 
-// ミリ秒を読みやすい時間に変換するヘルパー
 const msToDuration = (diffMs: number): string => {
     const diffMins = Math.floor(diffMs / (1000 * 60));
     const diffHours = Math.floor(diffMins / 60);
@@ -39,11 +38,6 @@ const msToDuration = (diffMs: number): string => {
     if (diffMins < 60) return `${diffMins} min`;
     if (diffHours < 24) return `${diffHours}h ${diffMins % 60}m`;
     return `${diffDays}days ${diffHours % 24}h ${diffMins % 60}m`;
-};
-
-const formatDuration = (start: string, end: string): string => {
-    const diffMs = new Date(end).getTime() - new Date(start).getTime();
-    return msToDuration(diffMs);
 };
 
 export default function LogPage() {
@@ -101,25 +95,25 @@ export default function LogPage() {
     return (
         <div className="flex flex-col h-screen bg-white text-black font-sans">
             <header className="p-8 pt-16 border-b border-gray-50 flex-none">
-                {/* 1. 文言変更: LOG BOOK */}
                 <h1 className="text-3xl font-bold tracking-tighter uppercase mb-8">Log Book</h1>
 
-                {/* 2. ヘッダー統計の追加 (TTL DISTANCE / TTL DURATION) */}
-                <div className="flex gap-x-8 gap-y-4 flex-wrap">
-                    <div>
+                {/* ヘッダー統計の配置調整 */}
+                <div className="flex justify-between items-start">
+                    <div className="text-right">
                         <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Quests</p>
                         <p className="text-xl font-bold tabular-nums">{logs.length}</p>
                     </div>
-                    <div>
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Items</p>
+                    <div className="text-right">
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Items</p>
                         <p className="text-xl font-bold tabular-nums">{totals.items}</p>
                     </div>
-                    <div>
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">TTL Distance</p>
-                        <p className="text-xl font-bold tabular-nums">{formatDistance(totals.distance)}</p>
+                    <div className="text-right">
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Distance</p>
+                        {/* 整数表記へ変更 */}
+                        <p className="text-xl font-bold tabular-nums">{Math.floor(totals.distance).toLocaleString()} km</p>
                     </div>
-                    <div>
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">TTL Duration</p>
+                    <div className="text-right">
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Duration</p>
                         <p className="text-xl font-bold tabular-nums">{msToDuration(totals.durationMs)}</p>
                     </div>
                 </div>
@@ -132,7 +126,7 @@ export default function LogPage() {
                             <div className="flex justify-between items-center mb-5">
                                 <div>
                                     <h3 className="text-xl font-black uppercase truncate leading-tight text-left">{plan.name}</h3>
-                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">
+                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1 text-left">
                                         {new Date(plan.completionDate).toLocaleDateString('ja-JP')}
                                     </p>
                                 </div>
@@ -173,7 +167,6 @@ export default function LogPage() {
                                 </div>
                             </div>
 
-                            {/* 4. カード内統計: ITEMSの追加と 3. REVISITボタンの削除 */}
                             <div className="flex items-center gap-8 border-t border-gray-50 pt-6 text-left">
                                 <div>
                                     <p className="text-[8px] font-bold text-gray-400 uppercase">Distance</p>
@@ -185,7 +178,8 @@ export default function LogPage() {
                                 </div>
                                 <div>
                                     <p className="text-[8px] font-bold text-gray-400 uppercase">Items</p>
-                                    <p className="font-black text-sm tabular-nums">{plan.collectedItems.length} PTS</p>
+                                    {/* PTSを削除 */}
+                                    <p className="font-black text-sm tabular-nums">{plan.collectedItems.length}</p>
                                 </div>
                             </div>
                         </div>
