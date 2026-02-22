@@ -52,11 +52,9 @@ export default function NewQuestPage() {
                     if (status === "OK" && res?.[0]) {
                         const comp = res[0].address_components;
                         const pref = comp.find(c => c.types.includes("administrative_area_level_1"))?.long_name;
-                        const locality = comp.find(c => c.types.includes("locality"))?.long_name ||
-                            comp.find(c => c.types.includes("sublocality_level_1"))?.long_name;
+                        const locality = comp.find(c => c.types.includes("locality"))?.long_name || comp.find(c => c.types.includes("sublocality_level_1"))?.long_name;
                         const country = comp.find(c => c.types.includes("country"))?.long_name;
 
-                        // 都道府県、市区町村の両方が取得できる「陸地」のみを採用
                         if (pref && locality && country) {
                             const landPos = { lat: res[0].geometry.location.lat(), lng: res[0].geometry.location.lng() };
                             resolve({ address: `${pref} ${locality}, ${country}`.trim(), pos: landPos });
@@ -117,7 +115,6 @@ export default function NewQuestPage() {
             {isFinalOverview && (
                 <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-black/40 backdrop-blur-[2px] animate-in fade-in duration-700">
                     <div className="bg-white/95 backdrop-blur-xl rounded-[2.5rem] p-8 w-full max-w-sm space-y-6 shadow-2xl relative overflow-hidden text-center border border-white/50">
-                        {/* ★ はみ出し修正：親コンテナの overflow-hidden を活用 */}
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#F37343] to-orange-300" />
                         <div className="space-y-1">
                             <p className="text-[10px] font-black text-[#F37343] uppercase tracking-[0.4em]">Mission Complete</p>
