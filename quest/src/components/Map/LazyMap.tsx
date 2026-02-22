@@ -23,7 +23,6 @@ export default function LazyMap({
     const briefingRef = useRef(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    // 初期表示位置の保証
     const initialCenter = useMemo(() => {
         if (items.length > 0 && items[0].lat) return { lat: items[0].lat, lng: items[0].lng };
         if (userLocation?.lat) return userLocation;
@@ -31,13 +30,13 @@ export default function LazyMap({
         return { lat: 35.6812, lng: 139.7671 };
     }, [items, userLocation, center]);
 
-    // ★ 改良版：全地点を確実に収める「粘着フィット」ロジック
+    // ★ 解決：全ピンを確実に収める「絶対フィット」ロジック
     useEffect(() => {
         if (!map || items.length === 0 || isBriefingActive) return;
 
         const applyBounds = () => {
-            // コンテナがまだ表示されていない（高さが0）場合はスキップして再試行を待つ
-            if (containerRef.current && containerRef.current.offsetHeight === 0) return;
+            // コンテナがまだ物理的に表示されていない場合は中止してリトライを待つ
+            if (!containerRef.current || containerRef.current.offsetWidth === 0) return;
 
             const bounds = new google.maps.LatLngBounds();
             let count = 0;
@@ -49,25 +48,32 @@ export default function LazyMap({
                 }
             });
 
-            // 冒険中のみ現在地を含める
+            // プラン確認画面以外（冒険中など）では現在地も範囲に含める
             if (!isFinalOverview && userLocation?.lat) {
                 bounds.extend(userLocation);
                 count++;
             }
 
             if (count > 0) {
-                console.log(`[LazyMap] Fitting ${count} points to container.`);
-                // 枠のサイズを再計算させる
+                console.log(`[LazyMap] Fitting ${count} points to current frame.`);
+                // 地図エンジンに枠のサイズを再計算させる
                 google.maps.event.trigger(map, 'resize');
-                // paddingを控えめの40pxにし、小さな枠でも全体が見えるように調整
-                map.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
+
+                // paddingを100pxに広げ、全ピンが中央に集まるように調整
+                map.fitBounds(bounds, { top: 100, right: 100, bottom: 100, left: 100 });
+
+                // 寄りすぎ（1点にズーム）を物理的に阻止
+                const currentZoom = map.getZoom();
+                if (currentZoom && currentZoom > 14) {
+                    map.setZoom(14);
+                }
             }
         };
 
-        // タイミングをずらしてしつこく実行（これで枠の認識ミスを物理的に防ぐ）
+        // 地図の安定を待って3段階で実行（確実性を担保）
         const timers = [
-            setTimeout(applyBounds, 200),
-            setTimeout(applyBounds, 1000),
+            setTimeout(applyBounds, 300),
+            setTimeout(applyBounds, 1200),
             setTimeout(applyBounds, 3000)
         ];
 
@@ -79,7 +85,7 @@ export default function LazyMap({
         };
     }, [map, items, isBriefingActive, isFinalOverview, userLocation]);
 
-    // ブリーフィングロジック
+    // ブリーフィング演出
     useEffect(() => {
         if (!isBriefingActive || !map || items.length === 0 || briefingRef.current) return;
         briefingRef.current = true;
@@ -96,7 +102,7 @@ export default function LazyMap({
 
             const finalBounds = new google.maps.LatLngBounds();
             items.forEach((p: any) => finalBounds.extend(p));
-            map.fitBounds(finalBounds, 60);
+            map.fitBounds(finalBounds, 80);
 
             setActivePlaceName(null);
             setActiveIndex(-1);

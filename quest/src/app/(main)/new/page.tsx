@@ -15,7 +15,9 @@ const rangeModes = [
     { id: 'grand', label: 'GRAND', min: 200, max: 40000, step: 100 }
 ];
 
-const formatDistance = (km: number): string => km < 1 ? `${Math.floor(km * 1000)} m` : `${km.toFixed(1)} km`;
+const formatDistance = (km: number): string => {
+    return km < 1 ? `${Math.floor(km * 1000)} m` : `${km.toFixed(1)} km`;
+};
 
 export default function NewQuestPage() {
     const router = useRouter();
@@ -32,7 +34,10 @@ export default function NewQuestPage() {
 
     useEffect(() => {
         if (typeof window !== "undefined" && "geolocation" in navigator) {
-            navigator.geolocation.getCurrentPosition((pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }));
+            navigator.geolocation.getCurrentPosition(
+                (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                (err) => console.warn(err)
+            );
         }
     }, []);
 
@@ -51,19 +56,33 @@ export default function NewQuestPage() {
                 geocoder.geocode({ location: point }, (res, status) => {
                     if (status === "OK" && res?.[0]) {
                         const comp = res[0].address_components;
+
+                        // ★ 解決：市区町村（locality）が取得できない場所（海など）は弾く
                         const pref = comp.find(c => c.types.includes("administrative_area_level_1"))?.long_name;
-                        const locality = comp.find(c => c.types.includes("locality"))?.long_name || comp.find(c => c.types.includes("sublocality_level_1"))?.long_name || "";
+                        const locality = comp.find(c => c.types.includes("locality"))?.long_name ||
+                            comp.find(c => c.types.includes("sublocality_level_1"))?.long_name;
                         const country = comp.find(c => c.types.includes("country"))?.long_name;
-                        if (pref && country) {
-                            resolve({ address: `${pref} ${locality}, ${country}`.trim(), pos: point });
+
+                        // 都道府県、市区町村、国の3点セットが揃っている場合のみ採用
+                        if (pref && locality && country) {
+                            const formatted = `${pref} ${locality}, ${country}`.trim();
+                            resolve({ address: formatted, pos: point });
                             return;
                         }
                     }
                     resolve(null);
                 });
             });
-            if (result) validItems.push({ id: Math.random().toString(36).substr(2, 9), ...result.pos, isCollected: false, addressName: result.address });
-            await new Promise(r => setTimeout(r, 50));
+
+            if (result) {
+                validItems.push({
+                    id: Math.random().toString(36).substr(2, 9),
+                    ...result.pos,
+                    isCollected: false,
+                    addressName: result.address
+                });
+            }
+            await new Promise(r => setTimeout(r, 100));
         }
 
         savePlan({ id: Math.random().toString(36).substr(2, 9), name: name.trim() || "NEW QUEST", radius, center, items: validItems, status: "ready", createdAt: new Date().toISOString(), itemCount: validItems.length, totalDistance: 0, collectedCount: 0 });
@@ -77,26 +96,57 @@ export default function NewQuestPage() {
             <div className="absolute inset-0 z-0">
                 <LazyMap radiusInKm={radius} userLocation={userLocation} items={(isBriefingActive || isFinalOverview) ? briefingItems : []} isBriefingActive={isBriefingActive} isFinalOverview={isFinalOverview} onBriefingStateChange={setIsFinalOverview} onBriefingComplete={() => setIsBriefingActive(false)} />
             </div>
+
             {!isBriefingActive && !isFinalOverview && (
                 <>
-                    <div className="absolute top-8 left-6 right-6 z-20"><div className="bg-white/40 backdrop-blur-2xl rounded-[2rem] border border-white/40 shadow-xl px-6 py-3"><input type="text" value={name} onChange={(e) => { setName(e.target.value); resetReadyStatus(); }} placeholder="QUEST NAME" className="w-full bg-transparent border-none outline-none text-gray-800 font-black text-center" /></div></div>
-                    <div className="mt-auto relative z-10 px-4 mb-4"><div className="bg-white/80 backdrop-blur-xl rounded-[3rem] p-6 shadow-2xl border border-white space-y-5">
-                        <div className="flex p-1 bg-black/5 rounded-2xl gap-1">{rangeModes.map((m) => (<button key={m.id} onClick={() => { setActiveMode(m); setRadius(m.min); resetReadyStatus(); }} className={`flex-1 py-2 text-[9px] font-black rounded-xl transition-all ${activeMode.id === m.id ? 'bg-white text-[#F37343] shadow-sm' : 'text-gray-500'}`}>{m.label}</button>))}</div>
-                        <div className="space-y-4 px-1">
-                            <div className="space-y-1"><div className="flex justify-between text-[10px] font-black text-[#F37343] uppercase tracking-widest"><span>Radius</span><span>{formatDistance(radius)}</span></div><input type="range" min={activeMode.min} max={activeMode.max} step={activeMode.step} value={radius} onChange={(e) => { setRadius(parseFloat(e.target.value)); resetReadyStatus(); }} className="w-full h-3 bg-gray-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-[#F37343] [&::-webkit-slider-thumb]:rounded-full" /></div>
-                            <div className="space-y-1"><div className="flex justify-between text-[10px] font-black text-[#F37343] uppercase tracking-widest"><span>Items</span><span>{itemCount}</span></div><input type="range" min="1" max="7" step="1" value={itemCount} onChange={(e) => { setItemCount(parseInt(e.target.value)); resetReadyStatus(); }} className="w-full h-3 bg-gray-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-[#F37343] [&::-webkit-slider-thumb]:rounded-full" /></div>
+                    <div className="absolute top-8 left-6 right-6 z-20">
+                        <div className="bg-white/40 backdrop-blur-2xl rounded-[2rem] border border-white/40 shadow-xl px-6 py-3">
+                            <input type="text" value={name} onChange={(e) => { setName(e.target.value); resetReadyStatus(); }} placeholder="QUEST NAME" className="w-full bg-transparent border-none outline-none text-gray-800 font-black text-center" />
                         </div>
-                        <button onClick={handleAction} disabled={isCreating} className={`w-full py-4 rounded-[2rem] font-black flex items-center justify-center gap-2 transition-all duration-500 uppercase ${isBriefingReady ? "bg-gradient-to-r from-[#F37343] to-orange-400 text-white shadow-lg" : "bg-gray-900 text-white"}`}>{isCreating ? <Loader2 className="animate-spin" /> : isBriefingReady ? <><Play size={16} fill="currentColor" /> START BRIEFING</> : "CREATE QUEST"}</button>
-                    </div></div>
+                    </div>
+                    <div className="mt-auto relative z-10 px-4 mb-4">
+                        <div className="bg-white/80 backdrop-blur-xl rounded-[3rem] p-6 shadow-2xl border border-white space-y-5">
+                            <div className="flex p-1 bg-black/5 rounded-2xl gap-1">
+                                {rangeModes.map((mode) => (
+                                    <button key={mode.id} onClick={() => { setActiveMode(mode); setRadius(mode.min); resetReadyStatus(); }} className={`flex-1 py-2 text-[9px] font-black rounded-xl transition-all ${activeMode.id === mode.id ? 'bg-white text-[#F37343] shadow-sm' : 'text-gray-500'}`}>{mode.label}</button>
+                                ))}
+                            </div>
+                            <div className="space-y-4 px-1">
+                                <div className="space-y-1">
+                                    <div className="flex justify-between text-[10px] font-black text-[#F37343] uppercase tracking-widest"><span>Radius</span><span>{formatDistance(radius)}</span></div>
+                                    <input type="range" min={activeMode.min} max={activeMode.max} step={activeMode.step} value={radius} onChange={(e) => { setRadius(parseFloat(e.target.value)); resetReadyStatus(); }} className="w-full h-3 bg-gray-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-[#F37343] [&::-webkit-slider-thumb]:rounded-full" />
+                                </div>
+                                <div className="space-y-1">
+                                    <div className="flex justify-between text-[10px] font-black text-[#F37343] uppercase tracking-widest"><span>Items Count</span><span>{itemCount}</span></div>
+                                    <input type="range" min="1" max="7" step="1" value={itemCount} onChange={(e) => { setItemCount(parseInt(e.target.value)); resetReadyStatus(); }} className="w-full h-3 bg-gray-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-[#F37343] [&::-webkit-slider-thumb]:rounded-full" />
+                                </div>
+                            </div>
+                            <button onClick={handleAction} disabled={isCreating} className={`w-full py-4 rounded-[2rem] font-black flex items-center justify-center gap-2 transition-all duration-500 shadow-lg uppercase active:scale-95 ${isBriefingReady ? "bg-gradient-to-r from-[#F37343] to-orange-400 text-white shadow-[0_10px_25px_rgba(243,115,67,0.4)]" : "bg-gray-900 text-white"}`}>
+                                {isCreating ? <Loader2 className="animate-spin" /> : isBriefingReady ? <><Play size={16} fill="currentColor" /> START BRIEFING</> : "CREATE QUEST"}
+                            </button>
+                        </div>
+                    </div>
                 </>
             )}
+
             {isFinalOverview && (
                 <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-black/40 backdrop-blur-[2px] animate-in fade-in duration-700">
-                    <div className="bg-white/95 backdrop-blur-xl rounded-[2.5rem] p-8 w-full max-sm shadow-2xl relative overflow-hidden text-center border border-white/50">
+                    <div className="bg-white/95 backdrop-blur-xl rounded-[2.5rem] p-8 w-full max-w-sm space-y-6 shadow-2xl relative overflow-hidden text-center border border-white/50">
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#F37343] to-orange-300" />
-                        <h2 className="text-xl font-black text-gray-900 uppercase truncate">{name || "NEW QUEST"}</h2>
-                        <div className="space-y-2 py-4 px-2">{briefingItems.map((item, idx) => (<div key={idx} className="flex items-center gap-3 text-left"><span className="flex-none w-5 h-5 bg-[#F37343] text-white text-[10px] font-black flex items-center justify-center rounded-full">{idx + 1}</span><span className="text-[12px] font-bold text-gray-700 uppercase truncate flex-1 tracking-tight">{item.addressName}</span></div>))}</div>
-                        <button onClick={() => router.push("/plan")} className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-3"><Play size={14} fill="currentColor" /><span>Confirm Quest</span></button>
+                        <div className="space-y-1">
+                            <h2 className="text-xl font-black text-gray-900 uppercase truncate">{name || "NEW QUEST"}</h2>
+                        </div>
+                        <div className="space-y-2 py-4 px-2">
+                            {briefingItems.map((item, idx) => (
+                                <div key={idx} className="flex items-center gap-3 text-left">
+                                    <span className="flex-none w-5 h-5 bg-[#F37343] text-white text-[10px] font-black flex items-center justify-center rounded-full shadow-sm">{idx + 1}</span>
+                                    <span className="text-[12px] font-bold text-gray-700 uppercase truncate flex-1 tracking-tight">{item.addressName}</span>
+                                </div>
+                            ))}
+                        </div>
+                        <button onClick={() => router.push("/plan")} className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-transform">
+                            <Play size={14} fill="currentColor" /><span>Confirm Quest</span>
+                        </button>
                     </div>
                 </div>
             )}
