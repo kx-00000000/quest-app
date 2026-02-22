@@ -22,7 +22,6 @@ export default function LazyMap({
     const [activeIndex, setActiveIndex] = useState<number>(-1);
     const briefingRef = useRef(false);
 
-    // 演出中以外は現在地かセンターに固定
     const controlledCenter = useMemo(() => {
         if (isBriefingActive || isFinalOverview || isLogMode) return undefined;
         if (userLocation?.lat) return userLocation;
@@ -42,22 +41,22 @@ export default function LazyMap({
             if (userLocation?.lat) { bounds.extend(userLocation); count++; }
 
             if (count > 0) {
-                // デバッグ用ログ（ブラウザのコンソールで確認できます）
+                // デバッグ用ログ
                 console.log(`[LazyMap] Fitting ${count} points into bounds.`);
 
                 // 地図エンジンにリサイズを強制通知
                 google.maps.event.trigger(map, 'resize');
 
-                // 範囲を適用
-                map.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 });
+                // 範囲を適用（paddingを十分に確保）
+                map.fitBounds(bounds, { top: 60, right: 60, bottom: 60, left: 60 });
             }
         };
 
-        // タイミングをずらして複数回実行（コンテナの描画完了を待つ）
+        // タイミングをずらして複数回実行（描画完了のラグをカバー）
         const timers = [
             setTimeout(applyBounds, 100),
-            setTimeout(applyBounds, 500),
-            setTimeout(applyBounds, 1500) // 最後の追い打ち
+            setTimeout(applyBounds, 600),
+            setTimeout(applyBounds, 1200)
         ];
 
         const listener = google.maps.event.addListenerOnce(map, 'idle', applyBounds);
@@ -85,7 +84,7 @@ export default function LazyMap({
 
             const finalBounds = new google.maps.LatLngBounds();
             items.forEach((p: any) => finalBounds.extend(p));
-            map.fitBounds(finalBounds, 80);
+            map.fitBounds(finalBounds, { top: 80, right: 80, bottom: 80, left: 80 });
 
             setActivePlaceName(null);
             setActiveIndex(-1);
@@ -97,7 +96,7 @@ export default function LazyMap({
         };
 
         startBriefing();
-    }, [isBriefingActive, map, items]);
+    }, [isBriefingActive, map, items, onBriefingStateChange, onBriefingComplete]);
 
     return (
         <div className="w-full h-full relative bg-[#f5f5f5]">
@@ -113,8 +112,9 @@ export default function LazyMap({
                     <div className="bg-black/90 px-8 py-3 rounded-full border border-[#F37343]/30 shadow-2xl text-center">
                         <p className="text-white text-xs font-black uppercase tracking-[0.4em]">{activePlaceName}</p>
                     </div>
+                    {/* ★ 修正：型定義を追加してビルドエラーを回避 */}
                     <div className="flex gap-1.5 w-full max-w-[200px] h-1.5 px-2">
-                        {items.map((_, idx) => (
+                        {items.map((_: any, idx: number) => (
                             <div key={idx} className={`flex-1 rounded-full transition-all duration-700 ${idx <= activeIndex ? "bg-[#F37343] shadow-[0_0_12px_rgba(243,115,67,0.6)]" : "bg-black/20 backdrop-blur-sm"}`} />
                         ))}
                     </div>
