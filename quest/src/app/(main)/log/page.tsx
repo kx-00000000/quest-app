@@ -11,6 +11,7 @@ interface LazyMapProps {
     center?: { lat: number; lng: number };
     userLocation?: { lat: number; lng: number } | null;
     radiusInKm?: number;
+    path?: { lat: number; lng: number }[]; // ★ 軌跡データの型定義
     themeColor?: string;
     isLogMode?: boolean;
     isBriefingActive?: boolean;
@@ -97,7 +98,7 @@ export default function LogPage() {
             <header className="p-8 pt-16 border-b border-gray-50 flex-none">
                 <h1 className="text-3xl font-bold tracking-tighter uppercase mb-8">Log Book</h1>
 
-                {/* ヘッダー統計の配置調整 */}
+                {/* ヘッダー統計の配置調整 (右寄せ・整数表記) */}
                 <div className="flex justify-between items-start">
                     <div className="text-right">
                         <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Quests</p>
@@ -109,7 +110,6 @@ export default function LogPage() {
                     </div>
                     <div className="text-right">
                         <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Distance</p>
-                        {/* 整数表記へ変更 */}
                         <p className="text-xl font-bold tabular-nums">{Math.floor(totals.distance).toLocaleString()} km</p>
                     </div>
                     <div className="text-right">
@@ -139,6 +139,7 @@ export default function LogPage() {
                                 <LazyMap
                                     items={plan.items}
                                     center={plan.center}
+                                    path={plan.path || []} // ★ 保存されている軌跡データを地図に渡す
                                     isFinalOverview={true}
                                     themeColor="#f06292"
                                 />
@@ -178,7 +179,7 @@ export default function LogPage() {
                                 </div>
                                 <div>
                                     <p className="text-[8px] font-bold text-gray-400 uppercase">Items</p>
-                                    {/* PTSを削除 */}
+                                    {/* 単位(PTS)を削除 */}
                                     <p className="font-black text-sm tabular-nums">{plan.collectedItems.length}</p>
                                 </div>
                             </div>
