@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState, ComponentType } from "react";
-import { getPlans } from "@/lib/storage";
+import { useEffect, useState } from "react";
+import { getPlans, deletePlan } from "@/lib/storage";
 import { calculateDistance } from "@/lib/geo";
-import { MapPin, ChevronDown, ChevronUp, Package, Clock, MessageCircle, Footprints } from "lucide-react";
+import { MapPin, Trash2, Play, Footprints, Check } from "lucide-react";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 
-// --- ★ ここで LazyMap が受け取る Props の型を定義します ---
 interface LazyMapProps {
     items?: any[];
     center?: { lat: number; lng: number };
@@ -16,12 +16,8 @@ interface LazyMapProps {
     isLogMode?: boolean;
     isBriefingActive?: boolean;
     isFinalOverview?: boolean;
-    planId?: string | null;
-    onBriefingStateChange?: (state: boolean) => void;
-    onBriefingComplete?: () => void;
 }
 
-// --- ★ dynamic インポートに上記の型を適用します ---
 const LazyMap = dynamic<LazyMapProps>(
     () => import("@/components/Map/LazyMap").then((mod) => mod.default),
     {
@@ -31,10 +27,7 @@ const LazyMap = dynamic<LazyMapProps>(
 );
 
 const formatDistance = (km: number): string => {
-    if (km < 1) {
-        const meters = Math.floor(km * 1000);
-        return `${meters.toLocaleString()} m`;
-    }
+    if (km < 1) return `${Math.floor(km * 1000).toLocaleString()} m`;
     return `${km.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`;
 };
 
@@ -50,12 +43,12 @@ const formatDuration = (start: string, end: string): string => {
 };
 
 export default function LogPage() {
-    const [completedPlans, setCompletedPlans] = useState<any[]>([]);
-    const [expandedId, setExpandedId] = useState<string | null>(null);
+    const router = useRouter();
+    const [logs, setLogs] = useState<any[]>([]);
 
     useEffect(() => {
         const allPlans = getPlans();
-        const logs = allPlans
+        const processedLogs = allPlans
             .filter(plan => (plan.items || []).some((i: any) => i.isCollected))
             .map((plan: any) => {
                 const collectedItems = (plan.items || [])
@@ -63,135 +56,129 @@ export default function LogPage() {
                     .sort((a: any, b: any) => new Date(a.collectedAt || 0).getTime() - new Date(b.collectedAt || 0).getTime());
 
                 let totalDistance = 0;
-                let prevPoint: [number, number] = plan.center ? [plan.center.lat, plan.center.lng] : [0, 0];
+                let prevPoint = plan.center ? [plan.center.lat, plan.center.lng] : [0, 0];
                 collectedItems.forEach((item: any) => {
                     totalDistance += calculateDistance(prevPoint[0], prevPoint[1], item.lat, item.lng);
                     prevPoint = [item.lat, item.lng];
                 });
 
-                const startTime = plan.createdAt;
-                const endTime = plan.finishedAt || (collectedItems.length > 0 ? collectedItems[collectedItems.length - 1].collectedAt : startTime);
+                const endTime = plan.finishedAt || (collectedItems.length > 0 ? collectedItems[collectedItems.length - 1].collectedAt : plan.createdAt);
 
                 return {
                     ...plan,
                     collectedItems,
                     totalDistance,
-                    duration: formatDuration(startTime, endTime),
+                    duration: formatDuration(plan.createdAt, endTime),
                     completionDate: endTime
                 };
             })
             .sort((a, b) => new Date(b.completionDate).getTime() - new Date(a.completionDate).getTime());
 
-        setCompletedPlans(logs);
-        if (logs.length > 0) setExpandedId(logs[0].id);
+        setLogs(processedLogs);
     }, []);
 
-    const toggleExpand = (id: string) => {
-        setExpandedId(expandedId === id ? null : id);
+    const handleDelete = (id: string) => {
+        if (confirm("このログを削除しますか？")) {
+            deletePlan(id);
+            setLogs(logs.filter(l => l.id !== id));
+        }
     };
 
     return (
-        <div className="min-h-screen bg-white text-black font-sans pb-32">
-            <header className="p-8 pt-16 border-b border-gray-100">
-                <h1 className="text-2xl font-bold tracking-tighter uppercase mb-6">Flight Log</h1>
+        <div className="flex flex-col h-screen bg-white text-black font-sans">
+            <header className="p-8 pt-16 border-b border-gray-50 flex-none">
+                <h1 className="text-3xl font-bold tracking-tighter uppercase mb-6">Flight Log</h1>
                 <div className="flex gap-10">
                     <div>
-                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Quests</p>
-                        <p className="text-2xl font-bold tabular-nums">{completedPlans.length}</p>
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Quests</p>
+                        <p className="text-2xl font-bold tabular-nums">{logs.length}</p>
                     </div>
                     <div>
-                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Items</p>
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Items</p>
                         <p className="text-2xl font-bold tabular-nums">
-                            {completedPlans.reduce((acc, curr) => acc + (curr.collectedItems?.length || 0), 0)}
+                            {logs.reduce((acc, curr) => acc + (curr.collectedItems?.length || 0), 0)}
                         </p>
                     </div>
                 </div>
             </header>
 
-            <main className="p-4 space-y-4">
-                {completedPlans.length > 0 ? (
-                    completedPlans.map((plan) => {
-                        const isExpanded = expandedId === plan.id;
-                        return (
-                            <div key={plan.id} className="bg-white rounded-[2rem] border border-gray-100 overflow-hidden shadow-sm transition-all">
-                                <div className="p-6 cursor-pointer flex justify-between items-start" onClick={() => toggleExpand(plan.id)}>
-                                    <div className="flex-1 pr-4">
-                                        <h3 className="text-lg font-bold text-black uppercase tracking-tight leading-tight">{plan.name}</h3>
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">
-                                            {new Date(plan.completionDate).toLocaleDateString('ja-JP')}
-                                        </p>
+            <main className="flex-1 overflow-y-auto p-4 space-y-6 pb-32">
+                {logs.length > 0 ? (
+                    logs.map((plan) => (
+                        <div key={plan.id} className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm p-6 relative">
+                            {/* タイトルとゴミ箱 */}
+                            <div className="flex justify-between items-center mb-5">
+                                <div>
+                                    <h3 className="text-xl font-black uppercase truncate leading-tight text-left">{plan.name}</h3>
+                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">
+                                        {new Date(plan.completionDate).toLocaleDateString('ja-JP')}
+                                    </p>
+                                </div>
+                                <button onClick={() => handleDelete(plan.id)} className="text-gray-300 hover:text-red-400 transition-colors">
+                                    <Trash2 size={20} />
+                                </button>
+                            </div>
+
+                            {/* 地図表示 */}
+                            <div className="h-48 relative rounded-2xl overflow-hidden border border-gray-100 mb-6 bg-gray-50">
+                                <LazyMap
+                                    items={plan.items}
+                                    center={plan.center}
+                                    isFinalOverview={true}
+                                    themeColor="#f06292"
+                                />
+                            </div>
+
+                            {/* 目的地リスト (PlanページのCompleteタブと同じスタイル) */}
+                            <div className="space-y-4 mb-6 px-1 text-left">
+                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                                    <MapPin size={10} /> Visit Records
+                                </p>
+                                <div className="grid gap-4">
+                                    {plan.collectedItems.map((item: any, idx: number) => (
+                                        <div key={item.id || idx} className="flex items-start gap-3">
+                                            <div className="w-5 h-5 rounded-full bg-black text-white flex items-center justify-center flex-none mt-0.5 shadow-sm">
+                                                <Check size={12} strokeWidth={4} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <span className="text-[11px] font-bold text-gray-700 block truncate uppercase">
+                                                    {item.addressName || item.locationName || `POINT ${idx + 1}`}
+                                                </span>
+                                                <p className="text-[9px] font-bold text-gray-400 tabular-nums uppercase mt-0.5 tracking-tight">
+                                                    {item.lat.toFixed(4)}°N {item.lng.toFixed(4)}°E • {new Date(item.collectedAt).toLocaleString('ja-JP', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* 下部統計エリア */}
+                            <div className="flex items-center justify-between border-t border-gray-50 pt-6">
+                                <div className="flex gap-6 text-left">
+                                    <div>
+                                        <p className="text-[8px] font-bold text-gray-400 uppercase">Distance</p>
+                                        <p className="font-black text-sm tabular-nums">{formatDistance(plan.totalDistance)}</p>
                                     </div>
-                                    <div className="text-gray-300 mt-1">
-                                        {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                                    <div>
+                                        <p className="text-[8px] font-bold text-gray-400 uppercase">Duration</p>
+                                        <p className="font-black text-sm tabular-nums">{plan.duration}</p>
                                     </div>
                                 </div>
-
-                                {isExpanded && (
-                                    <div className="animate-in fade-in slide-in-from-top-2 duration-500">
-                                        <div className="grid grid-cols-3 gap-2 px-6 mb-6">
-                                            <div className="bg-black text-white rounded-2xl p-4">
-                                                <div className="text-[8px] font-bold opacity-50 uppercase tracking-widest mb-1">Dist</div>
-                                                <div className="text-[13px] font-bold tabular-nums truncate">{formatDistance(plan.totalDistance)}</div>
-                                            </div>
-                                            <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 text-black">
-                                                <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-1">Time</div>
-                                                <div className="text-[13px] font-bold tabular-nums truncate">{plan.duration}</div>
-                                            </div>
-                                            <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 text-black">
-                                                <div className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-1">Items</div>
-                                                <div className="text-[13px] font-bold tabular-nums truncate">{plan.collectedItems?.length} pts</div>
-                                            </div>
-                                        </div>
-
-                                        {plan.comment && (
-                                            <div className="mx-6 mb-6 p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                                                <p className="text-sm font-medium text-gray-700 leading-relaxed italic">"{plan.comment}"</p>
-                                            </div>
-                                        )}
-
-                                        <div className="mx-6 h-52 relative border border-gray-100 rounded-2xl overflow-hidden mb-6">
-                                            {/* Google Maps 表示 */}
-                                            <LazyMap items={plan.items} themeColor="#f06292" center={plan.center} isLogMode={true} />
-                                        </div>
-
-                                        <div className="p-6 pt-0 space-y-6">
-                                            <div className="space-y-6">
-                                                {plan.collectedItems.map((item: any, idx: number) => (
-                                                    <div key={item.id || idx} className="flex gap-4">
-                                                        <div className="flex flex-col items-center">
-                                                            <div className="w-2 h-2 bg-black rounded-full mt-2" />
-                                                            {idx !== plan.collectedItems.length - 1 && (
-                                                                <div className="w-[1px] flex-1 bg-gray-100 my-1" />
-                                                            )}
-                                                        </div>
-                                                        <div className="flex-1 pb-1">
-                                                            <div className="flex justify-between items-start">
-                                                                <h4 className="text-sm font-bold text-black uppercase">{item.locationName || `POINT 0${idx + 1}`}</h4>
-                                                                <span className="text-[10px] font-bold text-gray-400 tabular-nums">
-                                                                    {new Date(item.collectedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
-                                                                </span>
-                                                            </div>
-                                                            <p className="text-[9px] font-bold text-gray-300 tabular-nums mt-0.5 uppercase">
-                                                                {item.lat.toFixed(4)}°N / {item.lng.toFixed(4)}°E
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        <div className="bg-gray-50 p-4 text-center border-t border-gray-100">
-                                            <p className="text-[8px] font-bold text-gray-300 uppercase tracking-[0.3em]">Quest Archive Verified</p>
-                                        </div>
-                                    </div>
-                                )}
+                                <button
+                                    onClick={() => router.push(`/adventure/${plan.id}`)}
+                                    className="px-8 py-4 bg-[#111827] text-white rounded-2xl font-black text-[11px] uppercase tracking-widest flex items-center gap-2 shadow-lg active:scale-95 transition-all"
+                                >
+                                    <Play size={12} fill="currentColor" />
+                                    <span>REVISIT</span>
+                                </button>
                             </div>
-                        );
-                    })
+                        </div>
+                    ))
                 ) : (
-                    <div className="text-center py-24 border border-dashed border-gray-100 rounded-[2rem]">
+                    <div className="text-center py-24 border-2 border-dashed border-gray-50 rounded-[3rem]">
                         <Footprints size={48} className="text-gray-100 mx-auto mb-4" />
-                        <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">No Records</p>
+                        <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">No Records Found</p>
                     </div>
                 )}
             </main>
