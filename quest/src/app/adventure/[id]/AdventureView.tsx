@@ -23,7 +23,7 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
             const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
             setUserLocation(newLoc);
 
-            // 1. 地名の逆ジオコーディング
+            // 1. 地名の取得
             geocoder.geocode({ location: newLoc }, (res, status) => {
                 if (status === "OK" && res?.[0]) {
                     const comp = res[0].address_components;
@@ -35,19 +35,18 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                 }
             });
 
-            // 2. 軌跡の更新
+            // 2. 軌跡（Polyline）の更新
             setPath((prevPath: any[]) => {
                 const lastPoint = prevPath[prevPath.length - 1];
                 if (!lastPoint || calculateDistance(lastPoint.lat, lastPoint.lng, newLoc.lat, newLoc.lng) > 0.01) {
                     const newPath = [...prevPath, newLoc];
-                    // ストレージに保存
                     updatePlan({ ...plan, path: newPath });
                     return newPath;
                 }
                 return prevPath;
             });
 
-            // 3. 到達判定（ここで発生していた型エラーを修正）
+            // 3. 到達判定
             setPlan((currentPlan: any) => {
                 let hasChanged = false;
                 const updatedItems = (currentPlan.items || []).map((item: any) => {
@@ -75,6 +74,7 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
         return () => navigator.geolocation.clearWatch(watchId);
     }, [plan.id]);
 
+    // ★ 修正箇所：sortの引数 a, b に型を追加
     const nearestItem = useMemo(() => {
         if (!userLocation) return null;
         const uncollected = (plan.items || []).filter((i: any) => !i.isCollected);
@@ -84,7 +84,7 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
             ...item,
             dist: calculateDistance(userLocation.lat, userLocation.lng, item.lat, item.lng),
             bear: calculateBearing(userLocation.lat, userLocation.lng, item.lat, item.lng)
-        })).sort((a, b) => a.dist - b.dist)[0];
+        })).sort((a: any, b: any) => a.dist - b.dist)[0];
     }, [userLocation, plan.items]);
 
     return (
