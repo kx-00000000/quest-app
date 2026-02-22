@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { getPlans, deletePlan } from "@/lib/storage";
 import { calculateDistance } from "@/lib/geo";
-import { MapPin, Trash2, Play, Footprints, Check } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { MapPin, Trash2, Footprints, Check } from "lucide-react";
 import dynamic from "next/dynamic";
 
 interface LazyMapProps {
@@ -31,8 +30,8 @@ const formatDistance = (km: number): string => {
     return `${km.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`;
 };
 
-const formatDuration = (start: string, end: string): string => {
-    const diffMs = new Date(end).getTime() - new Date(start).getTime();
+// ミリ秒を読みやすい時間に変換するヘルパー
+const msToDuration = (diffMs: number): string => {
     const diffMins = Math.floor(diffMs / (1000 * 60));
     const diffHours = Math.floor(diffMins / 60);
     const diffDays = Math.floor(diffHours / 24);
@@ -42,12 +41,21 @@ const formatDuration = (start: string, end: string): string => {
     return `${diffDays}days ${diffHours % 24}h ${diffMins % 60}m`;
 };
 
+const formatDuration = (start: string, end: string): string => {
+    const diffMs = new Date(end).getTime() - new Date(start).getTime();
+    return msToDuration(diffMs);
+};
+
 export default function LogPage() {
-    const router = useRouter();
     const [logs, setLogs] = useState<any[]>([]);
+    const [totals, setTotals] = useState({ distance: 0, durationMs: 0, items: 0 });
 
     useEffect(() => {
         const allPlans = getPlans();
+        let ttlDist = 0;
+        let ttlMs = 0;
+        let ttlItems = 0;
+
         const processedLogs = allPlans
             .filter(plan => (plan.items || []).some((i: any) => i.isCollected))
             .map((plan: any) => {
@@ -55,26 +63,32 @@ export default function LogPage() {
                     .filter((i: any) => i.isCollected)
                     .sort((a: any, b: any) => new Date(a.collectedAt || 0).getTime() - new Date(b.collectedAt || 0).getTime());
 
-                let totalDistance = 0;
+                let planDistance = 0;
                 let prevPoint = plan.center ? [plan.center.lat, plan.center.lng] : [0, 0];
                 collectedItems.forEach((item: any) => {
-                    totalDistance += calculateDistance(prevPoint[0], prevPoint[1], item.lat, item.lng);
+                    planDistance += calculateDistance(prevPoint[0], prevPoint[1], item.lat, item.lng);
                     prevPoint = [item.lat, item.lng];
                 });
 
                 const endTime = plan.finishedAt || (collectedItems.length > 0 ? collectedItems[collectedItems.length - 1].collectedAt : plan.createdAt);
+                const planMs = new Date(endTime).getTime() - new Date(plan.createdAt).getTime();
+
+                ttlDist += planDistance;
+                ttlMs += planMs;
+                ttlItems += collectedItems.length;
 
                 return {
                     ...plan,
                     collectedItems,
-                    totalDistance,
-                    duration: formatDuration(plan.createdAt, endTime),
+                    totalDistance: planDistance,
+                    duration: msToDuration(planMs),
                     completionDate: endTime
                 };
             })
             .sort((a, b) => new Date(b.completionDate).getTime() - new Date(a.completionDate).getTime());
 
         setLogs(processedLogs);
+        setTotals({ distance: ttlDist, durationMs: ttlMs, items: ttlItems });
     }, []);
 
     const handleDelete = (id: string) => {
@@ -87,17 +101,26 @@ export default function LogPage() {
     return (
         <div className="flex flex-col h-screen bg-white text-black font-sans">
             <header className="p-8 pt-16 border-b border-gray-50 flex-none">
-                <h1 className="text-3xl font-bold tracking-tighter uppercase mb-6">Flight Log</h1>
-                <div className="flex gap-10">
+                {/* 1. 文言変更: LOG BOOK */}
+                <h1 className="text-3xl font-bold tracking-tighter uppercase mb-8">Log Book</h1>
+
+                {/* 2. ヘッダー統計の追加 (TTL DISTANCE / TTL DURATION) */}
+                <div className="flex gap-x-8 gap-y-4 flex-wrap">
                     <div>
                         <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Quests</p>
-                        <p className="text-2xl font-bold tabular-nums">{logs.length}</p>
+                        <p className="text-xl font-bold tabular-nums">{logs.length}</p>
                     </div>
                     <div>
                         <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Items</p>
-                        <p className="text-2xl font-bold tabular-nums">
-                            {logs.reduce((acc, curr) => acc + (curr.collectedItems?.length || 0), 0)}
-                        </p>
+                        <p className="text-xl font-bold tabular-nums">{totals.items}</p>
+                    </div>
+                    <div>
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">TTL Distance</p>
+                        <p className="text-xl font-bold tabular-nums">{formatDistance(totals.distance)}</p>
+                    </div>
+                    <div>
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">TTL Duration</p>
+                        <p className="text-xl font-bold tabular-nums">{msToDuration(totals.durationMs)}</p>
                     </div>
                 </div>
             </header>
@@ -106,7 +129,6 @@ export default function LogPage() {
                 {logs.length > 0 ? (
                     logs.map((plan) => (
                         <div key={plan.id} className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm p-6 relative">
-                            {/* タイトルとゴミ箱 */}
                             <div className="flex justify-between items-center mb-5">
                                 <div>
                                     <h3 className="text-xl font-black uppercase truncate leading-tight text-left">{plan.name}</h3>
@@ -119,7 +141,6 @@ export default function LogPage() {
                                 </button>
                             </div>
 
-                            {/* 地図表示 */}
                             <div className="h-48 relative rounded-2xl overflow-hidden border border-gray-100 mb-6 bg-gray-50">
                                 <LazyMap
                                     items={plan.items}
@@ -129,7 +150,6 @@ export default function LogPage() {
                                 />
                             </div>
 
-                            {/* 目的地リスト (PlanページのCompleteタブと同じスタイル) */}
                             <div className="space-y-4 mb-6 px-1 text-left">
                                 <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
                                     <MapPin size={10} /> Visit Records
@@ -153,25 +173,20 @@ export default function LogPage() {
                                 </div>
                             </div>
 
-                            {/* 下部統計エリア */}
-                            <div className="flex items-center justify-between border-t border-gray-50 pt-6">
-                                <div className="flex gap-6 text-left">
-                                    <div>
-                                        <p className="text-[8px] font-bold text-gray-400 uppercase">Distance</p>
-                                        <p className="font-black text-sm tabular-nums">{formatDistance(plan.totalDistance)}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-[8px] font-bold text-gray-400 uppercase">Duration</p>
-                                        <p className="font-black text-sm tabular-nums">{plan.duration}</p>
-                                    </div>
+                            {/* 4. カード内統計: ITEMSの追加と 3. REVISITボタンの削除 */}
+                            <div className="flex items-center gap-8 border-t border-gray-50 pt-6 text-left">
+                                <div>
+                                    <p className="text-[8px] font-bold text-gray-400 uppercase">Distance</p>
+                                    <p className="font-black text-sm tabular-nums">{formatDistance(plan.totalDistance)}</p>
                                 </div>
-                                <button
-                                    onClick={() => router.push(`/adventure/${plan.id}`)}
-                                    className="px-8 py-4 bg-[#111827] text-white rounded-2xl font-black text-[11px] uppercase tracking-widest flex items-center gap-2 shadow-lg active:scale-95 transition-all"
-                                >
-                                    <Play size={12} fill="currentColor" />
-                                    <span>REVISIT</span>
-                                </button>
+                                <div>
+                                    <p className="text-[8px] font-bold text-gray-400 uppercase">Duration</p>
+                                    <p className="font-black text-sm tabular-nums">{plan.duration}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[8px] font-bold text-gray-400 uppercase">Items</p>
+                                    <p className="font-black text-sm tabular-nums">{plan.collectedItems.length} PTS</p>
+                                </div>
                             </div>
                         </div>
                     ))
