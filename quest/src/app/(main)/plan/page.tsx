@@ -43,10 +43,9 @@ export default function PlanPage() {
                         </div>
                         <h3 className="text-xl font-black uppercase mb-4 truncate text-left">{plan.name}</h3>
                         <div className="h-48 relative rounded-2xl overflow-hidden border border-gray-100 mb-6 bg-gray-50">
-                            {/* プランの中心点とアイテムを渡し、LazyMap側で fitBounds を発動させる */}
                             <LazyMap
                                 items={plan.items}
-                                center={plan.center || { lat: 35.6812, lng: 139.7671 }}
+                                center={plan.center}
                                 isFinalOverview={true}
                                 themeColor="#F37343"
                             />
