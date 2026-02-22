@@ -22,15 +22,15 @@ export default function LazyMap({
     const [activeIndex, setActiveIndex] = useState<number>(-1);
     const briefingRef = useRef(false);
 
-    // 初期化警告を消すための初期位置（絶対にundefinedにしない）
+    // Mapエンジンの初期化を保証する初期位置
     const initialCenter = useMemo(() => {
         if (items.length > 0 && items[0].lat) return { lat: Number(items[0].lat), lng: Number(items[0].lng) };
-        if (center?.lat) return { lat: Number(center.lat), lng: Number(center.lng) };
         if (userLocation?.lat) return userLocation;
+        if (center?.lat) return center;
         return { lat: 35.6812, lng: 139.7671 };
-    }, [items, center, userLocation]);
+    }, [items, userLocation, center]);
 
-    // ★ ログ画面の成功を再現：全地点を枠内に収める
+    // ★ 解決：全地点を収めるズームロジック
     useEffect(() => {
         if (!map || items.length === 0 || isBriefingActive) return;
 
@@ -45,23 +45,22 @@ export default function LazyMap({
             });
 
             if (count > 0) {
-                // コンテナサイズの再認識
+                // コンテナのサイズを強制再認識
                 google.maps.event.trigger(map, 'resize');
                 // ログ画面同様、少し余裕を持たせたパディングでフィット
                 map.fitBounds(bounds, { top: 60, right: 60, bottom: 60, left: 60 });
 
                 // 寄りすぎ（1点ズーム）を防止
                 const checkZoom = () => {
-                    if (map.getZoom()! > 15) map.setZoom(14);
+                    const currentZoom = map.getZoom();
+                    if (currentZoom && currentZoom > 15) map.setZoom(14);
                 };
                 google.maps.event.addListenerOnce(map, 'zoom_changed', checkZoom);
             }
         };
 
-        // タイミングをずらして確実に実行
-        const timers = [setTimeout(applyBounds, 200), setTimeout(applyBounds, 1500)];
+        const timers = [setTimeout(applyBounds, 300), setTimeout(applyBounds, 1500)];
         const listener = google.maps.event.addListenerOnce(map, 'idle', applyBounds);
-
         return () => {
             timers.forEach(clearTimeout);
             google.maps.event.removeListener(listener);
@@ -92,8 +91,7 @@ export default function LazyMap({
             if (onBriefingStateChange) onBriefingStateChange(true);
             if (onBriefingComplete) onBriefingComplete();
         };
-
-        startBriefing();
+        runBriefing();
     }, [isBriefingActive, map, items]);
 
     return (
@@ -104,7 +102,6 @@ export default function LazyMap({
                     <Marker key={idx} position={{ lat: Number(item.lat), lng: Number(item.lng) }} label={{ text: (idx + 1).toString(), color: 'white', fontWeight: 'bold' }} />
                 ))}
             </Map>
-
             {activePlaceName && (
                 <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-3 w-full px-10 animate-in fade-in slide-in-from-top-4 duration-700">
                     <div className="bg-black/90 px-8 py-3 rounded-full border border-[#F37343]/30 shadow-2xl text-center">
