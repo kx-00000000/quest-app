@@ -51,12 +51,8 @@ export default function NewQuestPage() {
                 geocoder.geocode({ location: point }, (res, status) => {
                     if (status === "OK" && res?.[0]) {
                         const comp = res[0].address_components;
-                        const types = res[0].types;
-
                         const pref = comp.find(c => c.types.includes("administrative_area_level_1"))?.long_name;
                         const locality = comp.find(c => c.types.includes("locality"))?.long_name || comp.find(c => c.types.includes("sublocality_level_1"))?.long_name;
-
-                        // ★ 厳格な陸地判定: 道路または建物情報が含まれていること
                         const isLand = comp.some(c => c.types.includes("route") || c.types.includes("establishment") || c.types.includes("sublocality"));
 
                         if (pref && locality && isLand) {
@@ -118,15 +114,15 @@ export default function NewQuestPage() {
 
             {isFinalOverview && (
                 <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-black/40 backdrop-blur-[2px] animate-in fade-in duration-700">
-                    <div className="bg-white/95 backdrop-blur-xl rounded-[2.5rem] p-8 w-full max-w-sm space-y-6 shadow-2xl relative overflow-hidden text-center border border-white/50 text-left">
+                    <div className="bg-white/95 backdrop-blur-xl rounded-[2.5rem] p-8 w-full max-w-sm space-y-6 shadow-2xl relative overflow-hidden text-center border border-white/50">
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#F37343] to-orange-300" />
                         <div className="space-y-1">
                             <p className="text-[10px] font-black text-[#F37343] uppercase tracking-[0.4em]">Mission Complete</p>
                             <h2 className="text-xl font-black text-gray-900 uppercase truncate">{name || "NEW QUEST"}</h2>
                         </div>
-                        <div className="space-y-2 py-4 px-2">
+                        <div className="space-y-2 py-4 px-2 text-left">
                             {briefingItems.map((item, idx) => (
-                                <div key={idx} className="flex items-center gap-3 text-left">
+                                <div key={idx} className="flex items-center gap-3">
                                     <span className="flex-none w-5 h-5 bg-[#F37343] text-white text-[10px] font-black flex items-center justify-center rounded-full shadow-sm">{idx + 1}</span>
                                     <span className="text-[12px] font-bold text-gray-700 uppercase truncate flex-1 tracking-tight">{item.addressName}</span>
                                 </div>
