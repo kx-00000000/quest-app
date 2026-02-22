@@ -65,7 +65,6 @@ export default function PlanPage() {
             <main className="flex-1 overflow-y-auto p-4 space-y-6 pb-32">
                 {filteredPlans.length > 0 ? (filteredPlans.map((plan) => (
                     <div key={plan.id} className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm p-6 relative">
-                        {/* タイトルとゴミ箱を同じ高さに配置 */}
                         <div className="flex justify-between items-center mb-5">
                             <h3 className="text-xl font-black uppercase truncate flex-1 pr-4 text-left">{plan.name}</h3>
                             <button
@@ -86,19 +85,28 @@ export default function PlanPage() {
                         </div>
 
                         {/* 目的地リスト */}
-                        <div className="space-y-3 mb-6 px-1">
-                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1">
+                        <div className="space-y-4 mb-6 px-1 text-left">
+                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
                                 <MapPin size={10} /> Destinations
                             </p>
-                            <div className="grid gap-2.5">
+                            <div className="grid gap-4">
                                 {plan.items?.map((item: any, idx: number) => (
-                                    <div key={idx} className="flex items-center gap-3">
-                                        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black text-white flex-none ${item.isCollected ? 'bg-green-500' : 'bg-[#F37343]'}`}>
+                                    <div key={idx} className="flex items-start gap-3">
+                                        {/* チェックマークアイコンのスタイル修正 */}
+                                        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black flex-none mt-0.5 ${item.isCollected ? 'bg-black text-white' : 'bg-[#F37343] text-white'}`}>
                                             {item.isCollected ? <Check size={12} strokeWidth={4} /> : (idx + 1)}
                                         </div>
-                                        <span className="text-[11px] font-bold text-gray-700 truncate flex-1 text-left">
-                                            {item.addressName}
-                                        </span>
+                                        <div className="flex-1 min-w-0">
+                                            <span className="text-[11px] font-bold text-gray-700 block truncate">
+                                                {item.addressName}
+                                            </span>
+                                            {/* 緯度・経度と日時の表示追加 */}
+                                            {item.isCollected && (
+                                                <p className="text-[9px] font-bold text-gray-400 tabular-nums uppercase mt-0.5 tracking-tight">
+                                                    {item.lat.toFixed(4)}°N {item.lng.toFixed(4)}°E • {new Date(item.collectedAt).toLocaleString('ja-JP', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                                </p>
+                                            )}
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -121,7 +129,7 @@ export default function PlanPage() {
                 ))) : (
                     <div className="text-center py-24 border-2 border-dashed border-gray-50 rounded-[3rem]">
                         <Footprints size={48} className="text-gray-100 mx-auto mb-4" />
-                        <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">No Quests found</p>
+                        <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">No Quests in {activeTab}</p>
                     </div>
                 )}
             </main>
