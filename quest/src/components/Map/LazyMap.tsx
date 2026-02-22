@@ -43,7 +43,6 @@ export default function LazyMap({
             });
 
             if (count > 0) {
-                // コンテナのサイズを強制的に再認識させてから計算（ログ画面の安定要因）
                 google.maps.event.trigger(map, 'resize');
                 map.fitBounds(bounds, { top: 60, right: 60, bottom: 60, left: 60 });
 
