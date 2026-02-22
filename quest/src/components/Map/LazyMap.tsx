@@ -21,20 +21,24 @@ export default function LazyMap({
     const [activePlaceName, setActivePlaceName] = useState<string | null>(null);
     const [activeIndex, setActiveIndex] = useState<number>(-1);
     const briefingRef = useRef(false);
+    const containerRef = useRef<HTMLDivElement>(null);
 
-    // ★ 警告解消：Mapコンポーネントの起動を100%保証する初期位置
-    const defaultMapCenter = useMemo(() => {
+    // 初期表示位置の保証
+    const initialCenter = useMemo(() => {
         if (items.length > 0 && items[0].lat) return { lat: items[0].lat, lng: items[0].lng };
         if (userLocation?.lat) return userLocation;
         if (center?.lat) return center;
-        return { lat: 35.6812, lng: 139.7671 }; // 東京
+        return { lat: 35.6812, lng: 139.7671 };
     }, [items, userLocation, center]);
 
-    // ★ 強力な全ピン表示ロジック
+    // ★ 改良版：全地点を確実に収める「粘着フィット」ロジック
     useEffect(() => {
         if (!map || items.length === 0 || isBriefingActive) return;
 
         const applyBounds = () => {
+            // コンテナがまだ表示されていない（高さが0）場合はスキップして再試行を待つ
+            if (containerRef.current && containerRef.current.offsetHeight === 0) return;
+
             const bounds = new google.maps.LatLngBounds();
             let count = 0;
 
@@ -45,45 +49,37 @@ export default function LazyMap({
                 }
             });
 
-            // プラン確認画面以外では現在地も範囲に含める
+            // 冒険中のみ現在地を含める
             if (!isFinalOverview && userLocation?.lat) {
                 bounds.extend(userLocation);
                 count++;
             }
 
             if (count > 0) {
-                console.log(`[LazyMap] Auto-fitting ${count} points into bounds.`);
-
-                // 1. まず地図の描画領域（コンテナサイズ）を強制的に再認識させる
+                console.log(`[LazyMap] Fitting ${count} points to container.`);
+                // 枠のサイズを再計算させる
                 google.maps.event.trigger(map, 'resize');
-
-                // 2. 全ピンを収める（paddingをさらに広めの100pxに設定し、端の見切れを防止）
-                map.fitBounds(bounds, { top: 100, right: 100, bottom: 100, left: 100 });
-
-                // 3. ズームしすぎ防止（密集地で寄りすぎないように）
-                google.maps.event.addListenerOnce(map, 'zoom_changed', () => {
-                    const currentZoom = map.getZoom();
-                    if (currentZoom && currentZoom > 16) map.setZoom(15);
-                });
+                // paddingを控えめの40pxにし、小さな枠でも全体が見えるように調整
+                map.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
             }
         };
 
-        // 地図の描画ラグを考慮し、時間差で確実に実行する
+        // タイミングをずらしてしつこく実行（これで枠の認識ミスを物理的に防ぐ）
         const timers = [
-            setTimeout(applyBounds, 300),
+            setTimeout(applyBounds, 200),
             setTimeout(applyBounds, 1000),
-            setTimeout(applyBounds, 2500) // 最終的な追い打ち
+            setTimeout(applyBounds, 3000)
         ];
 
-        const listener = google.maps.event.addListenerOnce(map, 'idle', applyBounds);
+        const idleListener = google.maps.event.addListenerOnce(map, 'idle', applyBounds);
 
         return () => {
             timers.forEach(clearTimeout);
-            google.maps.event.removeListener(listener);
+            google.maps.event.removeListener(idleListener);
         };
     }, [map, items, isBriefingActive, isFinalOverview, userLocation]);
 
-    // ブリーフィング演出
+    // ブリーフィングロジック
     useEffect(() => {
         if (!isBriefingActive || !map || items.length === 0 || briefingRef.current) return;
         briefingRef.current = true;
@@ -100,7 +96,7 @@ export default function LazyMap({
 
             const finalBounds = new google.maps.LatLngBounds();
             items.forEach((p: any) => finalBounds.extend(p));
-            map.fitBounds(finalBounds, 80);
+            map.fitBounds(finalBounds, 60);
 
             setActivePlaceName(null);
             setActiveIndex(-1);
@@ -115,21 +111,19 @@ export default function LazyMap({
     }, [isBriefingActive, map, items, onBriefingStateChange, onBriefingComplete]);
 
     return (
-        <div className="w-full h-full relative bg-[#f5f5f5]">
+        <div ref={containerRef} className="w-full h-full relative bg-[#f5f5f5]">
             <Map
                 defaultZoom={12}
-                defaultCenter={defaultMapCenter}
+                defaultCenter={initialCenter}
                 styles={mapStyle}
                 disableDefaultUI={true}
                 gestureHandling={'greedy'}
+                minZoom={2}
+                maxZoom={18}
             >
                 {userLocation && <Marker position={userLocation} />}
                 {items.map((item: any, idx: number) => (
-                    <Marker
-                        key={item.id || idx}
-                        position={{ lat: item.lat, lng: item.lng }}
-                        label={{ text: (idx + 1).toString(), color: 'white', fontWeight: 'bold' }}
-                    />
+                    <Marker key={item.id || idx} position={{ lat: item.lat, lng: item.lng }} label={{ text: (idx + 1).toString(), color: 'white', fontWeight: 'bold' }} />
                 ))}
             </Map>
 
