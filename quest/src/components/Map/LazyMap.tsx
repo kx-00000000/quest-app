@@ -22,7 +22,6 @@ export default function LazyMap({
     const [activeIndex, setActiveIndex] = useState<number>(-1);
     const briefingRef = useRef(false);
 
-    // 初期化時の警告を回避するためのデフォルト位置
     const initialPos = useMemo(() => {
         if (items.length > 0 && items[0].lat) return { lat: Number(items[0].lat), lng: Number(items[0].lng) };
         if (center?.lat) return { lat: Number(center.lat), lng: Number(center.lng) };
@@ -30,7 +29,6 @@ export default function LazyMap({
         return { lat: 35.6812, lng: 139.7671 };
     }, [items, center, userLocation]);
 
-    // ★ 解決：プラン画面等で全地点を収める
     useEffect(() => {
         if (!map || items.length === 0 || isBriefingActive) return;
 
@@ -45,11 +43,10 @@ export default function LazyMap({
             });
 
             if (count > 0) {
+                // コンテナのサイズを強制的に再認識させてから計算（ログ画面の安定要因）
                 google.maps.event.trigger(map, 'resize');
-                // paddingを広めに取り、全ピンを確実に収める
                 map.fitBounds(bounds, { top: 60, right: 60, bottom: 60, left: 60 });
 
-                // 寄りすぎ（1点ズーム）防止
                 const z = map.getZoom();
                 if (z && z > 15) map.setZoom(14);
             }
@@ -63,7 +60,6 @@ export default function LazyMap({
         };
     }, [map, items, isBriefingActive, isFinalOverview, isLogMode]);
 
-    // ブリーフィング演出
     useEffect(() => {
         if (!isBriefingActive || !map || items.length === 0 || briefingRef.current) return;
         briefingRef.current = true;
@@ -99,8 +95,8 @@ export default function LazyMap({
                 ))}
             </Map>
             {activePlaceName && (
-                <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-3 w-full px-10 animate-in fade-in slide-in-from-top-4 duration-700">
-                    <div className="bg-black/90 px-8 py-3 rounded-full border border-[#F37343]/30 shadow-2xl text-center">
+                <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-3 w-full px-10 animate-in fade-in slide-in-from-top-4 duration-700 text-center">
+                    <div className="bg-black/90 px-8 py-3 rounded-full border border-[#F37343]/30 shadow-2xl">
                         <p className="text-white text-xs font-black uppercase tracking-[0.4em]">{activePlaceName}</p>
                     </div>
                     <div className="flex gap-1.5 w-full max-w-[200px] h-1.5 px-2">

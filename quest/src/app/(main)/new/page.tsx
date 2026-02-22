@@ -31,7 +31,7 @@ export default function NewQuestPage() {
     const [isFinalOverview, setIsFinalOverview] = useState(false);
 
     useEffect(() => {
-        if ("geolocation" in navigator) {
+        if (typeof window !== "undefined" && "geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition((pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }));
         }
     }, []);
@@ -55,6 +55,7 @@ export default function NewQuestPage() {
                         const locality = comp.find(c => c.types.includes("locality"))?.long_name || comp.find(c => c.types.includes("sublocality_level_1"))?.long_name;
                         const country = comp.find(c => c.types.includes("country"))?.long_name;
 
+                        // 陸地判定：市区町村が特定できる場所のみ
                         if (pref && locality && country) {
                             const landPos = { lat: res[0].geometry.location.lat(), lng: res[0].geometry.location.lng() };
                             resolve({ address: `${pref} ${locality}, ${country}`.trim(), pos: landPos });
@@ -75,7 +76,7 @@ export default function NewQuestPage() {
     };
 
     return (
-        <div className="flex flex-col h-full min-h-screen relative bg-white overflow-hidden">
+        <div className="flex flex-col h-full min-h-screen relative bg-white overflow-hidden font-sans text-black text-left">
             <div className="absolute inset-0 z-0">
                 <LazyMap radiusInKm={radius} userLocation={userLocation} items={(isBriefingActive || isFinalOverview) ? briefingItems : []} isBriefingActive={isBriefingActive} isFinalOverview={isFinalOverview} onBriefingStateChange={setIsFinalOverview} onBriefingComplete={() => setIsBriefingActive(false)} />
             </div>
@@ -87,24 +88,33 @@ export default function NewQuestPage() {
                             <input type="text" value={name} onChange={(e) => { setName(e.target.value); resetReadyStatus(); }} placeholder="QUEST NAME" className="w-full bg-transparent border-none outline-none text-gray-800 font-black text-center placeholder:text-gray-400" />
                         </div>
                     </div>
-                    <div className="mt-auto relative z-10 px-4 mb-4">
-                        <div className="bg-white/80 backdrop-blur-xl rounded-[3rem] p-6 shadow-2xl border border-white space-y-5">
+
+                    <div className="mt-auto relative z-10 px-4 mb-4 text-left">
+                        <div className="bg-white/80 backdrop-blur-xl rounded-[3rem] p-6 shadow-2xl border border-white space-y-6">
                             <div className="flex p-1 bg-black/5 rounded-2xl gap-1">
                                 {rangeModes.map((mode) => (
                                     <button key={mode.id} onClick={() => { setActiveMode(mode); setRadius(mode.min); resetReadyStatus(); }} className={`flex-1 py-2 text-[9px] font-black rounded-xl transition-all ${activeMode.id === mode.id ? 'bg-white text-[#F37343] shadow-sm' : 'text-gray-500'}`}>{mode.label}</button>
                                 ))}
                             </div>
-                            <div className="space-y-4 px-1">
-                                <div className="space-y-1">
-                                    <div className="flex justify-between text-[10px] font-black text-[#F37343] uppercase tracking-widest"><span>Radius</span><span>{formatDistance(radius)}</span></div>
+
+                            <div className="space-y-5 px-1">
+                                <div className="space-y-2 text-left">
+                                    <div className="flex justify-between text-[10px] font-black text-[#F37343] uppercase tracking-widest">
+                                        <span>Radius</span>
+                                        <span>{formatDistance(radius)}</span>
+                                    </div>
                                     <input type="range" min={activeMode.min} max={activeMode.max} step={activeMode.step} value={radius} onChange={(e) => { setRadius(parseFloat(e.target.value)); resetReadyStatus(); }} className="w-full h-3 bg-gray-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-[#F37343] [&::-webkit-slider-thumb]:rounded-full" />
                                 </div>
-                                <div className="space-y-1">
-                                    <div className="flex justify-between text-[10px] font-black text-[#F37343] uppercase tracking-widest"><span>Items Count</span><span>{itemCount}</span></div>
+                                <div className="space-y-2 text-left">
+                                    <div className="flex justify-between text-[10px] font-black text-[#F37343] uppercase tracking-widest">
+                                        <span>Items Count</span>
+                                        <span>{itemCount}</span>
+                                    </div>
                                     <input type="range" min="1" max="7" step="1" value={itemCount} onChange={(e) => { setItemCount(parseInt(e.target.value)); resetReadyStatus(); }} className="w-full h-3 bg-gray-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-[#F37343] [&::-webkit-slider-thumb]:rounded-full" />
                                 </div>
                             </div>
-                            <button onClick={handleAction} disabled={isCreating} className={`w-full py-4 rounded-[2rem] font-black flex items-center justify-center gap-2 transition-all duration-500 shadow-lg uppercase active:scale-95 ${isBriefingReady ? "bg-gradient-to-r from-[#F37343] to-orange-400 text-white shadow-[0_10px_25px_rgba(243,115,67,0.4)]" : "bg-gray-900 text-white"}`}>
+
+                            <button onClick={handleAction} disabled={isCreating} className={`w-full py-4 rounded-[2rem] font-black flex items-center justify-center gap-2 transition-all duration-500 shadow-lg uppercase active:scale-95 ${isBriefingReady ? "bg-gradient-to-r from-[#F37343] to-orange-400 text-white shadow-[0_10px_25px_rgba(243,115,67,0.4)]" : "bg-[#111827] text-white"}`}>
                                 {isCreating ? <Loader2 className="animate-spin" /> : isBriefingReady ? <><Play size={16} fill="currentColor" /> START BRIEFING</> : "CREATE QUEST"}
                             </button>
                         </div>
@@ -128,7 +138,9 @@ export default function NewQuestPage() {
                                 </div>
                             ))}
                         </div>
-                        <button onClick={() => router.push("/plan")} className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-transform"><Play size={14} fill="currentColor" /><span>Confirm Quest</span></button>
+                        <button onClick={() => router.push("/plan")} className="w-full py-4 bg-[#111827] text-white rounded-2xl font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-transform">
+                            <Play size={14} fill="currentColor" /><span>Confirm Quest</span>
+                        </button>
                     </div>
                 </div>
             )}
