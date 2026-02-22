@@ -21,23 +21,20 @@ export default function LazyMap({
     const [activePlaceName, setActivePlaceName] = useState<string | null>(null);
     const [activeIndex, setActiveIndex] = useState<number>(-1);
     const briefingRef = useRef(false);
-    const containerRef = useRef<HTMLDivElement>(null);
 
-    const initialCenter = useMemo(() => {
-        if (items.length > 0 && items[0].lat) return { lat: items[0].lat, lng: items[0].lng };
+    // ★ 解決：Mapエンジンの起動を保証する初期値
+    const mapInitialPosition = useMemo(() => {
+        if (items.length > 0 && items[0].lat) return { lat: Number(items[0].lat), lng: Number(items[0].lng) };
         if (userLocation?.lat) return userLocation;
         if (center?.lat) return center;
         return { lat: 35.6812, lng: 139.7671 };
     }, [items, userLocation, center]);
 
-    // ★ 解決：全ピンを確実に収める「絶対フィット」ロジック
+    // ★ 解決：全ピンを確実に画面に収める「絶対フィット」ロジック
     useEffect(() => {
         if (!map || items.length === 0 || isBriefingActive) return;
 
         const applyBounds = () => {
-            // コンテナがまだ物理的に表示されていない場合は中止してリトライを待つ
-            if (!containerRef.current || containerRef.current.offsetWidth === 0) return;
-
             const bounds = new google.maps.LatLngBounds();
             let count = 0;
 
@@ -48,37 +45,37 @@ export default function LazyMap({
                 }
             });
 
-            // プラン確認画面以外（冒険中など）では現在地も範囲に含める
             if (!isFinalOverview && userLocation?.lat) {
                 bounds.extend(userLocation);
                 count++;
             }
 
             if (count > 0) {
-                console.log(`[LazyMap] Fitting ${count} points to current frame.`);
-                // 地図エンジンに枠のサイズを再計算させる
+                // コンテナサイズの再認識
                 google.maps.event.trigger(map, 'resize');
 
-                // paddingを100pxに広げ、全ピンが中央に集まるように調整
-                map.fitBounds(bounds, { top: 100, right: 100, bottom: 100, left: 100 });
+                // paddingを広めの80pxに設定。プラン画面(h-48)でも見切れないように。
+                map.fitBounds(bounds, { top: 80, right: 80, bottom: 80, left: 80 });
 
-                // 寄りすぎ（1点にズーム）を物理的に阻止
-                const currentZoom = map.getZoom();
-                if (currentZoom && currentZoom > 14) {
-                    map.setZoom(14);
-                }
+                // ★ 1点への猛烈ズームを物理的に阻止（最大ズームを14に制限）
+                const checkZoom = () => {
+                    const currentZoom = map.getZoom();
+                    if (currentZoom && currentZoom > 14) {
+                        map.setZoom(14);
+                    }
+                };
+                google.maps.event.addListenerOnce(map, 'zoom_changed', checkZoom);
             }
         };
 
-        // 地図の安定を待って3段階で実行（確実性を担保）
+        // 地図の安定を待って3段階で実行
         const timers = [
-            setTimeout(applyBounds, 300),
-            setTimeout(applyBounds, 1200),
-            setTimeout(applyBounds, 3000)
+            setTimeout(applyBounds, 200),
+            setTimeout(applyBounds, 1000),
+            setTimeout(applyBounds, 2500)
         ];
 
         const idleListener = google.maps.event.addListenerOnce(map, 'idle', applyBounds);
-
         return () => {
             timers.forEach(clearTimeout);
             google.maps.event.removeListener(idleListener);
@@ -114,22 +111,20 @@ export default function LazyMap({
         };
 
         startBriefing();
-    }, [isBriefingActive, map, items, onBriefingStateChange, onBriefingComplete]);
+    }, [isBriefingActive, map, items]);
 
     return (
-        <div ref={containerRef} className="w-full h-full relative bg-[#f5f5f5]">
+        <div className="w-full h-full relative bg-[#f5f5f5]">
             <Map
                 defaultZoom={12}
-                defaultCenter={initialCenter}
+                defaultCenter={mapInitialPosition}
                 styles={mapStyle}
                 disableDefaultUI={true}
                 gestureHandling={'greedy'}
-                minZoom={2}
-                maxZoom={18}
             >
                 {userLocation && <Marker position={userLocation} />}
                 {items.map((item: any, idx: number) => (
-                    <Marker key={item.id || idx} position={{ lat: item.lat, lng: item.lng }} label={{ text: (idx + 1).toString(), color: 'white', fontWeight: 'bold' }} />
+                    <Marker key={idx} position={{ lat: item.lat, lng: item.lng }} label={{ text: (idx + 1).toString(), color: 'white', fontWeight: 'bold' }} />
                 ))}
             </Map>
 
