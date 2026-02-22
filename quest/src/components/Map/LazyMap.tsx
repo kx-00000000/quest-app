@@ -35,7 +35,6 @@ export default function LazyMap({
     const [activePlaceName, setActivePlaceName] = useState<string | null>(null);
     const [activeIndex, setActiveIndex] = useState<number>(-1);
     const briefingRef = useRef(false);
-    const containerRef = useRef<HTMLDivElement>(null);
 
     const initialPos = useMemo(() => {
         if (items.length > 0 && items[0].lat) return { lat: Number(items[0].lat), lng: Number(items[0].lng) };
@@ -44,29 +43,23 @@ export default function LazyMap({
         return { lat: 35.6812, lng: 139.7671 };
     }, [items, center, userLocation]);
 
+    // 縮尺の自動調整
     useEffect(() => {
         if (!map || items.length === 0 || isBriefingActive) return;
-
         const applyBounds = () => {
             const bounds = new google.maps.LatLngBounds();
             let count = 0;
             items.forEach((p: any) => { if (p.lat && p.lng) { bounds.extend({ lat: Number(p.lat), lng: Number(p.lng) }); count++; } });
-            path.forEach((p: any) => { bounds.extend(p); count++; });
-
             if (count > 0) {
-                google.maps.event.trigger(map, 'resize');
                 map.fitBounds(bounds, { top: 60, right: 60, bottom: 60, left: 60 });
-                // 寄りすぎ防止
-                const z = map.getZoom();
-                if (z && z > 15) map.setZoom(14);
+                if (map.getZoom()! > 15) map.setZoom(14);
             }
         };
+        const timer = setTimeout(applyBounds, 500);
+        return () => clearTimeout(timer);
+    }, [map, items, isBriefingActive, isFinalOverview]);
 
-        const timers = [setTimeout(applyBounds, 300), setTimeout(applyBounds, 1500), setTimeout(applyBounds, 3000)];
-        const listener = google.maps.event.addListenerOnce(map, 'idle', applyBounds);
-        return () => { timers.forEach(clearTimeout); google.maps.event.removeListener(listener); };
-    }, [map, items, path, isBriefingActive, isFinalOverview]);
-
+    // ブリーフィング演出
     useEffect(() => {
         if (!isBriefingActive || !map || items.length === 0 || briefingRef.current) return;
         briefingRef.current = true;
@@ -94,7 +87,7 @@ export default function LazyMap({
     }, [isBriefingActive, map, items, onBriefingStateChange, onBriefingComplete]);
 
     return (
-        <div ref={containerRef} className="w-full h-full relative bg-[#f5f5f5]">
+        <div className="w-full h-full relative bg-[#f5f5f5]">
             <Map defaultZoom={12} defaultCenter={initialPos} styles={mapStyle} disableDefaultUI={true} gestureHandling={'greedy'}>
                 {userLocation && <Marker position={userLocation} />}
                 {items.map((item: any, idx: number) => (
