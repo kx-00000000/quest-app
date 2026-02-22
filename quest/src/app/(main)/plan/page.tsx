@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getPlans, deletePlan } from "@/lib/storage"; // ★ タイポ修正済み
+import { getPlans, deletePlan } from "@/lib/storage";
 import { Trash2, Play, Footprints } from "lucide-react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -13,8 +13,10 @@ export default function PlanPage() {
     const [plans, setPlans] = useState<any[]>([]);
 
     useEffect(() => {
-        const allPlans = getPlans().filter(p => !p.isArchived);
-        setPlans(allPlans);
+        const allPlans = getPlans();
+        if (allPlans) {
+            setPlans(allPlans.filter(p => !p.isArchived));
+        }
     }, []);
 
     const handleDelete = (id: string) => {
