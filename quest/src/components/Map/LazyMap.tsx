@@ -44,27 +44,29 @@ export default function LazyMap({
         return { lat: 35.6812, lng: 139.7671 };
     }, [items, center, userLocation]);
 
-    // ★ 縮尺調整ロジック
     useEffect(() => {
         if (!map || items.length === 0 || isBriefingActive) return;
+
         const applyBounds = () => {
-            if (!containerRef.current || containerRef.current.offsetWidth === 0) return;
             const bounds = new google.maps.LatLngBounds();
             let count = 0;
             items.forEach((p: any) => { if (p.lat && p.lng) { bounds.extend({ lat: Number(p.lat), lng: Number(p.lng) }); count++; } });
             path.forEach((p: any) => { bounds.extend(p); count++; });
+
             if (count > 0) {
                 google.maps.event.trigger(map, 'resize');
                 map.fitBounds(bounds, { top: 60, right: 60, bottom: 60, left: 60 });
-                if (map.getZoom()! > 15) map.setZoom(14);
+                // 寄りすぎ防止
+                const z = map.getZoom();
+                if (z && z > 15) map.setZoom(14);
             }
         };
-        const timers = [setTimeout(applyBounds, 300), setTimeout(applyBounds, 1500)];
+
+        const timers = [setTimeout(applyBounds, 300), setTimeout(applyBounds, 1500), setTimeout(applyBounds, 3000)];
         const listener = google.maps.event.addListenerOnce(map, 'idle', applyBounds);
         return () => { timers.forEach(clearTimeout); google.maps.event.removeListener(listener); };
     }, [map, items, path, isBriefingActive, isFinalOverview]);
 
-    // ★ 復活：ブリーフィング演出
     useEffect(() => {
         if (!isBriefingActive || !map || items.length === 0 || briefingRef.current) return;
         briefingRef.current = true;
@@ -89,7 +91,7 @@ export default function LazyMap({
             if (onBriefingComplete) onBriefingComplete();
         };
         runBriefing();
-    }, [isBriefingActive, map, items]);
+    }, [isBriefingActive, map, items, onBriefingStateChange, onBriefingComplete]);
 
     return (
         <div ref={containerRef} className="w-full h-full relative bg-[#f5f5f5]">
@@ -101,7 +103,7 @@ export default function LazyMap({
                 <Polyline path={path} color={themeColor} />
             </Map>
             {activePlaceName && (
-                <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-3 w-full px-10 animate-in fade-in slide-in-from-top-4 duration-700 text-center">
+                <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-3 w-full px-10 text-center animate-in fade-in slide-in-from-top-4 duration-700">
                     <div className="bg-black/90 px-8 py-3 rounded-full border border-[#F37343]/30 shadow-2xl">
                         <p className="text-white text-xs font-black uppercase tracking-[0.4em]">{activePlaceName}</p>
                     </div>

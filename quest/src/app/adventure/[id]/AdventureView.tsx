@@ -21,15 +21,18 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
             const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
             setUserLocation(newLoc);
 
+            // 現在地の市区町村名を取得
             geocoder.geocode({ location: newLoc }, (res, status) => {
                 if (status === "OK" && res?.[0]) {
                     const comp = res[0].address_components;
                     const pref = comp.find(c => c.types.includes("administrative_area_level_1"))?.long_name || "";
-                    const locality = comp.find(c => c.types.includes("locality"))?.long_name || "";
-                    setCurrentAreaName(`${pref} ${locality}`.trim());
+                    const locality = comp.find(c => c.types.includes("locality"))?.long_name ||
+                        comp.find(c => c.types.includes("sublocality_level_1"))?.long_name || "";
+                    setCurrentAreaName(`${pref} ${locality}`.trim() || "Tracking...");
                 }
             });
 
+            // 軌跡の更新
             setPath((prevPath: any[]) => {
                 const lastPoint = prevPath[prevPath.length - 1];
                 if (!lastPoint || calculateDistance(lastPoint.lat, lastPoint.lng, newLoc.lat, newLoc.lng) > 0.01) {
@@ -40,6 +43,7 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                 return prevPath;
             });
 
+            // 到達判定
             setPlan((currentPlan: any) => {
                 let hasChanged = false;
                 const updatedItems = (currentPlan.items || []).map((item: any) => {
@@ -73,23 +77,47 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
 
     return (
         <div className="relative h-screen bg-white overflow-hidden flex flex-col">
+            {/* 地図背景 */}
             <div className="absolute inset-0 z-0">
                 <LazyMap items={plan.items} userLocation={userLocation} center={plan.center} path={path} themeColor="#F37343" />
                 <div className="absolute inset-0 bg-white/20 backdrop-blur-[2px]" />
             </div>
-            <header className="relative z-10 p-6 pt-16 text-left">
+
+            {/* ヘッダーUI（地名を表示するパネル） */}
+            <header className="relative z-50 p-6 pt-16 text-left">
                 <div className="bg-black/90 backdrop-blur-xl rounded-[2.5rem] p-7 shadow-2xl text-white border border-white/10">
-                    <p className="flex items-center gap-1.5 mb-1.5 text-[#F37343] font-black text-[10px] uppercase tracking-[0.2em]"><MapPin size={12} strokeWidth={3} /> <span>{currentAreaName}</span></p>
+                    <p className="flex items-center gap-1.5 mb-1.5 text-[#F37343] font-black text-[10px] uppercase tracking-[0.2em]">
+                        <MapPin size={12} strokeWidth={3} /> <span>{currentAreaName}</span>
+                    </p>
                     <h1 className="text-xl font-black uppercase truncate mb-5">{plan.name}</h1>
+
                     {nearestItem && (
                         <div className="border-t border-white/10 pt-5 space-y-4">
-                            <div className="flex flex-col"><p className="text-[8px] font-bold text-gray-500 uppercase tracking-widest mb-1">Target</p><p className="text-sm font-black text-white truncate uppercase tracking-tight">{nearestItem.addressName}</p></div>
+                            {/* 次の目的地名を表示 */}
+                            <div className="flex flex-col">
+                                <p className="text-[8px] font-bold text-gray-500 uppercase tracking-widest mb-1">Target</p>
+                                <p className="text-sm font-black text-white truncate uppercase tracking-tight italic">
+                                    {nearestItem.addressName}
+                                </p>
+                            </div>
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-4">
-                                    <div className="bg-[#F37343] p-2 rounded-full shadow-[0_0_15px_rgba(243,115,67,0.4)]"><Navigation className="text-white" size={20} fill="currentColor" style={{ transform: `rotate(${nearestItem.bear}deg)` }} /></div>
-                                    <div><p className="text-[8px] font-bold text-gray-500 uppercase tracking-widest">Dist</p><p className="text-lg font-black tabular-nums">{nearestItem.dist < 1 ? `${Math.floor(nearestItem.dist * 1000)}m` : `${nearestItem.dist.toFixed(1)}km`}</p></div>
+                                    <div className="bg-[#F37343] p-2 rounded-full shadow-[0_0_15px_rgba(243,115,67,0.4)]">
+                                        <Navigation className="text-white" size={20} fill="currentColor" style={{ transform: `rotate(${nearestItem.bear}deg)` }} />
+                                    </div>
+                                    <div>
+                                        <p className="text-[8px] font-bold text-gray-500 uppercase tracking-widest">Dist</p>
+                                        <p className="text-lg font-black tabular-nums leading-none">
+                                            {nearestItem.dist < 1 ? `${Math.floor(nearestItem.dist * 1000)}m` : `${nearestItem.dist.toFixed(1)}km`}
+                                        </p>
+                                    </div>
                                 </div>
-                                <div className="text-right"><p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Progress</p><p className="text-lg font-black tabular-nums">{plan.items.filter((i: any) => i.isCollected).length} / {plan.items.length}</p></div>
+                                <div className="text-right">
+                                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Items</p>
+                                    <p className="text-lg font-black tabular-nums leading-none">
+                                        {plan.items.filter((i: any) => i.isCollected).length} / {plan.items.length}
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     )}
