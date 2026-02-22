@@ -22,15 +22,15 @@ export default function LazyMap({
     const [activeIndex, setActiveIndex] = useState<number>(-1);
     const briefingRef = useRef(false);
 
-    // ★ 解決：Mapエンジンの起動を保証する初期値
-    const mapInitialPosition = useMemo(() => {
+    // ★ 重要：Mapコンポーネントの初期化警告を消すための絶対的な中心点
+    const initialCenter = useMemo(() => {
         if (items.length > 0 && items[0].lat) return { lat: Number(items[0].lat), lng: Number(items[0].lng) };
+        if (center?.lat) return { lat: Number(center.lat), lng: Number(center.lng) };
         if (userLocation?.lat) return userLocation;
-        if (center?.lat) return center;
-        return { lat: 35.6812, lng: 139.7671 };
-    }, [items, userLocation, center]);
+        return { lat: 35.6812, lng: 139.7671 }; // 東京駅
+    }, [items, center, userLocation]);
 
-    // ★ 解決：全ピンを確実に画面に収める「絶対フィット」ロジック
+    // ★ 解決：全地点を収めるズームロジック
     useEffect(() => {
         if (!map || items.length === 0 || isBriefingActive) return;
 
@@ -45,60 +45,47 @@ export default function LazyMap({
                 }
             });
 
-            if (!isFinalOverview && userLocation?.lat) {
-                bounds.extend(userLocation);
-                count++;
-            }
-
             if (count > 0) {
-                // コンテナサイズの再認識
+                // コンテナのサイズを強制再認識
                 google.maps.event.trigger(map, 'resize');
-
-                // paddingを広めの80pxに設定。プラン画面(h-48)でも見切れないように。
+                // 余裕を持ったパディング (80px)
                 map.fitBounds(bounds, { top: 80, right: 80, bottom: 80, left: 80 });
 
-                // ★ 1点への猛烈ズームを物理的に阻止（最大ズームを14に制限）
-                const checkZoom = () => {
-                    const currentZoom = map.getZoom();
-                    if (currentZoom && currentZoom > 14) {
-                        map.setZoom(14);
-                    }
+                // 寄りすぎ防止（最大ズームを14に制限）
+                const zoomCheck = () => {
+                    if (map.getZoom()! > 14) map.setZoom(14);
                 };
-                google.maps.event.addListenerOnce(map, 'zoom_changed', checkZoom);
+                google.maps.event.addListenerOnce(map, 'zoom_changed', zoomCheck);
             }
         };
 
-        // 地図の安定を待って3段階で実行
+        // 描画の安定を待って3段階で実行
         const timers = [
-            setTimeout(applyBounds, 200),
-            setTimeout(applyBounds, 1000),
-            setTimeout(applyBounds, 2500)
+            setTimeout(applyBounds, 100),
+            setTimeout(applyBounds, 800),
+            setTimeout(applyBounds, 2000)
         ];
 
-        const idleListener = google.maps.event.addListenerOnce(map, 'idle', applyBounds);
-        return () => {
-            timers.forEach(clearTimeout);
-            google.maps.event.removeListener(idleListener);
-        };
-    }, [map, items, isBriefingActive, isFinalOverview, userLocation]);
+        return () => timers.forEach(clearTimeout);
+    }, [map, items, isBriefingActive]);
 
     // ブリーフィング演出
     useEffect(() => {
         if (!isBriefingActive || !map || items.length === 0 || briefingRef.current) return;
         briefingRef.current = true;
 
-        const startBriefing = async () => {
+        const runBriefing = async () => {
             map.setZoom(15);
             for (let i = 0; i < items.length; i++) {
                 const item = items[i];
                 setActiveIndex(i);
-                map.panTo({ lat: item.lat, lng: item.lng });
+                map.panTo({ lat: Number(item.lat), lng: Number(item.lng) });
                 setActivePlaceName(item.addressName || "WAYPOINT");
                 await new Promise(r => setTimeout(r, 2500));
             }
 
             const finalBounds = new google.maps.LatLngBounds();
-            items.forEach((p: any) => finalBounds.extend(p));
+            items.forEach((p: any) => finalBounds.extend({ lat: Number(p.lat), lng: Number(p.lng) }));
             map.fitBounds(finalBounds, 80);
 
             setActivePlaceName(null);
@@ -110,21 +97,25 @@ export default function LazyMap({
             if (onBriefingComplete) onBriefingComplete();
         };
 
-        startBriefing();
+        runBriefing();
     }, [isBriefingActive, map, items]);
 
     return (
         <div className="w-full h-full relative bg-[#f5f5f5]">
             <Map
                 defaultZoom={12}
-                defaultCenter={mapInitialPosition}
+                defaultCenter={initialCenter}
                 styles={mapStyle}
                 disableDefaultUI={true}
                 gestureHandling={'greedy'}
             >
                 {userLocation && <Marker position={userLocation} />}
                 {items.map((item: any, idx: number) => (
-                    <Marker key={idx} position={{ lat: item.lat, lng: item.lng }} label={{ text: (idx + 1).toString(), color: 'white', fontWeight: 'bold' }} />
+                    <Marker
+                        key={item.id || idx}
+                        position={{ lat: Number(item.lat), lng: Number(item.lng) }}
+                        label={{ text: (idx + 1).toString(), color: 'white', fontWeight: 'bold' }}
+                    />
                 ))}
             </Map>
 
