@@ -21,7 +21,7 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
             const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
             setUserLocation(newLoc);
 
-            // 現在地の地名取得（画面左上に表示用）
+            // 現在地の市町村名を取得（左上に表示）
             if (typeof google !== 'undefined' && google.maps.Geocoder) {
                 const geocoder = new google.maps.Geocoder();
                 geocoder.geocode({ location: newLoc }, (res, status) => {
@@ -62,15 +62,22 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                 }
                 return currentPlan;
             });
-        }, (err) => console.error(err), { enableHighAccuracy: true });
+        }, null, { enableHighAccuracy: true });
 
         return () => navigator.geolocation.clearWatch(watchId);
     }, [plan.id]);
 
-    const nearestItem = useMemo(() => {
+    // ★ 解決：GPSを待たずに、まずプラン内の地名を特定する
+    const activeTarget = useMemo(() => {
         const uncollected = (plan.items || []).filter((i: any) => !i.isCollected);
         if (uncollected.length === 0) return null;
-        if (!userLocation) return { ...uncollected[0], dist: 0, bear: 0 };
+
+        // GPSがまだ取れていない場合でも、リストの先頭を表示
+        if (!userLocation) {
+            return { ...uncollected[0], dist: 0, bear: 0 };
+        }
+
+        // GPSがある場合は距離順で計算
         return uncollected.map((item: any) => ({
             ...item,
             dist: calculateDistance(userLocation.lat, userLocation.lng, item.lat, item.lng),
@@ -78,13 +85,11 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
         })).sort((a: any, b: any) => a.dist - b.dist)[0];
     }, [userLocation, plan.items]);
 
-    const collectedCount = plan.items.filter((i: any) => i.isCollected).length;
-
     return (
         <div className="relative h-screen bg-white overflow-hidden flex flex-col text-black font-sans">
             <div className="absolute inset-0 z-0">
                 <LazyMap items={plan.items} userLocation={userLocation} center={plan.center} path={path} themeColor="#F37343" />
-                <div className="absolute inset-0 bg-white/30 backdrop-blur-[2px]" />
+                <div className="absolute inset-0 bg-white/40 backdrop-blur-[2px]" />
             </div>
 
             {/* 上部ステータス */}
@@ -94,50 +99,51 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                     <p className="text-[10px] font-bold text-gray-400 mt-0.5 uppercase tracking-widest">{currentAreaName}</p>
                 </div>
                 <div className="text-right">
-                    <p className="text-xl font-black tabular-nums">{collectedCount} <span className="text-gray-300">/ {plan.items.length}</span></p>
+                    <p className="text-xl font-black tabular-nums">
+                        {plan.items.filter((i: any) => i.isCollected).length}
+                        <span className="text-gray-300"> / {plan.items.length}</span>
+                    </p>
                 </div>
             </div>
 
             {/* 中央コンパス・距離 */}
             <div className="flex-1 flex flex-col items-center justify-center relative z-10 -mt-20">
                 <div className="relative w-64 h-64 flex items-center justify-center mb-8">
-                    <img src="/compass_bg.png" alt="Compass" className="w-full h-full object-contain opacity-80" />
-                    {nearestItem && (
+                    <img src="/compass_bg.png" alt="Compass" className="w-full h-full object-contain opacity-50" />
+                    {activeTarget && (
                         <Navigation
-                            className="absolute text-[#F37343] drop-shadow-lg"
+                            className="absolute text-[#F37343]"
                             size={48}
                             fill="currentColor"
-                            style={{ transform: `rotate(${nearestItem.bear}deg)` }}
+                            style={{ transform: `rotate(${activeTarget.bear}deg)` }}
                         />
                     )}
                 </div>
-
                 <div className="text-center">
                     <p className="text-7xl font-black tabular-nums tracking-tighter flex items-baseline">
-                        {nearestItem && nearestItem.dist > 0 ? (
-                            nearestItem.dist < 1
-                                ? <>{Math.floor(nearestItem.dist * 1000)}<span className="text-sm ml-2 text-gray-400">m</span></>
-                                : <>{nearestItem.dist.toFixed(1)}<span className="text-sm ml-2 text-gray-400">km</span></>
+                        {activeTarget && userLocation ? (
+                            activeTarget.dist < 1
+                                ? <>{Math.floor(activeTarget.dist * 1000)}<span className="text-sm ml-2 text-gray-400">m</span></>
+                                : <>{activeTarget.dist.toFixed(1)}<span className="text-sm ml-2 text-gray-400">km</span></>
                         ) : "--"}
                     </p>
                 </div>
             </div>
 
-            {/* 下部ナビゲーション（★ここが「---」の場所です） */}
+            {/* 下部ナビゲーション: 地名表示エリア */}
             <div className="relative z-10 pb-16 flex flex-col items-center gap-8">
                 <div className="flex items-center gap-6 text-gray-300">
                     <ChevronLeft size={24} className="opacity-30" />
-                    {/* ★ ここにプラン作成時の addressName を表示 */}
-                    <p className="text-[11px] font-black text-black uppercase tracking-[0.2em] max-w-[200px] truncate text-center">
-                        {nearestItem ? nearestItem.addressName : "COMPLETE"}
+                    {/* ★ ここに地名を表示（addressName または locationName） */}
+                    <p className="text-[11px] font-black text-black uppercase tracking-[0.2em] max-w-[240px] truncate text-center">
+                        {activeTarget ? (activeTarget.addressName || activeTarget.locationName) : "MISSION COMPLETE"}
                     </p>
                     <ChevronRight size={24} className="opacity-30" />
                 </div>
 
-                {/* ページネーションドット */}
                 <div className="flex gap-2">
                     {plan.items.map((item: any, idx: number) => (
-                        <div key={idx} className={`w-1.5 h-1.5 rounded-full ${item.isCollected ? 'bg-black' : (nearestItem?.id === item.id ? 'bg-[#F37343]' : 'bg-gray-200')}`} />
+                        <div key={idx} className={`w-1.5 h-1.5 rounded-full ${item.isCollected ? 'bg-black' : (activeTarget?.id === item.id ? 'bg-[#F37343]' : 'bg-gray-200')}`} />
                     ))}
                 </div>
 
