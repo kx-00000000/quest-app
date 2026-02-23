@@ -18,30 +18,37 @@ export default function LazyMap({
     const [activeIndex, setActiveIndex] = useState<number>(-1);
     const briefingRef = useRef(false);
 
-    // ★ 初期位置。世界地図にならないよう、ユーザー位置かセンターを優先
+    // ★ 世界地図にならないよう、初期位置を厳格に固定
     const initialPos = useMemo(() => {
-        if (userLocation?.lat) return userLocation;
         if (items.length > 0 && items[0].lat) return { lat: Number(items[0].lat), lng: Number(items[0].lng) };
         if (center?.lat) return { lat: Number(center.lat), lng: Number(center.lng) };
-        return { lat: 35.6812, lng: 139.7671 }; // 東京
+        if (userLocation?.lat) return userLocation;
+        return { lat: 35.6812, lng: 139.7671 };
     }, [items, center, userLocation]);
 
-    // ★ 自動縮尺調整（地点があるときだけ実行）
+    // ★ アイテムがある時だけ縮尺を合わせる
     useEffect(() => {
         if (!map || items.length === 0 || isBriefingActive) return;
 
         const applyBounds = () => {
             const bounds = new google.maps.LatLngBounds();
-            items.forEach((p: any) => bounds.extend({ lat: Number(p.lat), lng: Number(p.lng) }));
-            map.fitBounds(bounds, { top: 80, right: 80, bottom: 80, left: 80 });
+            let hasValidPoints = false;
+            items.forEach((p: any) => {
+                if (p.lat && p.lng) {
+                    bounds.extend({ lat: Number(p.lat), lng: Number(p.lng) });
+                    hasValidPoints = true;
+                }
+            });
 
-            if (map.getZoom()! > 15) map.setZoom(14);
+            if (hasValidPoints) {
+                map.fitBounds(bounds, { top: 80, right: 80, bottom: 80, left: 80 });
+                if (map.getZoom()! > 15) map.setZoom(14);
+            }
         };
-        const timer = setTimeout(applyBounds, 500);
-        return () => clearTimeout(timer);
+        setTimeout(applyBounds, 500);
     }, [map, items, isBriefingActive]);
 
-    // ブリーフィング演出
+    // ブリーフィング演出: 横に長いセグメントバー
     useEffect(() => {
         if (!isBriefingActive || !map || items.length === 0 || briefingRef.current) return;
         briefingRef.current = true;
@@ -64,13 +71,12 @@ export default function LazyMap({
     }, [isBriefingActive, map, items, onBriefingStateChange, onBriefingComplete]);
 
     return (
-        <div className="w-full h-full relative bg-[#f5f5f5]">
+        <div className="w-full h-full relative">
             <Map
                 defaultZoom={14}
                 defaultCenter={initialPos}
                 styles={mapStyle}
                 disableDefaultUI={true}
-                gestureHandling={'greedy'}
             >
                 {userLocation && <Marker position={userLocation} />}
                 {items.map((item: any, idx: number) => (
@@ -78,12 +84,12 @@ export default function LazyMap({
                 ))}
             </Map>
 
-            {/* ★ 復活：横に長いセグメントバー */}
             {activePlaceName && (
                 <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-4 w-full px-12 text-center animate-in fade-in slide-in-from-top-4 duration-700">
                     <div className="bg-black/90 px-8 py-3 rounded-full border border-[#F37343]/30 shadow-2xl">
                         <p className="text-white text-[11px] font-black uppercase tracking-[0.4em]">{activePlaceName}</p>
                     </div>
+                    {/* ★ 復活: 横に長いプログレスバー */}
                     <div className="flex gap-1.5 w-full max-w-[300px] h-1.5 px-1 bg-black/5 rounded-full overflow-hidden">
                         {items.map((_: any, idx: number) => (
                             <div key={idx} className={`flex-1 transition-all duration-1000 ${idx <= activeIndex ? "bg-[#F37343] shadow-[0_0_12px_rgba(243,115,67,0.5)]" : "bg-transparent"}`} />
