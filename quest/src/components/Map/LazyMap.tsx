@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useEffect, useRef, useState } from 'react';
-import { Map, Marker, useMap } from '@vis.gl/react-google-maps';
+import { Map, Marker, useMap, APIProvider } from '@vis.gl/react-google-maps';
 
 const mapStyle = [
     { "elementType": "geometry", "stylers": [{ "color": "#f5f5f5" }] },
@@ -71,34 +71,36 @@ export default function LazyMap({
     }, [isBriefingActive, items]);
 
     return (
-        <div className="w-full h-full relative bg-[#f5f5f5]">
-            <Map
-                defaultZoom={14}
-                defaultCenter={initialPos}
-                styles={mapStyle}
-                disableDefaultUI={true}
-                onIdle={(e) => { mapRef.current = e.map; }}
-            >
-                {userLocation && <Marker position={userLocation} />}
-                {items.map((item: any, idx: number) => (
-                    <Marker key={idx} position={{ lat: Number(item.lat), lng: Number(item.lng) }} label={{ text: (idx + 1).toString(), color: 'white', fontWeight: 'bold' }} />
-                ))}
-                <PolylineOverlay path={path} color={themeColor} />
-                <MapController items={items} isBriefingActive={isBriefingActive} />
-            </Map>
+        <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}>
+            <div className="w-full h-full relative bg-[#f5f5f5]">
+                <Map
+                    defaultZoom={14}
+                    defaultCenter={initialPos}
+                    styles={mapStyle}
+                    disableDefaultUI={true}
+                    onIdle={(e) => { mapRef.current = e.map; }}
+                >
+                    {userLocation && <Marker position={userLocation} />}
+                    {items.map((item: any, idx: number) => (
+                        <Marker key={idx} position={{ lat: Number(item.lat), lng: Number(item.lng) }} label={{ text: (idx + 1).toString(), color: 'white', fontWeight: 'bold' }} />
+                    ))}
+                    <PolylineOverlay path={path} color={themeColor} />
+                    <MapController items={items} isBriefingActive={isBriefingActive} />
+                </Map>
 
-            {activePlaceName && (
-                <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-4 w-full px-12">
-                    <div className="bg-black/90 px-8 py-3 rounded-full shadow-2xl">
-                        <p className="text-white text-[11px] font-black uppercase tracking-[0.4em]">{activePlaceName}</p>
+                {activePlaceName && (
+                    <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-4 w-full px-12">
+                        <div className="bg-black/90 px-8 py-3 rounded-full shadow-2xl">
+                            <p className="text-white text-[11px] font-black uppercase tracking-[0.4em]">{activePlaceName}</p>
+                        </div>
+                        <div className="flex gap-1 w-full max-w-[300px] h-1.5 px-1 bg-black/5 rounded-full overflow-hidden">
+                            {items.map((_: any, idx: number) => (
+                                <div key={idx} className={`flex-1 transition-all duration-1000 ${idx <= activeIndex ? "bg-[#F37343]" : "bg-transparent"}`} />
+                            ))}
+                        </div>
                     </div>
-                    <div className="flex gap-1 w-full max-w-[300px] h-1.5 px-1 bg-black/5 rounded-full overflow-hidden">
-                        {items.map((_: any, idx: number) => (
-                            <div key={idx} className={`flex-1 transition-all duration-1000 ${idx <= activeIndex ? "bg-[#F37343]" : "bg-transparent"}`} />
-                        ))}
-                    </div>
-                </div>
-            )}
-        </div>
+                )}
+            </div>
+        </APIProvider>
     );
 }
