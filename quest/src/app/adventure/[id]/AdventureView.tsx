@@ -21,7 +21,7 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
             const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
             setUserLocation(newLoc);
 
-            // 現在地の市町村名を左上に
+            // 現在地の地名（画面左上用）
             if (typeof google !== 'undefined' && google.maps.Geocoder) {
                 const geocoder = new google.maps.Geocoder();
                 geocoder.geocode({ location: newLoc }, (res, status) => {
@@ -34,7 +34,7 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                 });
             }
 
-            // 到達判定
+            // 到達判定ロジック
             setPlan((currentPlan: any) => {
                 let hasChanged = false;
                 const updatedItems = (currentPlan.items || []).map((item: any) => {
@@ -56,32 +56,40 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
         return () => navigator.geolocation.clearWatch(watchId);
     }, [plan.id]);
 
-    // 次の目的地を特定
-    const activeTarget = useMemo(() => {
+    // ★ 解決策：GPSの有無に関わらず、プランから「次に表示すべき地名」を強制抽出
+    const displayTarget = useMemo(() => {
         const uncollected = (plan.items || []).filter((i: any) => !i.isCollected);
         if (uncollected.length === 0) return null;
 
-        const base = uncollected[0];
-        if (!userLocation) return { ...base, dist: 0, bear: 0 };
+        // まずはリストの先頭を「表示用」として確保
+        const target = uncollected[0];
 
-        return uncollected.map((item: any) => ({
-            ...item,
-            dist: calculateDistance(userLocation.lat, userLocation.lng, item.lat, item.lng),
-            bear: calculateBearing(userLocation.lat, userLocation.lng, item.lat, item.lng)
-        })).sort((a: any, b: any) => a.dist - b.dist)[0];
+        // GPSがある時だけ、距離と方角を計算して追加する
+        if (userLocation) {
+            return {
+                ...target,
+                dist: calculateDistance(userLocation.lat, userLocation.lng, target.lat, target.lng),
+                bear: calculateBearing(userLocation.lat, userLocation.lng, target.lat, target.lng)
+            };
+        }
+
+        // GPSがない時は距離0/方角0で名前だけ返す
+        return { ...target, dist: 0, bear: 0 };
     }, [userLocation, plan.items]);
 
     return (
         <div className="relative h-screen bg-white overflow-hidden flex flex-col text-black font-sans">
             <div className="absolute inset-0 z-0">
                 <LazyMap items={plan.items} userLocation={userLocation} center={plan.center} path={path} themeColor="#F37343" />
-                <div className="absolute inset-0 bg-white/40 backdrop-blur-[2px]" />
+                <div className="absolute inset-0 bg-white/40 backdrop-blur-[1px]" />
             </div>
 
             <header className="relative z-10 p-8 flex justify-between items-start">
                 <div>
                     <h1 className="text-xl font-black uppercase tracking-tight">{plan.name}</h1>
-                    <p className="text-[10px] font-bold text-gray-400 mt-0.5 uppercase tracking-widest">{currentAreaName}</p>
+                    <p className="text-[10px] font-bold text-gray-400 mt-0.5 uppercase tracking-widest">
+                        {currentAreaName || "TRACKING..."}
+                    </p>
                 </div>
                 <div className="text-right">
                     <p className="text-xl font-black tabular-nums">
@@ -91,24 +99,24 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                 </div>
             </header>
 
-            <div className="flex-1 flex flex-col items-center justify-center relative z-10 -mt-20">
+            <div className="flex-1 flex flex-col items-center justify-center relative z-10 -mt-16">
                 <div className="relative w-64 h-64 flex items-center justify-center mb-8">
-                    <img src="/compass_bg.png" alt="Compass" className="w-full h-full object-contain opacity-50" />
-                    {activeTarget && (
+                    <img src="/compass_bg.png" alt="Compass" className="w-full h-full object-contain opacity-40" />
+                    {displayTarget && userLocation && (
                         <Navigation
                             className="absolute text-[#F37343]"
                             size={48}
                             fill="currentColor"
-                            style={{ transform: `rotate(${activeTarget.bear}deg)` }}
+                            style={{ transform: `rotate(${displayTarget.bear}deg)` }}
                         />
                     )}
                 </div>
                 <div className="text-center">
                     <p className="text-7xl font-black tabular-nums tracking-tighter flex items-baseline">
-                        {activeTarget && userLocation ? (
-                            activeTarget.dist < 1
-                                ? <>{Math.floor(activeTarget.dist * 1000)}<span className="text-sm ml-2 text-gray-400">m</span></>
-                                : <>{activeTarget.dist.toFixed(1)}<span className="text-sm ml-2 text-gray-400">km</span></>
+                        {displayTarget && userLocation ? (
+                            displayTarget.dist < 1
+                                ? <>{Math.floor(displayTarget.dist * 1000)}<span className="text-sm ml-2 text-gray-400 font-bold">m</span></>
+                                : <>{displayTarget.dist.toFixed(1)}<span className="text-sm ml-2 text-gray-400 font-bold">km</span></>
                         ) : "--"}
                     </p>
                 </div>
@@ -116,27 +124,24 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
 
             <footer className="relative z-10 pb-16 flex flex-col items-center gap-8">
                 <div className="flex items-center gap-6 text-gray-300">
-                    <ChevronLeft size={24} className="opacity-30" />
-                    {/* ★ 解決：「---」をプランの地名に変更 */}
-                    <p className="text-[11px] font-black text-black uppercase tracking-[0.2em] max-w-[240px] truncate text-center">
-                        {activeTarget ? (activeTarget.addressName || "WAYPOINT") : "MISSION COMPLETE"}
+                    <ChevronLeft size={24} className="opacity-20" />
+                    {/* ★ ここに addressName を表示。プランにあるデータを直接使うので、失敗しません。 */}
+                    <p className="text-[11px] font-black text-black uppercase tracking-[0.2em] max-w-[260px] truncate text-center">
+                        {displayTarget ? (displayTarget.addressName || "WAYPOINT") : "ALL CLEAR"}
                     </p>
-                    <ChevronRight size={24} className="opacity-30" />
+                    <ChevronRight size={24} className="opacity-20" />
                 </div>
 
                 <div className="flex gap-2">
                     {plan.items.map((item: any, idx: number) => (
-                        <div key={idx} className={`w-1.5 h-1.5 rounded-full ${item.isCollected ? 'bg-black' : (activeTarget?.id === item.id ? 'bg-[#F37343]' : 'bg-gray-200')}`} />
+                        <div key={idx} className={`w-1.5 h-1.5 rounded-full ${item.isCollected ? 'bg-black' : (displayTarget?.id === item.id ? 'bg-[#F37343]' : 'bg-gray-200')}`} />
                     ))}
                 </div>
 
                 <div className="flex flex-col gap-3 w-full px-8 max-w-xs">
-                    <button className="py-2 text-[10px] font-bold text-gray-400 border border-gray-100 rounded-full uppercase tracking-widest flex items-center justify-center gap-2">
-                        <MapPin size={12} /> ABORT
-                    </button>
-                    <div className="flex gap-2">
-                        <button className="flex-1 py-3 bg-gray-50 text-[10px] font-bold rounded-full uppercase">TEST CLOSE</button>
-                        <button className="flex-1 py-3 bg-black text-white text-[10px] font-bold rounded-full uppercase">FORCE GET</button>
+                    <div className="flex gap-2 w-full">
+                        <button className="flex-1 py-3 bg-gray-50 text-[10px] font-bold rounded-full uppercase tracking-widest text-gray-400 border border-gray-100">Abort</button>
+                        <button className="flex-1 py-3 bg-black text-white text-[10px] font-bold rounded-full uppercase tracking-widest">Force Get</button>
                     </div>
                 </div>
             </footer>
