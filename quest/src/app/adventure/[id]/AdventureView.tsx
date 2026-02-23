@@ -21,7 +21,7 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
             const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
             setUserLocation(newLoc);
 
-            // 現在地の市町村名を取得（左上に表示）
+            // 現在地の市町村名を左上に
             if (typeof google !== 'undefined' && google.maps.Geocoder) {
                 const geocoder = new google.maps.Geocoder();
                 geocoder.geocode({ location: newLoc }, (res, status) => {
@@ -33,17 +33,6 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                     }
                 });
             }
-
-            // 軌跡保存
-            setPath((prevPath: any[]) => {
-                const lastPoint = prevPath[prevPath.length - 1];
-                if (!lastPoint || calculateDistance(lastPoint.lat, lastPoint.lng, newLoc.lat, newLoc.lng) > 0.01) {
-                    const newPath = [...prevPath, newLoc];
-                    updatePlan({ ...plan, path: newPath });
-                    return newPath;
-                }
-                return prevPath;
-            });
 
             // 到達判定
             setPlan((currentPlan: any) => {
@@ -67,17 +56,14 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
         return () => navigator.geolocation.clearWatch(watchId);
     }, [plan.id]);
 
-    // ★ 解決：GPSを待たずに、まずプラン内の地名を特定する
+    // 次の目的地を特定
     const activeTarget = useMemo(() => {
         const uncollected = (plan.items || []).filter((i: any) => !i.isCollected);
         if (uncollected.length === 0) return null;
 
-        // GPSがまだ取れていない場合でも、リストの先頭を表示
-        if (!userLocation) {
-            return { ...uncollected[0], dist: 0, bear: 0 };
-        }
+        const base = uncollected[0];
+        if (!userLocation) return { ...base, dist: 0, bear: 0 };
 
-        // GPSがある場合は距離順で計算
         return uncollected.map((item: any) => ({
             ...item,
             dist: calculateDistance(userLocation.lat, userLocation.lng, item.lat, item.lng),
@@ -92,8 +78,7 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                 <div className="absolute inset-0 bg-white/40 backdrop-blur-[2px]" />
             </div>
 
-            {/* 上部ステータス */}
-            <div className="relative z-10 p-8 flex justify-between items-start">
+            <header className="relative z-10 p-8 flex justify-between items-start">
                 <div>
                     <h1 className="text-xl font-black uppercase tracking-tight">{plan.name}</h1>
                     <p className="text-[10px] font-bold text-gray-400 mt-0.5 uppercase tracking-widest">{currentAreaName}</p>
@@ -104,9 +89,8 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                         <span className="text-gray-300"> / {plan.items.length}</span>
                     </p>
                 </div>
-            </div>
+            </header>
 
-            {/* 中央コンパス・距離 */}
             <div className="flex-1 flex flex-col items-center justify-center relative z-10 -mt-20">
                 <div className="relative w-64 h-64 flex items-center justify-center mb-8">
                     <img src="/compass_bg.png" alt="Compass" className="w-full h-full object-contain opacity-50" />
@@ -130,13 +114,12 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                 </div>
             </div>
 
-            {/* 下部ナビゲーション: 地名表示エリア */}
-            <div className="relative z-10 pb-16 flex flex-col items-center gap-8">
+            <footer className="relative z-10 pb-16 flex flex-col items-center gap-8">
                 <div className="flex items-center gap-6 text-gray-300">
                     <ChevronLeft size={24} className="opacity-30" />
-                    {/* ★ ここに地名を表示（addressName または locationName） */}
+                    {/* ★ 解決：「---」をプランの地名に変更 */}
                     <p className="text-[11px] font-black text-black uppercase tracking-[0.2em] max-w-[240px] truncate text-center">
-                        {activeTarget ? (activeTarget.addressName || activeTarget.locationName) : "MISSION COMPLETE"}
+                        {activeTarget ? (activeTarget.addressName || "WAYPOINT") : "MISSION COMPLETE"}
                     </p>
                     <ChevronRight size={24} className="opacity-30" />
                 </div>
@@ -156,7 +139,7 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                         <button className="flex-1 py-3 bg-black text-white text-[10px] font-bold rounded-full uppercase">FORCE GET</button>
                     </div>
                 </div>
-            </div>
+            </footer>
         </div>
     );
 }
