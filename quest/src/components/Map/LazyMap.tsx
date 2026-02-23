@@ -43,7 +43,6 @@ export default function LazyMap({
         return { lat: 35.6812, lng: 139.7671 };
     }, [items, center, userLocation]);
 
-    // 縮尺の自動調整
     useEffect(() => {
         if (!map || items.length === 0 || isBriefingActive) return;
         const applyBounds = () => {
@@ -59,7 +58,6 @@ export default function LazyMap({
         return () => clearTimeout(timer);
     }, [map, items, isBriefingActive, isFinalOverview]);
 
-    // ブリーフィング演出
     useEffect(() => {
         if (!isBriefingActive || !map || items.length === 0 || briefingRef.current) return;
         briefingRef.current = true;
@@ -69,8 +67,8 @@ export default function LazyMap({
             for (let i = 0; i < items.length; i++) {
                 const item = items[i];
                 setActiveIndex(i);
-                map.panTo({ lat: Number(item.lat), lng: Number(item.lng) });
                 setActivePlaceName(item.addressName || "WAYPOINT");
+                map.panTo({ lat: Number(item.lat), lng: Number(item.lng) });
                 await new Promise(r => setTimeout(r, 2500));
             }
             const finalBounds = new google.maps.LatLngBounds();
@@ -95,6 +93,29 @@ export default function LazyMap({
                 ))}
                 <Polyline path={path} color={themeColor} />
             </Map>
+
+            {/* ★ 以前の「横に長いバー」UIを完全復元 */}
+            {activePlaceName && (
+                <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-4 w-full px-12 text-center animate-in fade-in slide-in-from-top-4 duration-700">
+                    {/* 地名バッジ */}
+                    <div className="bg-black/90 px-8 py-3 rounded-full border border-[#F37343]/30 shadow-2xl">
+                        <p className="text-white text-[11px] font-black uppercase tracking-[0.4em]">{activePlaceName}</p>
+                    </div>
+
+                    {/* 横に長いセグメントバー */}
+                    <div className="flex gap-1 w-full max-w-[280px] h-1.5 px-1">
+                        {items.map((_: any, idx: number) => (
+                            <div
+                                key={idx}
+                                className={`flex-1 rounded-full transition-all duration-1000 ${idx <= activeIndex
+                                        ? "bg-[#F37343] shadow-[0_0_12px_rgba(243,115,67,0.6)]"
+                                        : "bg-black/20 backdrop-blur-sm"
+                                    }`}
+                            />
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
