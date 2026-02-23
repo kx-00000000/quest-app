@@ -55,7 +55,7 @@ export default function LazyMap({
                 if (map.getZoom()! > 15) map.setZoom(14);
             }
         };
-        const timer = setTimeout(applyBounds, 500);
+        const timer = setTimeout(applyBounds, 600);
         return () => clearTimeout(timer);
     }, [map, items, isBriefingActive, isFinalOverview]);
 
@@ -95,18 +95,6 @@ export default function LazyMap({
                 ))}
                 <Polyline path={path} color={themeColor} />
             </Map>
-            {activePlaceName && (
-                <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-3 w-full px-10 text-center animate-in fade-in slide-in-from-top-4 duration-700">
-                    <div className="bg-black/90 px-8 py-3 rounded-full border border-[#F37343]/30 shadow-2xl">
-                        <p className="text-white text-xs font-black uppercase tracking-[0.4em]">{activePlaceName}</p>
-                    </div>
-                    <div className="flex gap-1.5 w-full max-w-[200px] h-1.5 px-2">
-                        {items.map((_: any, idx: number) => (
-                            <div key={idx} className={`flex-1 rounded-full transition-all duration-700 ${idx <= activeIndex ? "bg-[#F37343] shadow-[0_0_12px_rgba(243,115,67,0.6)]" : "bg-black/20 backdrop-blur-sm"}`} />
-                        ))}
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

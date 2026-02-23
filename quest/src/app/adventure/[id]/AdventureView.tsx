@@ -17,32 +17,31 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
     useEffect(() => {
         if (!("geolocation" in navigator)) return;
 
-        // GeocoderはAPI読み込み後に初期化
-        const initGeocoder = () => {
-            if (typeof google === 'undefined' || !google.maps.Geocoder) return null;
-            return new google.maps.Geocoder();
-        };
-
         const watchId = navigator.geolocation.watchPosition((pos) => {
             const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
             setUserLocation(newLoc);
 
-            const geocoder = initGeocoder();
-            if (geocoder) {
+            // ★ 全世界対応：現在地の地名取得ロジック
+            if (typeof google !== 'undefined' && google.maps && google.maps.Geocoder) {
+                const geocoder = new google.maps.Geocoder();
                 geocoder.geocode({ location: newLoc }, (res, status) => {
                     if (status === "OK" && res?.[0]) {
-                        const comp = res[0].address_components;
-                        // 日本の住所体系（区・市・町）に柔軟に対応
-                        const pref = comp.find(c => c.types.includes("administrative_area_level_1"))?.long_name || "";
-                        const city = comp.find(c => c.types.includes("locality"))?.long_name || "";
-                        const ward = comp.find(c => c.types.includes("sublocality_level_1"))?.long_name || "";
+                        // 国名、郵便番号、不要な記号を削除して「街の名前」を抽出
+                        // 例: "160-0022 東京都新宿区新宿３丁目" -> "東京都新宿区新宿"
+                        // 例: "Brooklyn, NY 11201, USA" -> "Brooklyn, NY"
+                        const cleanName = res[0].formatted_address
+                            .replace(/日本、|〒[0-9]{3}-[0-9]{4} |[0-9]{3}-[0-9]{4} /g, "") // 日本向け
+                            .replace(/, [A-Z]{2} [0-9]{5}/g, "") // アメリカ向け（ZIPコード削除）
+                            .replace(/, [0-9]{5}/g, "") // ヨーロッパ向け（郵便番号削除）
+                            .split(',').slice(0, 2).join(',') // 最初の方の主要な地名だけ残す
+                            .trim();
 
-                        const areaName = `${pref} ${city}${ward}`.trim();
-                        setCurrentAreaName(areaName || "Exploring...");
+                        setCurrentAreaName(cleanName || "Tracking...");
                     }
                 });
             }
 
+            // 軌跡保存
             setPath((prevPath: any[]) => {
                 const lastPoint = prevPath[prevPath.length - 1];
                 if (!lastPoint || calculateDistance(lastPoint.lat, lastPoint.lng, newLoc.lat, newLoc.lng) > 0.01) {
@@ -53,6 +52,7 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                 return prevPath;
             });
 
+            // 到達判定
             setPlan((currentPlan: any) => {
                 let hasChanged = false;
                 const updatedItems = (currentPlan.items || []).map((item: any) => {
@@ -92,20 +92,21 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                 <div className="absolute inset-0 bg-white/20 backdrop-blur-[2px]" />
             </div>
 
+            {/* 黒いパネルヘッダー：デザイン仕様は完全に維持 */}
             <header className="relative z-50 p-6 pt-16">
                 <div className="bg-black/90 backdrop-blur-xl rounded-[2.5rem] p-7 shadow-2xl text-white border border-white/10">
                     <p className="flex items-center gap-1.5 mb-1.5 text-[#F37343] font-black text-[10px] uppercase tracking-[0.2em]">
                         <MapPin size={12} strokeWidth={3} />
-                        <span>{currentAreaName}</span>
+                        <span className="truncate">{currentAreaName}</span>
                     </p>
-                    <h1 className="text-xl font-black uppercase truncate mb-5">{plan.name}</h1>
+                    <h1 className="text-xl font-black uppercase truncate mb-5 tracking-tight">{plan.name}</h1>
 
                     {nearestItem && (
                         <div className="border-t border-white/10 pt-5 space-y-4">
                             <div className="flex flex-col">
                                 <p className="text-[8px] font-bold text-gray-500 uppercase tracking-widest mb-1">Target</p>
-                                <p className="text-sm font-black text-white truncate uppercase tracking-tight italic">
-                                    {nearestItem.addressName || "Unknown Destination"}
+                                <p className="text-sm font-black text-white truncate uppercase tracking-tight">
+                                    {nearestItem.addressName || "Destination"}
                                 </p>
                             </div>
                             <div className="flex items-center justify-between">
@@ -121,7 +122,7 @@ export default function AdventureView({ plan: initialPlan }: { plan: any }) {
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Progress</p>
+                                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Items</p>
                                     <p className="text-lg font-black tabular-nums leading-none">
                                         {plan.items.filter((i: any) => i.isCollected).length} / {plan.items.length}
                                     </p>
