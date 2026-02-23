@@ -43,7 +43,6 @@ export default function LazyMap({
         return { lat: 35.6812, lng: 139.7671 };
     }, [items, center, userLocation]);
 
-    // 縮尺の自動調整
     useEffect(() => {
         if (!map || items.length === 0 || isBriefingActive) return;
         const applyBounds = () => {
@@ -59,7 +58,6 @@ export default function LazyMap({
         return () => clearTimeout(timer);
     }, [map, items, isBriefingActive, isFinalOverview]);
 
-    // ブリーフィング演出
     useEffect(() => {
         if (!isBriefingActive || !map || items.length === 0 || briefingRef.current) return;
         briefingRef.current = true;
@@ -96,14 +94,14 @@ export default function LazyMap({
                 <Polyline path={path} color={themeColor} />
             </Map>
 
-            {/* ★ 以前の「横に長いセグメントバー」UIを完全復元 */}
+            {/* ★ 復活：横に長いセグメントバー形式 */}
             {activePlaceName && (
-                <div className="absolute top-24 left-1/2 -translate-x-1/2 z-[200] flex flex-col items-center gap-4 w-full px-12 text-center animate-in fade-in slide-in-from-top-4 duration-700">
+                <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-4 w-full px-12 text-center animate-in fade-in slide-in-from-top-4 duration-700">
                     <div className="bg-black/90 px-8 py-3 rounded-full border border-[#F37343]/30 shadow-2xl">
                         <p className="text-white text-[11px] font-black uppercase tracking-[0.4em]">{activePlaceName}</p>
                     </div>
 
-                    <div className="flex gap-1.5 w-full max-w-[300px] h-1.5 px-1">
+                    <div className="flex gap-1.5 w-full max-w-[280px] h-1.5 px-1">
                         {items.map((_: any, idx: number) => (
                             <div
                                 key={idx}
