@@ -18,6 +18,7 @@ export default function LazyMap({
     const [activeIndex, setActiveIndex] = useState<number>(-1);
     const briefingRef = useRef(false);
 
+    // ★ 初期位置。世界地図にならないよう、ユーザー位置かセンターを優先
     const initialPos = useMemo(() => {
         if (userLocation?.lat) return userLocation;
         if (items.length > 0 && items[0].lat) return { lat: Number(items[0].lat), lng: Number(items[0].lng) };
@@ -25,7 +26,7 @@ export default function LazyMap({
         return { lat: 35.6812, lng: 139.7671 }; // 東京
     }, [items, center, userLocation]);
 
-    // ★ 解決：アイテムがない時に fitBounds を動かさない（世界地図化を防ぐ）
+    // ★ 自動縮尺調整（地点があるときだけ実行）
     useEffect(() => {
         if (!map || items.length === 0 || isBriefingActive) return;
 
@@ -34,11 +35,8 @@ export default function LazyMap({
             items.forEach((p: any) => bounds.extend({ lat: Number(p.lat), lng: Number(p.lng) }));
             map.fitBounds(bounds, { top: 80, right: 80, bottom: 80, left: 80 });
 
-            // ズームの最大値を制限
-            const currZoom = map.getZoom();
-            if (currZoom && currZoom > 15) map.setZoom(14);
+            if (map.getZoom()! > 15) map.setZoom(14);
         };
-
         const timer = setTimeout(applyBounds, 500);
         return () => clearTimeout(timer);
     }, [map, items, isBriefingActive]);
@@ -63,7 +61,7 @@ export default function LazyMap({
             if (onBriefingComplete) onBriefingComplete();
         };
         runBriefing();
-    }, [isBriefingActive, map, items]);
+    }, [isBriefingActive, map, items, onBriefingStateChange, onBriefingComplete]);
 
     return (
         <div className="w-full h-full relative bg-[#f5f5f5]">
@@ -80,7 +78,7 @@ export default function LazyMap({
                 ))}
             </Map>
 
-            {/* ブリーフィング演出: 横に長いセグメントバー */}
+            {/* ★ 復活：横に長いセグメントバー */}
             {activePlaceName && (
                 <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-4 w-full px-12 text-center animate-in fade-in slide-in-from-top-4 duration-700">
                     <div className="bg-black/90 px-8 py-3 rounded-full border border-[#F37343]/30 shadow-2xl">
