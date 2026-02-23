@@ -5,13 +5,13 @@ import { useParams, useRouter } from "next/navigation";
 import { getPlans, savePlan } from "@/lib/storage";
 import { calculateDistance } from "@/lib/geo";
 import Compass from "@/components/Compass";
-import { Loader2, Flag, ChevronLeft, ChevronRight, ShieldAlert, Eye, Lock, MapPin } from "lucide-react";
+import { Loader2, Flag, ChevronLeft, ChevronRight, ShieldAlert, Eye, Lock } from "lucide-react";
 import dynamic from "next/dynamic";
 
 const LazyMap = dynamic<any>(() => import("@/components/Map/LazyMap").then(mod => mod.default), { ssr: false });
 
 const ITEM_IMAGES = ["/images/items/item-1.png", "/images/items/item-2.png", "/images/items/item-3.png"];
-const ANIMAL_IMAGES = ["/images/animals/animal-1.png", "/images/animals/animal-2.png", "/images/animals/animal-3.png"];
+const ANIMAL_IMAGES = ["/images/animals/animal-2.png", "/images/animals/animal-2.png", "/images/animals/animal-3.png"];
 
 const getDistanceParts = (meters: number) => {
     if (meters < 1000) return { integer: Math.floor(meters).toLocaleString(), decimal: null, unit: "m" };
@@ -35,7 +35,6 @@ export default function QuestActivePage() {
     const router = useRouter();
     const [plan, setPlan] = useState<any>(null);
     const [userLoc, setUserLoc] = useState<{ lat: number, lng: number } | null>(null);
-    const [currentAreaName, setCurrentAreaName] = useState("");
     const [manualTargetId, setManualTargetId] = useState<string | null>(null);
     const [distanceToTarget, setDistanceToTarget] = useState(0);
     const [targetBearing, setTargetBearing] = useState(0);
@@ -96,15 +95,6 @@ export default function QuestActivePage() {
             watchId.current = navigator.geolocation.watchPosition((pos) => {
                 const newLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                 setUserLoc(newLoc);
-                if (window.google && window.google.maps?.Geocoder) {
-                    const geocoder = new google.maps.Geocoder();
-                    geocoder.geocode({ location: newLoc }, (res, status) => {
-                        if (status === "OK" && res?.[0]) {
-                            const clean = res[0].formatted_address.replace(/日本、|〒[0-9-]* |[0-9-]{8} /g, "").split(',').slice(0, 1).join('').trim();
-                            setCurrentAreaName(clean);
-                        }
-                    });
-                }
                 setPath(prev => {
                     const last = prev[prev.length - 1];
                     if (!last || calculateDistance(last.lat, last.lng, newLoc.lat, newLoc.lng) > 0.01) {
@@ -128,7 +118,7 @@ export default function QuestActivePage() {
 
     return (
         <div className="h-screen bg-white flex flex-col relative overflow-hidden text-black font-sans">
-            {/* 地図背景とぼかしレイヤー */}
+            {/* 地図背景レイヤー */}
             <div className="absolute inset-0 z-0">
                 <LazyMap items={plan.items} userLocation={userLoc} center={plan.center} path={path} themeColor="#F37343" />
                 <div className="absolute inset-0 bg-white/40 backdrop-blur-[2px]" />
@@ -136,8 +126,8 @@ export default function QuestActivePage() {
 
             <header className="p-8 pt-14 flex justify-between items-baseline z-20 relative">
                 <div className="text-left">
+                    {/* ★ 修正：クエスト名のみ表示し、現在地の住所（currentAreaName）を削除 */}
                     <h2 className="text-xl font-black uppercase truncate max-w-[200px] tracking-tight">{plan.name}</h2>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{currentAreaName || "TRACKING..."}</p>
                 </div>
                 <p className="text-2xl font-black tabular-nums">{plan.collectedCount}<span className="text-sm text-gray-300 mx-1">/</span>{plan.itemCount}</p>
             </header>
@@ -183,8 +173,8 @@ export default function QuestActivePage() {
                     <div className="flex items-center gap-6 mb-6">
                         <button onClick={() => { const uncollected = plan.items.filter((i: any) => !i.isCollected); if (uncollected.length > 1) { const idx = uncollected.findIndex((i: any) => i.id === activeTarget?.id); setManualTargetId(uncollected[(idx - 1 + uncollected.length) % uncollected.length].id); } }} className="p-2 text-gray-200"><ChevronLeft size={32} /></button>
                         <div className="text-center min-w-[160px] flex flex-col items-center gap-4">
-                            {/* ★ 地名：addressName を優先表示 */}
-                            <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-black max-w-[200px] truncate">{activeTarget?.addressName || activeTarget?.locationName || "---"}</h4>
+                            {/* ★ 修正：地名表示フォントを 11px -> 13px に拡大 */}
+                            <h4 className="text-[13px] font-black uppercase tracking-[0.2em] text-black max-w-[200px] truncate">{activeTarget?.addressName || activeTarget?.locationName || "---"}</h4>
                             <div className="flex gap-2.5 items-center h-4">
                                 {plan.items.map((item: any, idx: number) => {
                                     const isCurrent = activeTarget && item.id === activeTarget.id;
@@ -203,7 +193,15 @@ export default function QuestActivePage() {
                 </div>
             )}
 
-            {/* 安全確認デモ（初回のみ） */}
+            {isAcquired && (
+                <div className="absolute inset-0 z-[3000] flex items-center justify-center p-6 bg-white/80 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="relative text-center w-full max-w-[300px]">
+                        <img src="/images/bg-acquired.png" className="w-full h-auto" />
+                        {randomItemImg && <img src={randomItemImg} className="absolute top-[78%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[35%] h-auto drop-shadow-2xl animate-bounce" />}
+                    </div>
+                </div>
+            )}
+
             {showSafetyDemo && (
                 <div className="absolute inset-0 z-[6000] bg-white p-10 flex flex-col justify-center text-left">
                     <div className="mb-10"><p className="text-[10px] font-black text-[#F37343] uppercase tracking-[0.4em] mb-2">Safety Protocol</p><h2 className="text-3xl font-black uppercase tracking-tighter text-black">Safety First</h2></div>
